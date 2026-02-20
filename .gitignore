@@ -1,0 +1,38 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+.next/
+pnpm-lock.yaml
+out/
+dist/
+
+# Java/Gradle
+build/
+.gradle/
+*.class
+*.jar
+target/
+
+# Rust/Cargo
+/target/
+Cargo.lock
+*.o
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
