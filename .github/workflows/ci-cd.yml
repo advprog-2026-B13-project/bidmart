@@ -170,18 +170,33 @@ jobs:
           echo "✅ CI passed for all changed services"
     
   deploy-staging:
-    name: Deployment (CD)
+    name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: ci-summary
+    # Hanya jalan kalau CI sukses DAN push ke branch staging
     if: |
       needs.ci-summary.result == 'success' && 
       github.event_name == 'push' && 
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+      github.ref == 'refs/heads/staging'
     steps:
-      - name: Deploying to Staging
+      - name: Staging Deployment
         run: |
           echo "CI Quality Gate: PASSED"
-          echo "Event: ${{ github.event_name }} pada branch: ${{ github.ref }}"
-          echo "Memulai proses Deployment ke server..."
-          sleep 2
-          echo "✅ Deployment selesai!"
+          echo "Deploying to STAGING server..."
+          echo "✅ Staging is up to date!"
+
+  deploy-main:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: ci-summary
+    # Hanya jalan kalau CI sukses DAN push ke branch main
+    if: |
+      needs.ci-summary.result == 'success' && 
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main'
+    steps:
+      - name: Production Deployment
+        run: |
+          echo "CI Quality Gate: PASSED"
+          echo "Deploying to PRODUCTION server..."
+          echo "🚀 Production is live!"
