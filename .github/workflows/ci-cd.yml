@@ -27,13 +27,13 @@ jobs:
           filters: |
             auction:
               - ['apps/bidmart-auction/**']
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-cd.yml'
             core:
               - ['apps/bidmart-core/**']
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-cd.yml'
             fe:
               - ['apps/bidmart-fe/**']
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-cd.yml'
   # Bidmart Auction (Rust)
   auction:
     needs: detect-changes
@@ -168,11 +168,17 @@ jobs:
         working-directory: apps/bidmart-core
         run: chmod +x gradlew
 
-      - name: Run tests + JaCoCo + SonarQube
+      - name: Run tests + JaCoCo
         working-directory: apps/bidmart-core
+        run: ./gradlew test jacocoTestReport
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew test jacocoTestReport sonar
+        with:
+          projectBaseDir: apps/bidmart-core
 
   sonar-fe:
     needs: [detect-changes, fe]
@@ -202,6 +208,7 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           projectBaseDir: apps/bidmart-fe
