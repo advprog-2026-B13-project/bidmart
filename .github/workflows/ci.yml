@@ -106,12 +106,11 @@ jobs:
         run: ./gradlew test jacocoTestReport
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        working-directory: apps/bidmart-core
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: apps/bidmart-core
+        run: ./gradlew sonar --info
 
   fe:
     needs: detect-changes
