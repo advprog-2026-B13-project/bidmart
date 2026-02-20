@@ -1,18 +1,9 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - staging
-  pull_request:
-    branches:
-      - main
-      - staging
+  workflow_call:
 
-# Detect which services were changed
 jobs:
-  # Detect changes to determine which jobs to run
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -26,15 +17,14 @@ jobs:
         with:
           filters: |
             auction:
-              - ['apps/bidmart-auction/**']
-              - '.github/workflows/ci-cd.yml'
+              - 'apps/bidmart-auction/**'
             core:
-              - ['apps/bidmart-core/**']
-              - '.github/workflows/ci-cd.yml'
+              - 'apps/bidmart-core/**'
             fe:
-              - ['apps/bidmart-fe/**']
-              - '.github/workflows/ci-cd.yml'
-  # Bidmart Auction (Rust)
+              - 'apps/bidmart-fe/**'
+
+  # ========== BUILD & TEST ==========
+
   auction:
     needs: detect-changes
     if: needs.detect-changes.outputs.auction == 'true'
@@ -52,24 +42,21 @@ jobs:
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          restore-keys: ${{ runner.os }}-cargo-registry-
 
       - name: Cache cargo index
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-git-
+          restore-keys: ${{ runner.os }}-cargo-git-
 
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
           path: apps/bidmart-auction/target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-target-
+          restore-keys: ${{ runner.os }}-cargo-build-target-
 
       - name: Check formatting
         working-directory: apps/bidmart-auction
@@ -87,7 +74,6 @@ jobs:
         working-directory: apps/bidmart-auction
         run: cargo test --verbose
 
-  # Bidmart Core (Java/Spring Boot)
   core:
     needs: detect-changes
     if: needs.detect-changes.outputs.core == 'true'
@@ -114,7 +100,6 @@ jobs:
         working-directory: apps/bidmart-core
         run: ./gradlew test
 
-  # Bidmart Frontend (Next.js)
   fe:
     needs: detect-changes
     if: needs.detect-changes.outputs.fe == 'true'
@@ -136,8 +121,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/bidmart-fe
-        run: pnpm install --no-frozen-lockfile        
-        
+        run: pnpm install --no-frozen-lockfile
+
       - name: Lint
         working-directory: apps/bidmart-fe
         run: pnpm lint
@@ -213,7 +198,8 @@ jobs:
         with:
           projectBaseDir: apps/bidmart-fe
 
-  # Summary job that succeeds if all required checks pass
+  # ========== SUMMARY ==========
+
   ci-summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, auction, core, fe, sonar-core, sonar-fe]
@@ -222,55 +208,18 @@ jobs:
       - name: Check CI status
         run: |
           if [ "${{ needs.detect-changes.outputs.auction }}" = "true" ] && [ "${{ needs.auction.result }}" != "success" ]; then
-            echo "❌ Auction CI failed"
-            exit 1
+            echo "❌ Auction CI failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.core.result }}" != "success" ]; then
-            echo "❌ Core CI failed"
-            exit 1
+            echo "❌ Core CI failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.sonar-core.result }}" != "success" ]; then
-            echo "❌ Core SonarCloud failed"
-            exit 1
+            echo "❌ Core SonarCloud failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.fe.result }}" != "success" ]; then
-            echo "❌ Frontend CI failed"
-            exit 1
+            echo "❌ Frontend CI failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.sonar-fe.result }}" != "success" ]; then
-            echo "❌ Frontend SonarCloud failed"
-            exit 1
+            echo "❌ Frontend SonarCloud failed"; exit 1
           fi
           echo "✅ All CI + SonarCloud checks passed"
-    
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: ci-summary
-    # Hanya jalan kalau CI sukses DAN push ke branch staging
-    if: |
-      needs.ci-summary.result == 'success' && 
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/staging'
-    steps:
-      - name: Staging Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to STAGING server..."
-          echo "✅ Staging is up to date!"
-
-  deploy-main:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: ci-summary
-    # Hanya jalan kalau CI sukses DAN push ke branch main
-    if: |
-      needs.ci-summary.result == 'success' && 
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main'
-    steps:
-      - name: Production Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to PRODUCTION server..."
-          echo "🚀 Production is live!"
