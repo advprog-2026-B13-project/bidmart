@@ -136,7 +136,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/bidmart-fe
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-workspace
         
       - name: Lint
         working-directory: apps/bidmart-fe
