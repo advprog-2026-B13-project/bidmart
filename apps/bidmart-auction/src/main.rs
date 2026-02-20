@@ -1,7 +1,4 @@
-use axum::{
-    routing::get,
-    Router,
-};
+use axum::{routing::get, Router};
 use std::net::SocketAddr;
 
 #[tokio::main]
@@ -22,9 +19,7 @@ async fn main() {
 
     tracing::info!("Server running at http://{}", addr);
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+    axum::serve(listener, app).await.expect("Server error");
 }
 
 async fn health_check() -> &'static str {
