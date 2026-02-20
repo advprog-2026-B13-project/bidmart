@@ -1,0 +1,13 @@
+package id.ac.ui.cs.advprog.bidmartcore;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BidmartCoreApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(BidmartCoreApplication.class, args);
+    }
+
+}
