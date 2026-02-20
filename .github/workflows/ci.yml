@@ -18,10 +18,13 @@ jobs:
           filters: |
             auction:
               - 'apps/bidmart-auction/**'
+              - '.github/workflows/ci.yml'
             core:
               - 'apps/bidmart-core/**'
+              - '.github/workflows/ci.yml'
             fe:
               - 'apps/bidmart-fe/**'
+              - '.github/workflows/ci.yml'
 
   # ========== BUILD & TEST ==========
 
