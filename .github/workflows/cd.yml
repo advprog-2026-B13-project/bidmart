@@ -1,0 +1,27 @@
+name: CD
+
+on:
+  workflow_call:
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Staging Deployment
+        run: |
+          echo "CI Quality Gate: PASSED"
+          echo "Deploying to STAGING server..."
+          echo "✅ Staging is up to date!"
+
+  deploy-main:
+    name: Deploy to Production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Production Deployment
+        run: |
+          echo "CI Quality Gate: PASSED"
+          echo "Deploying to PRODUCTION server..."
+          echo "🚀 Production is live!"

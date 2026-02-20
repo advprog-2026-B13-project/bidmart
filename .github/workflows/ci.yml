@@ -1,18 +1,9 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - staging
-  pull_request:
-    branches:
-      - main
-      - staging
+  workflow_call:
 
-# Detect which services were changed
 jobs:
-  # Detect changes to determine which jobs to run
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -26,15 +17,17 @@ jobs:
         with:
           filters: |
             auction:
-              - ['apps/bidmart-auction/**']
+              - 'apps/bidmart-auction/**'
               - '.github/workflows/ci.yml'
             core:
-              - ['apps/bidmart-core/**']
+              - 'apps/bidmart-core/**'
               - '.github/workflows/ci.yml'
             fe:
-              - ['apps/bidmart-fe/**']
+              - 'apps/bidmart-fe/**'
               - '.github/workflows/ci.yml'
-  # Bidmart Auction (Rust)
+
+  # ========== BUILD & TEST ==========
+
   auction:
     needs: detect-changes
     if: needs.detect-changes.outputs.auction == 'true'
@@ -52,24 +45,21 @@ jobs:
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          restore-keys: ${{ runner.os }}-cargo-registry-
 
       - name: Cache cargo index
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-git-
+          restore-keys: ${{ runner.os }}-cargo-git-
 
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
           path: apps/bidmart-auction/target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-target-
+          restore-keys: ${{ runner.os }}-cargo-build-target-
 
       - name: Check formatting
         working-directory: apps/bidmart-auction
@@ -87,7 +77,6 @@ jobs:
         working-directory: apps/bidmart-auction
         run: cargo test --verbose
 
-  # Bidmart Core (Java/Spring Boot)
   core:
     needs: detect-changes
     if: needs.detect-changes.outputs.core == 'true'
@@ -114,7 +103,6 @@ jobs:
         working-directory: apps/bidmart-core
         run: ./gradlew test
 
-  # Bidmart Frontend (Next.js)
   fe:
     needs: detect-changes
     if: needs.detect-changes.outputs.fe == 'true'
@@ -136,8 +124,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/bidmart-fe
-        run: pnpm install --no-frozen-lockfile        
-        
+        run: pnpm install --no-frozen-lockfile
+
       - name: Lint
         working-directory: apps/bidmart-fe
         run: pnpm lint
@@ -146,57 +134,95 @@ jobs:
         working-directory: apps/bidmart-fe
         run: pnpm build
 
-  # Summary job that succeeds if all required checks pass
+  # ========== SONARCLOUD SCANS ==========
+
+  sonar-core:
+    needs: [detect-changes, core]
+    if: needs.detect-changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Make gradlew executable
+        working-directory: apps/bidmart-core
+        run: chmod +x gradlew
+
+      - name: Run tests + JaCoCo
+        working-directory: apps/bidmart-core
+        run: ./gradlew test jacocoTestReport
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: apps/bidmart-core
+
+  sonar-fe:
+    needs: [detect-changes, fe]
+    if: needs.detect-changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'apps/bidmart-fe/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        working-directory: apps/bidmart-fe
+        run: pnpm install --no-frozen-lockfile
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: apps/bidmart-fe
+
+  # ========== SUMMARY ==========
+
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, auction, core, fe]
+    needs: [detect-changes, auction, core, fe, sonar-core, sonar-fe]
     if: always()
     steps:
       - name: Check CI status
         run: |
-          # If detect-changes says nothing changed, that's OK
           if [ "${{ needs.detect-changes.outputs.auction }}" = "true" ] && [ "${{ needs.auction.result }}" != "success" ]; then
-            echo "❌ Auction CI failed"
-            exit 1
+            echo "❌ Auction CI failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.core.result }}" != "success" ]; then
-            echo "❌ Core CI failed"
-            exit 1
+            echo "❌ Core CI failed"; exit 1
+          fi
+          if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.sonar-core.result }}" != "success" ]; then
+            echo "❌ Core SonarCloud failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.fe.result }}" != "success" ]; then
-            echo "❌ Frontend CI failed"
-            exit 1
+            echo "❌ Frontend CI failed"; exit 1
           fi
-          echo "✅ CI passed for all changed services"
-    
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: ci-summary
-    # Hanya jalan kalau CI sukses DAN push ke branch staging
-    if: |
-      needs.ci-summary.result == 'success' && 
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/staging'
-    steps:
-      - name: Staging Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to STAGING server..."
-          echo "✅ Staging is up to date!"
-
-  deploy-main:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: ci-summary
-    # Hanya jalan kalau CI sukses DAN push ke branch main
-    if: |
-      needs.ci-summary.result == 'success' && 
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main'
-    steps:
-      - name: Production Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to PRODUCTION server..."
-          echo "🚀 Production is live!"
+          if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.sonar-fe.result }}" != "success" ]; then
+            echo "❌ Frontend SonarCloud failed"; exit 1
+          fi
+          echo "✅ All CI + SonarCloud checks passed"
