@@ -25,9 +25,15 @@ jobs:
         id: filter
         with:
           filters: |
-            auction: ['apps/bidmart-auction/**']
-            core: ['apps/bidmart-core/**']
-            fe: ['apps/bidmart-fe/**']
+            auction:
+              - ['apps/bidmart-auction/**']
+              - '.github/workflows/ci.yml'
+            core:
+              - ['apps/bidmart-core/**']
+              - '.github/workflows/ci.yml'
+            fe:
+              - ['apps/bidmart-fe/**']
+              - '.github/workflows/ci.yml'
   # Bidmart Auction (Rust)
   auction:
     needs: detect-changes
