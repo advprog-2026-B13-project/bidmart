@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bidmart Frontend
 
-## Getting Started
+Web interface built with Next.js and React.
 
-First, run the development server:
+## Overview
 
+Frontend application for Bidmart.
+
+**Technology Stack:**
+- Framework: Next.js 16.1.6
+- Language: TypeScript
+- UI Framework: React 19.2.3
+- Styling: Tailwind CSS 4
+- Package Manager: pnpm
+- Linting: ESLint 9
+
+## Prerequisites
+
+- Node.js 20+ (or compatible version)
+- pnpm 8+
+
+## Installation
+
+1. Ensure Node.js and pnpm are installed:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+node --version
+pnpm --version
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Navigate to the frontend directory:
+```bash
+cd apps/bidmart-fe
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Install dependencies:
+```bash
+pnpm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Running
 
-## Learn More
+### Development server
+```bash
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The app auto-refreshes as you edit files.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Production build
+```bash
+pnpm build
+```
 
-## Deploy on Vercel
+### Start production server
+```bash
+pnpm start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Runs on [http://localhost:3000](http://localhost:3000)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Development
+
+### Lint code
+```bash
+pnpm lint
+```
+
+## Project Structure
+
+```
+app/
+├── layout.tsx        # Root layout
+├── page.tsx          # Home page
+└── globals.css       # Global styles
+public/               # Static assets
+next.config.ts        # Next.js configuration
+eslint.config.mjs     # ESLint configuration
+tsconfig.json         # TypeScript configuration
+```
+
+## Troubleshooting
+
+**Port 3000 already in use:**
+```bash
+pnpm dev -- -p 3001
+```
+
+**Clear cache:**
+```bash
+rm -rf .next node_modules
+pnpm install
+```
