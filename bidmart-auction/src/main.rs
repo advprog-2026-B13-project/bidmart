@@ -15,10 +15,10 @@ async fn main() {
         .route("/health", get(health_check));
 
     // Run our app with hyper
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .expect("Failed to bind to port 8080");
+        .expect("Failed to bind to port 8081");
 
     tracing::info!("Server running at http://{}", addr);
 
