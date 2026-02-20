@@ -1,0 +1,18 @@
+﻿name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  cd:
+    needs: ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/cd.yml
+    secrets: inherit
