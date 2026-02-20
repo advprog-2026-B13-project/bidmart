@@ -146,15 +146,74 @@ jobs:
         working-directory: apps/bidmart-fe
         run: pnpm build
 
+  # ========== SONARCLOUD SCANS ==========
+
+  sonar-core:
+    needs: [detect-changes, core]
+    if: needs.detect-changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Make gradlew executable
+        working-directory: apps/bidmart-core
+        run: chmod +x gradlew
+
+      - name: Run tests + JaCoCo + SonarQube
+        working-directory: apps/bidmart-core
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./gradlew test jacocoTestReport sonar
+
+  sonar-fe:
+    needs: [detect-changes, fe]
+    if: needs.detect-changes.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'apps/bidmart-fe/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        working-directory: apps/bidmart-fe
+        run: pnpm install --no-frozen-lockfile
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: apps/bidmart-fe
+
   # Summary job that succeeds if all required checks pass
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, auction, core, fe]
+    needs: [detect-changes, auction, core, fe, sonar-core, sonar-fe]
     if: always()
     steps:
       - name: Check CI status
         run: |
-          # If detect-changes says nothing changed, that's OK
           if [ "${{ needs.detect-changes.outputs.auction }}" = "true" ] && [ "${{ needs.auction.result }}" != "success" ]; then
             echo "❌ Auction CI failed"
             exit 1
@@ -163,11 +222,19 @@ jobs:
             echo "❌ Core CI failed"
             exit 1
           fi
+          if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.sonar-core.result }}" != "success" ]; then
+            echo "❌ Core SonarCloud failed"
+            exit 1
+          fi
           if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.fe.result }}" != "success" ]; then
             echo "❌ Frontend CI failed"
             exit 1
           fi
-          echo "✅ CI passed for all changed services"
+          if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.sonar-fe.result }}" != "success" ]; then
+            echo "❌ Frontend SonarCloud failed"
+            exit 1
+          fi
+          echo "✅ All CI + SonarCloud checks passed"
     
   deploy-staging:
     name: Deploy to Staging
