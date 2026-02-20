@@ -26,8 +26,8 @@ async fn health_check() -> &'static str {
 }
 
 async fn chained_health() -> Json<Value> {
-    let core_url = std::env::var("CORE_SERVICE_URL")
-        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+    let core_url =
+        std::env::var("CORE_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
 
     let url = format!("{}/api/health/status", core_url);
 
