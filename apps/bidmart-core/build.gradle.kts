@@ -3,6 +3,7 @@ plugins {
     id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
+     id("org.sonarqube") version "7.1.0.6387" 
 }
 
 group = "id.ac.ui.cs.advprog"
@@ -54,5 +55,15 @@ tasks.jacocoTestReport {
         xml.required = true
         html.required = true
         csv.required = false
+    }
+}
+
+
+sonar {
+    properties {
+        property("sonar.projectKey", "advprog-2026-b13-project_bidmart-core")
+        property("sonar.organization", "advprog-2026-b13-project")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
     }
 }
