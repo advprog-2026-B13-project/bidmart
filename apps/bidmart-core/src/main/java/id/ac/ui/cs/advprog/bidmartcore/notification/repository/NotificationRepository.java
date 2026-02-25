@@ -1,4 +1,9 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.repository;
 
-// Ini hanya template / placeholder aja buat dasar struktur projek, tar hapus kalau gak kepake atau mau pake nama lain ;)
-public class NotificationRepository {}
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+// TODO: rename atau modif file template ini
+public interface NotificationRepository extends JpaRepository<NotificationModel, UUID> {}

@@ -1,4 +1,10 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
-// Ini hanya template / placeholder aja buat dasar struktur projek, tar hapus kalau gak kepake atau mau pake nama lain ;)
-public class CatalogService {}
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.CatalogModel;
+
+import java.util.List;
+
+// TODO: rename atau modif file template ini
+public interface CatalogService {
+    List<CatalogModel> findAll();
+}

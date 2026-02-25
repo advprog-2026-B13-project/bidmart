@@ -1,4 +1,10 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.service;
 
-// Ini hanya template / placeholder aja buat dasar struktur projek, tar hapus kalau gak kepake atau mau pake nama lain ;)
-public class NotificationService {}
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
+
+import java.util.List;
+
+// TODO: rename atau modif file template ini
+public interface NotificationService {
+    List<NotificationModel> findAll();
+}

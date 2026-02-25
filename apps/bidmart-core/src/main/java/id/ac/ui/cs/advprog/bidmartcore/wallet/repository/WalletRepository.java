@@ -1,4 +1,11 @@
 package id.ac.ui.cs.advprog.bidmartcore.wallet.repository;
 
-// Ini hanya template / placeholder aja buat dasar struktur projek, tar hapus kalau gak kepake atau mau pake nama lain ;)
-public class WalletRepository {}
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.UUID;
+
+// TODO: rename atau modif file template ini
+@Repository
+public interface WalletRepository extends JpaRepository<WalletModel, UUID> {}
