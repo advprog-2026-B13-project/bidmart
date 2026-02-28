@@ -1,11 +1,10 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.repository;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.CatalogModel;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
+import java.util.List;
 
 // TODO: rename atau modif file template ini
-@Repository
-public interface CatalogRepository extends JpaRepository<CatalogModel, UUID> {}
+public interface CatalogRepository {
+    List<CatalogModel> findAll();
+}
