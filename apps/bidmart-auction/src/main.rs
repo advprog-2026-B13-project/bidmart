@@ -1,17 +1,43 @@
-use axum::{routing::get, Json, Router};
-use serde_json::{json, Value};
-use std::net::SocketAddr;
+//! BidMart Auction Service: Main entry point.
+//!
+//! Architecture: Clean Architecture + Hexagonal (Ports & Adapters)
+//! - adapter/http: Routes, handlers, HTTP-specific logic
+//! - app: Use cases, DTOs, application errors
+//! - domain: Entities, types, domain errors
+//! - port: Trait definitions (interfaces)
+
+mod adapter;
+mod app;
+mod domain;
+mod port;
+
+use std::sync::Arc;
+
+use adapter::http::routes::{create_router, AppState};
+use app::place_bid::PlaceBidUseCase;
+
+use crate::port::BidRepository;
+use crate::adapter::repository::PlaceholderBidRepository;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let app = Router::new()
-        .route("/", get(health_check))
-        .route("/health", get(health_check))
-        .route("/api/health/status", get(chained_health));
+    // TODO: Initialize actual infrastructure (DB, Redis, etc.)
+    let bid_repo: Arc<dyn BidRepository> = Arc::new(PlaceholderBidRepository::new());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
+    // Create use case with injected dependencies
+    let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo));
+
+    // Build app state
+    let state = AppState {
+        place_bid: place_bid.clone(),
+    };
+
+    // Create router
+    let app = create_router(state);
+
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8081));
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .expect("Failed to bind to port 8081");
@@ -19,35 +45,4 @@ async fn main() {
     tracing::info!("Server running at http://{}", addr);
 
     axum::serve(listener, app).await.expect("Server error");
-}
-
-async fn health_check() -> &'static str {
-    "Auction Service is running!"
-}
-
-async fn chained_health() -> Json<Value> {
-    let core_url =
-        std::env::var("CORE_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-
-    let url = format!("{}/api/health/status", core_url);
-
-    match reqwest::get(&url).await {
-        Ok(resp) => match resp.json::<Value>().await {
-            Ok(core_status) => Json(json!({
-                "service": "bidmart-auction",
-                "status": "UP",
-                "core": core_status
-            })),
-            Err(e) => Json(json!({
-                "service": "bidmart-auction",
-                "status": "UP",
-                "core": { "status": "ERROR", "error": e.to_string() }
-            })),
-        },
-        Err(e) => Json(json!({
-            "service": "bidmart-auction",
-            "status": "UP",
-            "core": { "status": "UNREACHABLE", "error": e.to_string() }
-        })),
-    }
 }

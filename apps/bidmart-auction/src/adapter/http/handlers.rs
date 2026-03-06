@@ -50,7 +50,8 @@ pub async fn place_bid(
 ) -> Result<Json<BidResponse>, ApiError> {
     // TODO: Extract user_id from JWT token, not from request body
     // For now, accept user_id from body (skeleton)
-    
+    println!("Received place bid request for item: {}", item_id);
+
     let cmd = PlaceBidCommand {
         user_id: body.user_id,
         item_id: item_id.clone(),

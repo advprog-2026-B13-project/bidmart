@@ -20,6 +20,6 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(handlers::health_check))
         .route("/api/health/status", get(handlers::chained_health))
-        .route("/api/items/{id}/bids", post(handlers::place_bid))
+        .route("/api/items/:item_id/bids", post(handlers::place_bid))
         .with_state(state)
 }
