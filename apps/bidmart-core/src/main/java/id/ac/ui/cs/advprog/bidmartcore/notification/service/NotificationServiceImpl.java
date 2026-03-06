@@ -1,20 +1,25 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.service;
 
-import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
 import id.ac.ui.cs.advprog.bidmartcore.notification.repository.NotificationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 @Service
 public class NotificationServiceImpl implements NotificationService {
+
+    private final NotificationRepository notificationRepository;
+
     @Autowired
-    private NotificationRepository notificationRepository;
+    public NotificationServiceImpl(NotificationRepository notificationRepository) {
+        this.notificationRepository = notificationRepository;
+    }
 
     @Override
-    public List<NotificationModel> findAll() {
-        return notificationRepository.findAll();
+    public List<Notification> getUserNotifications(UUID userId) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 }
