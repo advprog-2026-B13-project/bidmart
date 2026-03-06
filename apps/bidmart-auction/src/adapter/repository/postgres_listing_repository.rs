@@ -51,7 +51,7 @@ impl ListingRepository for PostgresListingRepository {
             if let Some(db_err) = e.as_database_error() {
                 if db_err.code() == Some("23505".into()) {
                     // "230505" is the SQLSTATE code for unique violation in PostgreSQL
-                    return ListingRepositoryError::AlreadyExists(listing.id.clone());
+                    return ListingRepositoryError::AlreadyExists(listing.id);
                 }
             }
 
@@ -92,7 +92,7 @@ impl ListingRepository for PostgresListingRepository {
                 minimum_increment: Money(r.minimum_increment),
                 created_at: SystemTime::from(r.created_at),
             })),
-            None => Ok(None),
+            None => Err(ListingRepositoryError::NotFound(*id)),
         }
     }
 
@@ -123,33 +123,10 @@ impl ListingRepository for PostgresListingRepository {
 
         // If no rows were affected, the listing likely doesn't exist.
         if result.rows_affected() == 0 {
-            return Err(ListingRepositoryError::NotFound(listing.id.clone()));
+            return Err(ListingRepositoryError::NotFound(listing.id));
         }
 
         Ok(())
     }
 
-    async fn is_active(
-        &self,
-        id: &ListingId,
-        at: SystemTime,
-    ) -> Result<bool, ListingRepositoryError> {
-        let now = chrono::DateTime::<chrono::Utc>::from(at);
-
-        let active = sqlx::query_scalar!(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM listings 
-                WHERE id = $1 AND start_time <= $2 AND end_time > $2
-            )
-            "#,
-            id.0,
-            now
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ListingRepositoryError::InfrastructureError(e.to_string()))?;
-
-        Ok(active.unwrap_or(false))
-    }
 }

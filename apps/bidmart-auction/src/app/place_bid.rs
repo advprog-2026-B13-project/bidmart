@@ -37,9 +37,19 @@ impl PlaceBidUseCase {
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Listing {} not found", listing_id.0)))?;
 
+        if listing.seller_id == buyer_id {
+            return Err(AppError::Validation(DomainError::CannotBidOwnAuction(
+                buyer_id.0.to_string(),
+            )));
+        }
+
         let now = SystemTime::now();
-        if now < listing.start_time || now > listing.end_time {
+        if now < listing.start_time {
             return Err(AppError::Validation(DomainError::AuctionNotStarted));
+        }
+
+        if now > listing.end_time {
+            return Err(AppError::Validation(DomainError::AuctionEnded));
         }
 
         // 3. Ambil bid tertinggi saat ini

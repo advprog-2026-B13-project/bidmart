@@ -21,7 +21,7 @@ use app::place_bid::PlaceBidUseCase;
 use crate::adapter::repository::{PostgresBidRepository, PostgresListingRepository};
 use crate::port::{BidRepository, ListingRepository};
 
-use crate::config::config::AppConfig;
+use crate::config::app_config::AppConfig;
 use crate::config::database::init_postgres_pool;
 
 #[tokio::main]

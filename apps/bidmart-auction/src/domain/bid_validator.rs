@@ -19,7 +19,10 @@ impl BidValidator {
             Some(highest) => {
                 let required_minimum = Money(highest.0 + minimum_increment.0);
                 if amount < required_minimum {
-                    return Err(DomainError::BidTooLow(required_minimum.0));
+                    return Err(DomainError::MinimumIncrementNotMet {
+                        current: highest,
+                        required: required_minimum,
+                    });
                 }
             }
             None => {

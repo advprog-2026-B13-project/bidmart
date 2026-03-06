@@ -14,6 +14,7 @@ pub enum AppError {
     #[error("not found: {0}")]
     NotFound(String),
 
+    #[allow(dead_code)]
     #[error("unauthorized: {0}")]
     Unauthorized(String),
 
@@ -24,7 +25,6 @@ pub enum AppError {
 impl From<BidRepositoryError> for AppError {
     fn from(e: BidRepositoryError) -> Self {
         match e {
-            BidRepositoryError::NotFound(msg) => AppError::NotFound(msg),
             BidRepositoryError::Unavailable(msg) => AppError::Internal(msg),
         }
     }
@@ -37,9 +37,6 @@ impl From<ListingRepositoryError> for AppError {
                 AppError::NotFound(format!("Listing with ID {} not found", id.0))
             }
             ListingRepositoryError::InfrastructureError(msg) => AppError::Internal(msg),
-            ListingRepositoryError::Conflict(msg) => {
-                AppError::Validation(DomainError::InvalidListing(msg))
-            }
             ListingRepositoryError::AlreadyExists(id) => AppError::Validation(
                 DomainError::InvalidListing(format!("Listing with ID {} already exists", id.0)),
             ),

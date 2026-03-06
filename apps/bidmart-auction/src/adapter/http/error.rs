@@ -24,7 +24,7 @@ impl IntoResponse for ApiError {
                 (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", self.0.to_string())
             }
             AppError::Internal(_) => {
-                println!("CRITICAL ERROR: {}", self.0.to_string());
+                println!("CRITICAL ERROR: {}", self.0);
                 // Generic message for internal errors to avoid leaking details
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,

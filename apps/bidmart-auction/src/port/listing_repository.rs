@@ -1,7 +1,6 @@
 //! Port: Listing repository trait.
 
 use async_trait::async_trait;
-use std::time::SystemTime;
 use thiserror::Error;
 
 use crate::domain::listing::Listing;
@@ -18,8 +17,6 @@ pub enum ListingRepositoryError {
 
     #[error("database error: {0}")]
     InfrastructureError(String),
-    #[error("concurrency error: {0}")]
-    Conflict(String),
 }
 
 /// ListingRepository port: manages the lifecycle of auction items.
@@ -30,11 +27,7 @@ pub trait ListingRepository: Send + Sync {
 
     async fn find_by_id(&self, id: &ListingId) -> Result<Option<Listing>, ListingRepositoryError>;
 
+    #[allow(dead_code)]
     async fn update(&self, listing: &Listing) -> Result<(), ListingRepositoryError>;
 
-    async fn is_active(
-        &self,
-        id: &ListingId,
-        at: SystemTime,
-    ) -> Result<bool, ListingRepositoryError>;
 }

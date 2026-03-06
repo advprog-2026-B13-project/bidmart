@@ -9,8 +9,6 @@ use crate::domain::types::{ListingId, Money, UserId};
 /// Errors from the bid repository.
 #[derive(Debug, Error)]
 pub enum BidRepositoryError {
-    #[error("not found: {0}")]
-    NotFound(String),
     #[error("unavailable: {0}")]
     Unavailable(String),
 }

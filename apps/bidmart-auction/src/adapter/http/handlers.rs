@@ -59,7 +59,7 @@ pub async fn place_bid(
 
     let cmd = PlaceBidCommand {
         buyer_id: body.buyer_id,
-        listing_id: listing_id,
+        listing_id,
         bid_amount: body.bid_amount,
     };
 

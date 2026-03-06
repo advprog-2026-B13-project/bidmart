@@ -8,12 +8,6 @@ use uuid::Uuid;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ListingId(pub Uuid);
 
-impl ListingId {
-    pub fn new(id: Uuid) -> Self {
-        Self(id)
-    }
-}
-
 impl fmt::Display for ListingId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -30,11 +24,6 @@ impl From<Uuid> for ListingId {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UserId(pub Uuid);
 
-impl UserId {
-    pub fn new(id: Uuid) -> Self {
-        Self(id)
-    }
-}
 
 impl fmt::Display for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -69,10 +58,12 @@ impl fmt::Display for BidId {
 pub struct Money(pub i64);
 
 impl Money {
+    #[allow(dead_code)]
     pub fn from_rupiah(rupiah: i64) -> Self {
         Money(rupiah)
     }
 
+    #[allow(dead_code)]
     pub fn rupiah(&self) -> i64 {
         self.0
     }
