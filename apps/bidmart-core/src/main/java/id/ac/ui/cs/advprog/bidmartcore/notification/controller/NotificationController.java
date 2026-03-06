@@ -1,28 +1,28 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.controller;
 
-import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
 import id.ac.ui.cs.advprog.bidmartcore.notification.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 @RestController
-@RequestMapping("/api/notification")
+@RequestMapping("/api/notifications")
 public class NotificationController {
+
+    private final NotificationService notificationService;
+
     @Autowired
-    private NotificationService notificationService;
+    public NotificationController(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
 
-    @GetMapping("/all")
-    public Map<String, Object> getAll() {
-        List<NotificationModel> notificationDatas = notificationService.findAll();
-
-        return Map.of(
-                "results", notificationDatas
-        );
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Notification>> getUserNotifications(@PathVariable UUID userId) {
+        List<Notification> notifications = notificationService.getUserNotifications(userId);
+        return ResponseEntity.ok(notifications);
     }
 }

@@ -1,10 +1,9 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.service;
 
-import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
-
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
 import java.util.List;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 public interface NotificationService {
-    List<NotificationModel> findAll();
+    List<Notification> getUserNotifications(UUID userId);
 }

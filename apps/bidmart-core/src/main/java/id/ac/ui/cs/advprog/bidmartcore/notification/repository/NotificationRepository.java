@@ -1,10 +1,13 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.repository;
 
-import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationModel;
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
-public interface NotificationRepository {
-    List<NotificationModel> findAll();
+@Repository
+public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+    List<Notification> findByUserIdOrderByCreatedAtDesc(UUID userId);
 }
