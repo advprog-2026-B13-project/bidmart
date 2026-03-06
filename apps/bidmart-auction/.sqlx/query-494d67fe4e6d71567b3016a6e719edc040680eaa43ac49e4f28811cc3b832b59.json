@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE listings\n            SET \n                seller_id = $2,\n                starting_price = $3,\n                start_time = $4,\n                end_time = $5,\n                minimum_increment = $6\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "494d67fe4e6d71567b3016a6e719edc040680eaa43ac49e4f28811cc3b832b59"
+}

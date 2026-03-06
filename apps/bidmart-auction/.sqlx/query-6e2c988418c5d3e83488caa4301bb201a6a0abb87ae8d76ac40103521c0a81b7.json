@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                id as \"id!\", \n                seller_id, \n                starting_price, \n                start_time as \"start_time!\", \n                end_time as \"end_time!\", \n                minimum_increment, \n                created_at as \"created_at!\"        \n            FROM listings\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "seller_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "starting_price",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "start_time!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "end_time!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "minimum_increment",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "6e2c988418c5d3e83488caa4301bb201a6a0abb87ae8d76ac40103521c0a81b7"
+}
