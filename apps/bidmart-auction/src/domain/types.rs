@@ -2,53 +2,56 @@
 
 use std::fmt;
 use uuid::Uuid;
+use serde::{Serialize, Deserialize};
 
-/// Unique item/auction identifier.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ListingId(pub String);
+/// Unique listing/auction identifier (Synced from Core Service).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ListingId(pub Uuid);
 
 impl ListingId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
     }
 }
 
 impl fmt::Display for ListingId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        write!(f, "{}", self.0)
     }
 }
 
-impl From<String> for ListingId {
-    fn from(s: String) -> Self {
-        ListingId(s)
+impl From<Uuid> for ListingId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
     }
 }
 
-/// Unique user identifier (from JWT).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct UserId(pub String);
+/// Unique user identifier (Synced from Core Service/JWT).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct UserId(pub Uuid);
 
 impl UserId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
     }
+
 }
 
 impl fmt::Display for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        write!(f, "{}", self.0)
     }
 }
 
-impl From<String> for UserId {
-    fn from(s: String) -> Self {
-        UserId(s)
+impl From<Uuid> for UserId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
     }
 }
 
-/// Unique bid identifier (UUID v4).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+
+/// Unique bid identifier (Generated locally as UUID v4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BidId(pub Uuid);
 
 impl BidId {
@@ -64,7 +67,7 @@ impl fmt::Display for BidId {
 }
 
 /// Monetary amount (avoids floating-point issues).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Money(pub i64);
 
 impl Money {
@@ -75,8 +78,6 @@ impl Money {
     pub fn rupiah(&self) -> i64 {
         self.0
     }
-
-
 }
 
 impl fmt::Display for Money {
@@ -85,20 +86,14 @@ impl fmt::Display for Money {
     }
 }
 
-impl From<i64> for Money {
-    fn from(rupiah: i64) -> Self {
-        Money(rupiah)
-    }
-}
-
 /// Idempotency key for preventing duplicate bids.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IdempotencyKey(pub String);
 
 impl IdempotencyKey {
     /// Create idempotency key from buyer_id, listing_id, and bid_amount.
     pub fn new(buyer_id: &UserId, listing_id: &ListingId, amount: Money) -> Self {
-        Self(format!("bid:{}:{}:{}", listing_id, buyer_id, amount))
+        Self(format!("bid:{}:{}:{}", listing_id.0, buyer_id.0, amount.0))
     }
 }
 

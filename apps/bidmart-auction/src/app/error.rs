@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 use crate::domain::error::DomainError;
-use crate::port::bid_repository::BidRepositoryError;
+use crate::port::{BidRepositoryError, ListingRepositoryError};
 
 /// Unified application error mapped to HTTP status codes.
 #[derive(Debug, Error)]
@@ -26,6 +26,22 @@ impl From<BidRepositoryError> for AppError {
         match e {
             BidRepositoryError::NotFound(msg) => AppError::NotFound(msg),
             BidRepositoryError::Unavailable(msg) => AppError::Internal(msg),
+        }
+    }
+}
+
+impl From<ListingRepositoryError> for AppError {
+    fn from(e: ListingRepositoryError) -> Self {
+        match e {
+            ListingRepositoryError::NotFound(id) => {
+                AppError::NotFound(format!("Listing with ID {} not found", id.0))
+            }
+            ListingRepositoryError::InfrastructureError(msg) => {
+                AppError::Internal(msg)
+            }
+            ListingRepositoryError::Conflict(msg) => {
+                AppError::Validation(DomainError::InvalidListing(msg))
+            }
         }
     }
 }

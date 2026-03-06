@@ -7,6 +7,7 @@ use axum::Router;
 
 use crate::app::get_highest_bid::GetHighestBidUseCase;
 use crate::app::place_bid::PlaceBidUseCase;
+use crate::app::register_listing::RegisterListingUseCase;
 
 use super::handlers;
 
@@ -15,6 +16,7 @@ use super::handlers;
 pub struct AppState {
     pub place_bid: Arc<PlaceBidUseCase>,
     pub get_highest_bid: Arc<GetHighestBidUseCase>,
+    pub register_listing: Arc<RegisterListingUseCase>,
 }
 
 /// Build the Axum router with all routes.
@@ -22,7 +24,8 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(handlers::health_check))
         .route("/api/health/status", get(handlers::chained_health))
-        .route("/api/items/:listing_id/bids", post(handlers::place_bid))
-        .route("/api/items/:listing_id/bids/highest", get(handlers::get_highest_bid))
+        .route("/api/listing/:listing_id/bids", post(handlers::place_bid))
+        .route("/api/listing/:listing_id/bids/highest", get(handlers::get_highest_bid))
+        .route("/api/listing/new", post(handlers::register_listing))
         .with_state(state)
 }

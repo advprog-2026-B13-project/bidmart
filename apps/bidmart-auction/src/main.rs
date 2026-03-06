@@ -18,8 +18,8 @@ use std::sync::Arc;
 use adapter::http::routes::{create_router, AppState};
 use app::place_bid::PlaceBidUseCase;
 
-use crate::port::BidRepository;
-use crate::adapter::repository::PostgresBidRepository;
+use crate::port::{BidRepository, ListingRepository};
+use crate::adapter::repository::{PostgresBidRepository, PostgresListingRepository};
 
 use crate::config::database::init_postgres_pool;
 use crate::config::config::AppConfig;
@@ -46,15 +46,18 @@ async fn main() {
     }
     tracing::info!("Database migrated successfully!");
     
-    let bid_repo: Arc<dyn BidRepository> = Arc::new(PostgresBidRepository::new(pool));
+    let bid_repo: Arc<dyn BidRepository> = Arc::new(PostgresBidRepository::new(pool.clone()));
+    let listing_repo: Arc<dyn ListingRepository> = Arc::new(PostgresListingRepository::new(pool));
     // Create use case with injected dependencies
-    let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo));
+    let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo, listing_repo.clone())); // Update constructor
     let get_highest_bid = Arc::new(app::get_highest_bid::GetHighestBidUseCase::new(place_bid.bid_repo.clone()));
+    let register_listing = Arc::new(app::register_listing::RegisterListingUseCase::new(listing_repo));    
 
     // Build app state
     let state = AppState {
         place_bid: place_bid.clone(),
         get_highest_bid: get_highest_bid.clone(),
+        register_listing: register_listing.clone(),
     };
 
     // Create router

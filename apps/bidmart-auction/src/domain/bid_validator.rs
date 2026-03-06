@@ -9,17 +9,24 @@ impl BidValidator {
     pub fn validate_new_bid(
         amount: Money,
         current_highest: Option<Money>,
+        starting_price: Money,
+        minimum_increment: Money,
     ) -> Result<(), DomainError> {
-        if amount.rupiah() <= 0 {
+        if amount.0 <= 0 {
             return Err(DomainError::InvalidBidAmount);
         }
 
-
-        // Validate bid is higher than current highest
-        // todo: english auction increment
-        if let Some(highest) = current_highest {
-            if amount <= highest {
-                return Err(DomainError::BidTooLow(highest.rupiah()));
+        match current_highest {
+            Some(highest) => {
+                let required_minimum = Money(highest.0 + minimum_increment.0);
+                if amount < required_minimum {
+                    return Err(DomainError::BidTooLow(required_minimum.0));
+                }
+            }
+            None => {
+                if amount < starting_price {
+                    return Err(DomainError::BidTooLow(starting_price.0));
+                }
             }
         }
 

@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use super::types::{BidId, IdempotencyKey, ListingId, Money, UserId};
 
-/// A bid placed by a user on an item.
+/// A bid placed by a user on a listing.
 #[derive(Clone, Debug)]
 pub struct Bid {
     pub id: BidId,

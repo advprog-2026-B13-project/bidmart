@@ -27,7 +27,7 @@ pub trait BidRepository: Send + Sync {
     /// Save a new bid.
    async fn save(&self, bid: &Bid) -> Result<SaveResult, BidRepositoryError>;
 
-    /// Get the highest bid for an item.
+    /// Get the highest bid for an listing.
     async fn get_highest_bid(
         &self,
         listing_id: &ListingId,
