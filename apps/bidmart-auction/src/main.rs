@@ -10,34 +10,60 @@ mod adapter;
 mod app;
 mod domain;
 mod port;
+mod config;
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use adapter::http::routes::{create_router, AppState};
 use app::place_bid::PlaceBidUseCase;
 
 use crate::port::BidRepository;
-use crate::adapter::repository::PlaceholderBidRepository;
+use crate::adapter::repository::PostgresBidRepository;
+
+use crate::config::database::init_postgres_pool;
+use crate::config::config::AppConfig;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    // TODO: Initialize actual infrastructure (DB, Redis, etc.)
-    let bid_repo: Arc<dyn BidRepository> = Arc::new(PlaceholderBidRepository::new());
 
+    let app_config = AppConfig::from_env();
+
+    let pool = match init_postgres_pool(&app_config.database_url, 10).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            tracing::error!("Failed to initialize database pool: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    tracing::info!("Migrating database...");
+    if let Err(e) = sqlx::migrate!().run(&pool).await {
+        tracing::error!("Database migration failed: {}", e);
+        std::process::exit(1);
+    }
+    tracing::info!("Database migrated successfully!");
+    
+    let bid_repo: Arc<dyn BidRepository> = Arc::new(PostgresBidRepository::new(pool));
     // Create use case with injected dependencies
     let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo));
+    let get_highest_bid = Arc::new(app::get_highest_bid::GetHighestBidUseCase::new(place_bid.bid_repo.clone()));
 
     // Build app state
     let state = AppState {
         place_bid: place_bid.clone(),
+        get_highest_bid: get_highest_bid.clone(),
     };
 
     // Create router
     let app = create_router(state);
 
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8081));
+    let addr : SocketAddr = format!("{}:{}", app_config.host, app_config.port)
+        .parse()
+        .expect("Invalid host or port");
+
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .expect("Failed to bind to port 8081");

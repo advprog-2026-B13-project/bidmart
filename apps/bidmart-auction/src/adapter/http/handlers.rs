@@ -1,12 +1,14 @@
 //! Axum request handlers: thin glue between HTTP and use cases.
 
+use std::result;
+
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapter::http::error::ApiError;
 use crate::adapter::http::routes::AppState;
-use crate::app::dto::PlaceBidCommand;
+use crate::app::dto::{GetHighestBidCommand, PlaceBidCommand};
 
 /// POST /api/items/{id}/bids request body.
 #[derive(Debug, Deserialize)]
@@ -23,6 +25,15 @@ pub struct BidResponse {
     pub user_id: String,
     pub bid_amount: i64,
 }
+
+
+#[derive(Debug, Serialize)]
+pub struct HighestBidResponse {
+    pub user_id: String,
+    pub bid_amount: i64,
+}
+
+
 
 /// GET /health
 pub async fn health_check() -> &'static str {
@@ -68,3 +79,22 @@ pub async fn place_bid(
     }))
 }
     
+/// GET /api/items/{id}/bids/highest
+/// 
+/// Returns the current highest bid for the specified item.
+pub async fn get_highest_bid(
+    State(state): State<AppState>,
+    Path(item_id): Path<String>,
+) -> Result<Json<Option<HighestBidResponse>>, ApiError> {
+
+    let cmd =  GetHighestBidCommand {item_id};
+
+    let result = state.get_highest_bid.execute(cmd).await?;
+
+    let response = result.map(|res| HighestBidResponse {
+            user_id: res.user_id,
+            bid_amount: res.bid_amount,
+        });
+
+    Ok(Json(response))
+}

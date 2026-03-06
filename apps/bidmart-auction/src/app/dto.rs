@@ -18,3 +18,11 @@ pub struct PlaceBidResult {
     pub item_id: String,
     pub bid_amount: i64,
 }
+
+pub struct GetHighestBidCommand {
+    pub item_id: String,
+}
+pub struct GetHighestBidResult {
+    pub user_id: String,
+    pub bid_amount: i64,
+}

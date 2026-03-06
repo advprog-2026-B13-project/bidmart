@@ -17,3 +17,7 @@ tracing-subscriber = "0.3"
 async-trait = "0.1"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 thiserror = "1.0"
+
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "uuid", "chrono"] }
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15.7"
