@@ -28,7 +28,6 @@ pub struct GetHighestBidResult {
     pub bid_amount: i64,
 }
 
-
 pub struct RegisterListingCommand {
     pub id: Uuid,
     pub seller_id: Uuid,

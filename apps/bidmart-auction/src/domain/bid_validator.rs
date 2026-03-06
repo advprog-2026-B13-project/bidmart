@@ -1,4 +1,3 @@
-
 use crate::domain::error::DomainError;
 use crate::domain::types::Money;
 
@@ -25,7 +24,7 @@ impl BidValidator {
             }
             None => {
                 if amount < starting_price {
-                    return Err(DomainError::BidTooLow(starting_price.0));
+                    return Err(DomainError::BelowStartingPrice(starting_price.0));
                 }
             }
         }

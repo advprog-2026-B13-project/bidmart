@@ -7,8 +7,7 @@ use crate::domain::types::Money;
 /// Domain errors represent business rule violations.
 #[derive(Debug, Error)]
 pub enum DomainError {
-
-    #[error("bid amount {0} is too low")]
+    #[error("bid amount is too low, the required minimum is {0}")]
     BidTooLow(i64),
 
     #[error("bid amount must be positive")]
@@ -21,13 +20,10 @@ pub enum DomainError {
     AuctionEnded,
 
     #[error("bid must be at least the starting price of {0}")]
-    BelowStartingPrice(Money),
+    BelowStartingPrice(i64),
 
     #[error("bid does not meet the minimum increment: current highest is {current}, required at least {required}")]
-    MinimumIncrementNotMet {
-        current: Money,
-        required: Money,
-    },
+    MinimumIncrementNotMet { current: Money, required: Money },
 
     #[error("auction with id {0} was not found")]
     AuctionNotFound(String),

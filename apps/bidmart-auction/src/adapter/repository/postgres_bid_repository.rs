@@ -23,7 +23,10 @@ impl BidRepository for PostgresBidRepository {
     async fn save(&self, bid: &Bid) -> Result<SaveResult, BidRepositoryError> {
         tracing::info!(
             "Saving bid: id={}, listing_id={}, amount={}, idempotency_key={}",
-            bid.id.0, bid.listing_id.0, bid.amount.0, bid.idempotency_key.0
+            bid.id.0,
+            bid.listing_id.0,
+            bid.amount.0,
+            bid.idempotency_key.0
         );
 
         let result = sqlx::query!(

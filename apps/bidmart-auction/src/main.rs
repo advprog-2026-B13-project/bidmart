@@ -8,9 +8,9 @@
 
 mod adapter;
 mod app;
+mod config;
 mod domain;
 mod port;
-mod config;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,16 +18,15 @@ use std::sync::Arc;
 use adapter::http::routes::{create_router, AppState};
 use app::place_bid::PlaceBidUseCase;
 
-use crate::port::{BidRepository, ListingRepository};
 use crate::adapter::repository::{PostgresBidRepository, PostgresListingRepository};
+use crate::port::{BidRepository, ListingRepository};
 
-use crate::config::database::init_postgres_pool;
 use crate::config::config::AppConfig;
+use crate::config::database::init_postgres_pool;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-
 
     let app_config = AppConfig::from_env();
 
@@ -45,13 +44,17 @@ async fn main() {
         std::process::exit(1);
     }
     tracing::info!("Database migrated successfully!");
-    
+
     let bid_repo: Arc<dyn BidRepository> = Arc::new(PostgresBidRepository::new(pool.clone()));
     let listing_repo: Arc<dyn ListingRepository> = Arc::new(PostgresListingRepository::new(pool));
     // Create use case with injected dependencies
     let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo, listing_repo.clone())); // Update constructor
-    let get_highest_bid = Arc::new(app::get_highest_bid::GetHighestBidUseCase::new(place_bid.bid_repo.clone()));
-    let register_listing = Arc::new(app::register_listing::RegisterListingUseCase::new(listing_repo));    
+    let get_highest_bid = Arc::new(app::get_highest_bid::GetHighestBidUseCase::new(
+        place_bid.bid_repo.clone(),
+    ));
+    let register_listing = Arc::new(app::register_listing::RegisterListingUseCase::new(
+        listing_repo,
+    ));
 
     // Build app state
     let state = AppState {
@@ -63,7 +66,7 @@ async fn main() {
     // Create router
     let app = create_router(state);
 
-    let addr : SocketAddr = format!("{}:{}", app_config.host, app_config.port)
+    let addr: SocketAddr = format!("{}:{}", app_config.host, app_config.port)
         .parse()
         .expect("Invalid host or port");
 

@@ -19,21 +19,28 @@ impl RegisterListingUseCase {
         Self { listing_repo }
     }
 
-    pub async fn execute(&self, cmd: RegisterListingCommand) -> Result<RegisterListingResult, AppError> {
+    pub async fn execute(
+        &self,
+        cmd: RegisterListingCommand,
+    ) -> Result<RegisterListingResult, AppError> {
         let listing_id = ListingId(cmd.id);
         let seller_id = UserId(cmd.seller_id);
         let starting_price = Money(cmd.starting_price);
         let min_increment = Money(cmd.minimum_increment);
-        
+
         let start_time = SystemTime::from(cmd.start_time);
         let end_time = SystemTime::from(cmd.end_time);
 
         if end_time <= start_time {
-            return Err(AppError::Validation(DomainError::InvalidListing("end_time must be after start_time".to_string())));
+            return Err(AppError::Validation(DomainError::InvalidListing(
+                "end_time must be after start_time".to_string(),
+            )));
         }
-        
+
         if starting_price.0 < 0 {
-            return Err(AppError::Validation(DomainError::InvalidListing("starting_price cannot be negative".to_string())));
+            return Err(AppError::Validation(DomainError::InvalidListing(
+                "starting_price cannot be negative".to_string(),
+            )));
         }
 
         let listing = Listing::new(
@@ -45,9 +52,7 @@ impl RegisterListingUseCase {
             min_increment,
         );
 
-        self.listing_repo.save(&listing).await.map_err(|e| {
-            AppError::Internal(e.to_string())
-        })?;
+        self.listing_repo.save(&listing).await?;
 
         Ok(RegisterListingResult {
             listing_id: listing.id.0,

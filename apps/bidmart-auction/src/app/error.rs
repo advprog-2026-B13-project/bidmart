@@ -36,12 +36,13 @@ impl From<ListingRepositoryError> for AppError {
             ListingRepositoryError::NotFound(id) => {
                 AppError::NotFound(format!("Listing with ID {} not found", id.0))
             }
-            ListingRepositoryError::InfrastructureError(msg) => {
-                AppError::Internal(msg)
-            }
+            ListingRepositoryError::InfrastructureError(msg) => AppError::Internal(msg),
             ListingRepositoryError::Conflict(msg) => {
                 AppError::Validation(DomainError::InvalidListing(msg))
             }
+            ListingRepositoryError::AlreadyExists(id) => AppError::Validation(
+                DomainError::InvalidListing(format!("Listing with ID {} already exists", id.0)),
+            ),
         }
     }
 }

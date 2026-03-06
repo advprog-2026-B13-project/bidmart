@@ -1,4 +1,3 @@
-
 use std::env;
 
 #[derive(Debug, Clone)]
@@ -11,11 +10,11 @@ pub struct AppConfig {
 
 impl AppConfig {
     /// Load configuration from environment variables.
-    /// 
+    ///
     /// Required env vars:
     /// - `DATABASE_URL`
     /// - `CORE_SERVICE_URL`
-    /// 
+    ///
     /// Optional env vars (with defaults):
     /// - `APP_HOST` (default: "127.0.0.1")
     /// - `APP_PORT` (default: 8081)
@@ -23,7 +22,9 @@ impl AppConfig {
         dotenvy::dotenv().ok();
         Self {
             host: get_env("APP_HOST", "127.0.0.1"),
-            port: get_env("APP_PORT", "8081").parse().expect("APP_PORT must be a valid u16"),
+            port: get_env("APP_PORT", "8081")
+                .parse()
+                .expect("APP_PORT must be a valid u16"),
             database_url: get_env_required("DATABASE_URL"),
             core_url: get_env_required("CORE_SERVICE_URL"),
         }

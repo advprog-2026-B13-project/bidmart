@@ -1,6 +1,5 @@
 //! Axum request handlers: thin glue between HTTP and use cases.
 
-
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -26,14 +25,11 @@ pub struct BidResponse {
     pub bid_amount: i64,
 }
 
-
 #[derive(Debug, Serialize)]
 pub struct HighestBidResponse {
     pub buyer_id: Uuid,
     pub bid_amount: i64,
 }
-
-
 
 /// GET /health
 pub async fn health_check() -> &'static str {
@@ -41,9 +37,7 @@ pub async fn health_check() -> &'static str {
 }
 
 /// GET /api/health/status
-pub async fn chained_health(
-    State(_state): State<AppState>,
-) -> Json<serde_json::Value> {
+pub async fn chained_health(State(_state): State<AppState>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "service": "bidmart-auction",
         "status": "UP"
@@ -51,7 +45,7 @@ pub async fn chained_health(
 }
 
 /// POST /api/listing/{listing_id}/bids
-/// 
+///
 /// Requires JWT authentication (TODO: implement JWT middleware).
 /// Includes idempotency mechanism to prevent duplicate bids.
 pub async fn place_bid(
@@ -65,7 +59,7 @@ pub async fn place_bid(
 
     let cmd = PlaceBidCommand {
         buyer_id: body.buyer_id,
-        listing_id: listing_id, 
+        listing_id: listing_id,
         bid_amount: body.bid_amount,
     };
 
@@ -78,27 +72,25 @@ pub async fn place_bid(
         bid_amount: result.bid_amount,
     }))
 }
-    
+
 /// GET /api/listing/{listing_id}/bids/highest
-/// 
+///
 /// Returns the current highest bid for the specified listing.
 pub async fn get_highest_bid(
     State(state): State<AppState>,
     Path(listing_id): Path<Uuid>,
 ) -> Result<Json<Option<HighestBidResponse>>, ApiError> {
-
-    let cmd =  GetHighestBidCommand {listing_id};
+    let cmd = GetHighestBidCommand { listing_id };
 
     let result = state.get_highest_bid.execute(cmd).await?;
 
     let response = result.map(|res| HighestBidResponse {
-            buyer_id: res.buyer_id,
-            bid_amount: res.bid_amount,
-        });
+        buyer_id: res.buyer_id,
+        bid_amount: res.bid_amount,
+    });
 
     Ok(Json(response))
 }
-
 
 /// POST /api/listing/new request body.
 #[derive(Debug, Deserialize)]
@@ -118,7 +110,7 @@ pub struct RegisterListingResponse {
 }
 
 /// POST /api/listing/new
-/// 
+///
 /// Registers a new auction listing in the system.
 pub async fn register_listing(
     State(state): State<AppState>,

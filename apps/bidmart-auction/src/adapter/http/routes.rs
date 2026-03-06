@@ -25,7 +25,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health_check))
         .route("/api/health/status", get(handlers::chained_health))
         .route("/api/listing/:listing_id/bids", post(handlers::place_bid))
-        .route("/api/listing/:listing_id/bids/highest", get(handlers::get_highest_bid))
+        .route(
+            "/api/listing/:listing_id/bids/highest",
+            get(handlers::get_highest_bid),
+        )
         .route("/api/listing/new", post(handlers::register_listing))
         .with_state(state)
 }

@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use crate::app::dto::{PlaceBidCommand, PlaceBidResult};
 use crate::app::error::AppError;
 use crate::domain::bid::Bid;
-use crate::domain::bid_validator::BidValidator; 
+use crate::domain::bid_validator::BidValidator;
 use crate::domain::error::DomainError;
 use crate::domain::types::{IdempotencyKey, ListingId, Money, UserId};
 use crate::port::bid_repository::BidRepository;
@@ -15,15 +15,15 @@ use crate::port::listing_repository::ListingRepository;
 
 pub struct PlaceBidUseCase {
     pub bid_repo: Arc<dyn BidRepository>,
-    pub listing_repo: Arc<dyn ListingRepository>, 
+    pub listing_repo: Arc<dyn ListingRepository>,
 }
 
 impl PlaceBidUseCase {
-    pub fn new(
-        bid_repo: Arc<dyn BidRepository>, 
-        listing_repo: Arc<dyn ListingRepository> 
-    ) -> Self {
-        Self { bid_repo, listing_repo }
+    pub fn new(bid_repo: Arc<dyn BidRepository>, listing_repo: Arc<dyn ListingRepository>) -> Self {
+        Self {
+            bid_repo,
+            listing_repo,
+        }
     }
 
     pub async fn execute(&self, cmd: PlaceBidCommand) -> Result<PlaceBidResult, AppError> {
@@ -31,7 +31,10 @@ impl PlaceBidUseCase {
         let listing_id = ListingId(cmd.listing_id);
         let amount = Money(cmd.bid_amount);
 
-        let listing = self.listing_repo.find_by_id(&listing_id).await?
+        let listing = self
+            .listing_repo
+            .find_by_id(&listing_id)
+            .await?
             .ok_or_else(|| AppError::NotFound(format!("Listing {} not found", listing_id.0)))?;
 
         let now = SystemTime::now();
@@ -45,11 +48,11 @@ impl PlaceBidUseCase {
 
         // 4. Panggil validator dengan parameter lengkap
         BidValidator::validate_new_bid(
-            amount, 
+            amount,
             current_highest_amount,
             listing.starting_price,
-            listing.minimum_increment
-        )?; 
+            listing.minimum_increment,
+        )?;
 
         // 5. Buat domain entity
         let idempotency_key = IdempotencyKey::new(&buyer_id, &listing_id, amount);

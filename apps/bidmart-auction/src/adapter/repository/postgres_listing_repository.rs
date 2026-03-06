@@ -23,7 +23,11 @@ impl PostgresListingRepository {
 #[async_trait]
 impl ListingRepository for PostgresListingRepository {
     async fn save(&self, listing: &Listing) -> Result<(), ListingRepositoryError> {
-        tracing::info!("Saving listing: id={}, seller_id={}", listing.id.0, listing.seller_id.0);
+        tracing::info!(
+            "Saving listing: id={}, seller_id={}",
+            listing.id.0,
+            listing.seller_id.0
+        );
 
         sqlx::query!(
             r#"
@@ -43,7 +47,16 @@ impl ListingRepository for PostgresListingRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| ListingRepositoryError::InfrastructureError(e.to_string()))?;
+        .map_err(|e| {
+            if let Some(db_err) = e.as_database_error() {
+                if db_err.code() == Some("23505".into()) {
+                    // "230505" is the SQLSTATE code for unique violation in PostgreSQL
+                    return ListingRepositoryError::AlreadyExists(listing.id.clone());
+                }
+            }
+
+            ListingRepositoryError::InfrastructureError(e.to_string())
+        })?;
 
         Ok(())
     }
@@ -52,13 +65,13 @@ impl ListingRepository for PostgresListingRepository {
         let row = sqlx::query!(
             r#"
             SELECT 
-                id, 
+                id as "id!", 
                 seller_id, 
                 starting_price, 
                 start_time as "start_time!", 
                 end_time as "end_time!", 
                 minimum_increment, 
-                created_at as "created_at!"
+                created_at as "created_at!"        
             FROM listings
             WHERE id = $1
             "#,
@@ -116,9 +129,13 @@ impl ListingRepository for PostgresListingRepository {
         Ok(())
     }
 
-    async fn is_active(&self, id: &ListingId, at: SystemTime) -> Result<bool, ListingRepositoryError> {
+    async fn is_active(
+        &self,
+        id: &ListingId,
+        at: SystemTime,
+    ) -> Result<bool, ListingRepositoryError> {
         let now = chrono::DateTime::<chrono::Utc>::from(at);
-        
+
         let active = sqlx::query_scalar!(
             r#"
             SELECT EXISTS(

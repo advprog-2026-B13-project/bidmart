@@ -1,8 +1,8 @@
 //! Domain newtypes for type-safe identifiers and values.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
 /// Unique listing/auction identifier (Synced from Core Service).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -34,7 +34,6 @@ impl UserId {
     pub fn new(id: Uuid) -> Self {
         Self(id)
     }
-
 }
 
 impl fmt::Display for UserId {
@@ -48,7 +47,6 @@ impl From<Uuid> for UserId {
         Self(id)
     }
 }
-
 
 /// Unique bid identifier (Generated locally as UUID v4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
