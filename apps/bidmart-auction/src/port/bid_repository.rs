@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::bid::Bid;
-use crate::domain::types::{ItemId, Money, UserId};
+use crate::domain::types::{ListingId, Money, UserId};
 
 /// Errors from the bid repository.
 #[derive(Debug, Error)]
@@ -30,6 +30,6 @@ pub trait BidRepository: Send + Sync {
     /// Get the highest bid for an item.
     async fn get_highest_bid(
         &self,
-        item_id: &ItemId,
+        listing_id: &ListingId,
     ) -> Result<Option<(UserId, Money)>, BidRepositoryError>;
 }

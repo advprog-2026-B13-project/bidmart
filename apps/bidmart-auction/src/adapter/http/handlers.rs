@@ -13,7 +13,7 @@ use crate::app::dto::{GetHighestBidCommand, PlaceBidCommand};
 /// POST /api/items/{id}/bids request body.
 #[derive(Debug, Deserialize)]
 pub struct BidRequest {
-    pub user_id: String,
+    pub buyer_id: String,
     pub bid_amount: i64,
 }
 
@@ -21,15 +21,15 @@ pub struct BidRequest {
 #[derive(Debug, Serialize)]
 pub struct BidResponse {
     pub bid_id: String,
-    pub item_id: String,
-    pub user_id: String,
+    pub listing_id: String,
+    pub buyer_id: String,
     pub bid_amount: i64,
 }
 
 
 #[derive(Debug, Serialize)]
 pub struct HighestBidResponse {
-    pub user_id: String,
+    pub buyer_id: String,
     pub bid_amount: i64,
 }
 
@@ -50,22 +50,22 @@ pub async fn chained_health(
     }))
 }
 
-/// POST /api/items/{id}/bids
+/// POST /api/items/{listing_id}/bids
 /// 
 /// Requires JWT authentication (TODO: implement JWT middleware).
 /// Includes idempotency mechanism to prevent duplicate bids.
 pub async fn place_bid(
     State(state): State<AppState>,
-    Path(item_id): Path<String>,
+    Path(listing_id): Path<String>,
     Json(body): Json<BidRequest>,
 ) -> Result<Json<BidResponse>, ApiError> {
-    // TODO: Extract user_id from JWT token, not from request body
-    // For now, accept user_id from body (skeleton)
-    println!("Received place bid request for item: {}", item_id);
+    // TODO: Extract buyer_id from JWT token, not from request body
+    // For now, accept buyer_id from body (skeleton)
+    println!("Received place bid request for item: {}", listing_id);
 
     let cmd = PlaceBidCommand {
-        user_id: body.user_id,
-        item_id: item_id.clone(),
+        buyer_id: body.buyer_id,
+        listing_id: listing_id.clone(),
         bid_amount: body.bid_amount,
     };
 
@@ -73,26 +73,26 @@ pub async fn place_bid(
 
     Ok(Json(BidResponse {
         bid_id: result.bid_id,
-        item_id: result.item_id,
-        user_id: result.user_id,
+        listing_id: result.listing_id,
+        buyer_id: result.buyer_id,
         bid_amount: result.bid_amount,
     }))
 }
     
-/// GET /api/items/{id}/bids/highest
+/// GET /api/items/{listing_id}/bids/highest
 /// 
 /// Returns the current highest bid for the specified item.
 pub async fn get_highest_bid(
     State(state): State<AppState>,
-    Path(item_id): Path<String>,
+    Path(listing_id): Path<String>,
 ) -> Result<Json<Option<HighestBidResponse>>, ApiError> {
 
-    let cmd =  GetHighestBidCommand {item_id};
+    let cmd =  GetHighestBidCommand {listing_id};
 
     let result = state.get_highest_bid.execute(cmd).await?;
 
     let response = result.map(|res| HighestBidResponse {
-            user_id: res.user_id,
+            buyer_id: res.buyer_id,
             bid_amount: res.bid_amount,
         });
 

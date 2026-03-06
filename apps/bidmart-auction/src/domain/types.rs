@@ -5,23 +5,23 @@ use uuid::Uuid;
 
 /// Unique item/auction identifier.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ItemId(pub String);
+pub struct ListingId(pub String);
 
-impl ItemId {
+impl ListingId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
 }
 
-impl fmt::Display for ItemId {
+impl fmt::Display for ListingId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl From<String> for ItemId {
+impl From<String> for ListingId {
     fn from(s: String) -> Self {
-        ItemId(s)
+        ListingId(s)
     }
 }
 
@@ -64,22 +64,19 @@ impl fmt::Display for BidId {
 }
 
 /// Monetary amount (avoids floating-point issues).
-// may switch to rupiah only
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Money(pub i64);
 
 impl Money {
-    pub fn from_cents(cents: i64) -> Self {
-        Self(cents)
+    pub fn from_rupiah(rupiah: i64) -> Self {
+        Money(rupiah)
     }
 
-    pub fn from_dollars(dollars: f64) -> Self {
-        Self((dollars * 100.0).round() as i64)
-    }
-
-    pub fn cents(&self) -> i64 {
+    pub fn rupiah(&self) -> i64 {
         self.0
     }
+
+
 }
 
 impl fmt::Display for Money {
@@ -89,8 +86,8 @@ impl fmt::Display for Money {
 }
 
 impl From<i64> for Money {
-    fn from(cents: i64) -> Self {
-        Money(cents)
+    fn from(rupiah: i64) -> Self {
+        Money(rupiah)
     }
 }
 
@@ -99,9 +96,9 @@ impl From<i64> for Money {
 pub struct IdempotencyKey(pub String);
 
 impl IdempotencyKey {
-    /// Create idempotency key from user_id, item_id, and bid_amount.
-    pub fn new(user_id: &UserId, item_id: &ItemId, amount: Money) -> Self {
-        Self(format!("bid:{}:{}:{}", item_id, user_id, amount))
+    /// Create idempotency key from buyer_id, listing_id, and bid_amount.
+    pub fn new(buyer_id: &UserId, listing_id: &ListingId, amount: Money) -> Self {
+        Self(format!("bid:{}:{}:{}", listing_id, buyer_id, amount))
     }
 }
 

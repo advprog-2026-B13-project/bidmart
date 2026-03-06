@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 /// Input for PlaceBidUseCase.
 #[derive(Debug, Deserialize)]
 pub struct PlaceBidCommand {
-    pub user_id: String,
-    pub item_id: String,
+    pub buyer_id: String,
+    pub listing_id: String,
     pub bid_amount: i64,
 }
 
@@ -14,15 +14,15 @@ pub struct PlaceBidCommand {
 #[derive(Debug, Serialize)]
 pub struct PlaceBidResult {
     pub bid_id: String,
-    pub user_id: String,
-    pub item_id: String,
+    pub buyer_id: String,
+    pub listing_id: String,
     pub bid_amount: i64,
 }
 
 pub struct GetHighestBidCommand {
-    pub item_id: String,
+    pub listing_id: String,
 }
 pub struct GetHighestBidResult {
-    pub user_id: String,
+    pub buyer_id: String,
     pub bid_amount: i64,
 }

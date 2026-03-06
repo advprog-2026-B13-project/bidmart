@@ -2,14 +2,14 @@
 
 use std::time::SystemTime;
 
-use super::types::{BidId, IdempotencyKey, ItemId, Money, UserId};
+use super::types::{BidId, IdempotencyKey, ListingId, Money, UserId};
 
 /// A bid placed by a user on an item.
 #[derive(Clone, Debug)]
 pub struct Bid {
     pub id: BidId,
-    pub item_id: ItemId,
-    pub user_id: UserId,
+    pub listing_id: ListingId,
+    pub buyer_id: UserId,
     pub amount: Money,
     pub idempotency_key: IdempotencyKey,
     pub placed_at: SystemTime,
@@ -17,15 +17,15 @@ pub struct Bid {
 
 impl Bid {
     pub fn new(
-        item_id: ItemId,
-        user_id: UserId,
+        listing_id: ListingId,
+        buyer_id: UserId,
         amount: Money,
         idempotency_key: IdempotencyKey,
     ) -> Self {
         Self {
             id: BidId::new(),
-            item_id,
-            user_id,
+            listing_id,
+            buyer_id,
             amount,
             idempotency_key,
             placed_at: SystemTime::now(),
