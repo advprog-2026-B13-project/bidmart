@@ -24,7 +24,6 @@ impl From<Uuid> for ListingId {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UserId(pub Uuid);
 
-
 impl fmt::Display for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

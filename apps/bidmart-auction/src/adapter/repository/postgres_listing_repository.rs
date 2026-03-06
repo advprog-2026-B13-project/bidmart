@@ -128,5 +128,4 @@ impl ListingRepository for PostgresListingRepository {
 
         Ok(())
     }
-
 }

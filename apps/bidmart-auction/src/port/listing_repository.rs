@@ -29,5 +29,4 @@ pub trait ListingRepository: Send + Sync {
 
     #[allow(dead_code)]
     async fn update(&self, listing: &Listing) -> Result<(), ListingRepositoryError>;
-
 }

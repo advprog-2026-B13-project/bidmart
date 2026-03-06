@@ -7,7 +7,6 @@ use crate::domain::types::Money;
 /// Domain errors represent business rule violations.
 #[derive(Debug, Error)]
 pub enum DomainError {
-
     #[error("bid amount must be positive")]
     InvalidBidAmount,
 
