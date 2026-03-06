@@ -1,0 +1,49 @@
+//! Use case: Place a bid on an item.
+
+use std::sync::Arc;
+
+use crate::app::dto::{PlaceBidCommand, PlaceBidResult};
+use crate::app::error::AppError;
+use crate::domain::bid::Bid;
+use crate::domain::bid_validator::BidValidator; 
+use crate::domain::types::{IdempotencyKey, ItemId, Money, UserId};
+use crate::port::bid_repository::BidRepository;
+
+pub struct PlaceBidUseCase {
+    pub bid_repo: Arc<dyn BidRepository>,
+}
+
+impl PlaceBidUseCase {
+    pub fn new(bid_repo: Arc<dyn BidRepository>) -> Self {
+        Self { bid_repo }
+    }
+
+    pub async fn execute(&self, cmd: PlaceBidCommand) -> Result<PlaceBidResult, AppError> {
+        // might add redis lock here for item_id to prevent concurrent bid processing
+        let user_id = UserId(cmd.user_id);
+        let item_id = ItemId(cmd.item_id);
+        let amount = Money(cmd.bid_amount);
+
+        // Get current highest bid
+        let current_highest_bid = self.bid_repo.get_highest_bid(&item_id).await?;
+
+    let current_highest_amount = current_highest_bid.map(|(_, amount)| amount);        // Validate using domain service
+        BidValidator::validate_new_bid(amount, current_highest_amount)?; 
+
+        // Create domain entity
+        let idempotency_key = IdempotencyKey::new(&user_id, &item_id, amount);
+        let bid = Bid::new(item_id, user_id, amount, idempotency_key);
+
+        // Save bid to repository
+        
+        let _ = self.bid_repo.save(&bid).await?;
+
+        // Return result
+        Ok(PlaceBidResult {
+            bid_id: bid.id.to_string(),
+            user_id: bid.user_id.0,
+            item_id: bid.item_id.0,
+            bid_amount: bid.amount.0,
+        })
+    }
+}
