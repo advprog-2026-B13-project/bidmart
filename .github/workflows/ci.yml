@@ -84,6 +84,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@v2
@@ -109,9 +111,16 @@ jobs:
         working-directory: apps/bidmart-core
         run: ./gradlew build
 
-      - name: Run tests
+      - name: Run tests + JaCoCo
         working-directory: apps/bidmart-core
-        run: ./gradlew test
+        run: ./gradlew test jacocoTestReport
+
+      - name: SonarCloud Scan
+        working-directory: apps/bidmart-core
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./gradlew sonar --info
 
       - name: Cleanup
         if: always()
@@ -124,6 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -231,11 +242,10 @@ jobs:
         with:
           projectBaseDir: apps/bidmart-fe
 
-  # ========== SUMMARY ==========
 
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, auction, core, fe, sonar-core, sonar-fe]
+    needs: [detect-changes, auction, core, fe]
     if: always()
     steps:
       - name: Check CI status
@@ -244,15 +254,9 @@ jobs:
             echo "❌ Auction CI failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.core.result }}" != "success" ]; then
-            echo "❌ Core CI failed"; exit 1
-          fi
-          if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.sonar-core.result }}" != "success" ]; then
-            echo "❌ Core SonarCloud failed"; exit 1
+            echo "❌ Core CI + SonarCloud failed"; exit 1
           fi
           if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.fe.result }}" != "success" ]; then
-            echo "❌ Frontend CI failed"; exit 1
-          fi
-          if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.sonar-fe.result }}" != "success" ]; then
-            echo "❌ Frontend SonarCloud failed"; exit 1
+            echo "❌ Frontend CI + SonarCloud failed"; exit 1
           fi
           echo "✅ All CI + SonarCloud checks passed"
