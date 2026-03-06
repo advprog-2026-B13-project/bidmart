@@ -2,17 +2,18 @@ package id.ac.ui.cs.advprog.bidmartcore.wallet.controller;
 
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/wallet")
+@RequiredArgsConstructor
 public class WalletController {
 
-    @Autowired
-    private WalletService walletService;
+    private final WalletService walletService;
 
     @PostMapping("/create/{userId}")
     public WalletModel createWallet(@PathVariable UUID userId) {
@@ -22,5 +23,12 @@ public class WalletController {
     @GetMapping("/{userId}")
     public WalletModel getWallet(@PathVariable UUID userId) {
         return walletService.getWalletByUserId(userId);
+    }
+
+    @PostMapping("/{userId}/topup")
+    public WalletModel topUp(
+            @PathVariable UUID userId,
+            @RequestParam BigDecimal amount) {
+        return walletService.topUp(userId, amount);
     }
 }

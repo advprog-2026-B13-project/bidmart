@@ -7,14 +7,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface WalletService {
-
     List<WalletModel> findAll();
-
     WalletModel createWallet(UUID userId);
-
-    WalletModel findByUserId(UUID userId);
-
     WalletModel getWalletByUserId(UUID userId);
-
-    WalletModel deposit(UUID userId, BigDecimal amount);
+    WalletModel topUp(UUID userId, BigDecimal amount);
 }
