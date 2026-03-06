@@ -6,19 +6,24 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 @Entity
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name="wallet")
+@Table(name = "wallet")
 public class WalletModel {
+
     @Id
-    @GeneratedValue(strategy= GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="SAMPLE_COLUMN", length=50)
-    private String sampleColumn;
+    @Column(nullable = false, unique = true)
+    private UUID userId;
+
+    @Column(nullable = false)
+    private BigDecimal balance;
 }

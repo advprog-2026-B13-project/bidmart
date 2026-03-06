@@ -7,4 +7,8 @@ import java.util.List;
 // TODO: rename atau modif file template ini
 public interface WalletRepository {
     List<WalletModel> findAll();
+
+    WalletModel save(WalletModel wallet);
+
+    WalletModel findByUserId(UUID userId);
 }

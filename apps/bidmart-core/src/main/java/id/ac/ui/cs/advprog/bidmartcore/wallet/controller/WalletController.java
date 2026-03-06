@@ -3,26 +3,24 @@ package id.ac.ui.cs.advprog.bidmartcore.wallet.controller;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 @RestController
 @RequestMapping("/api/wallet")
 public class WalletController {
+
     @Autowired
     private WalletService walletService;
 
-    @GetMapping("/all")
-    public Map<String, Object> getAll() {
-        List<WalletModel> walletDatas = walletService.findAll();
+    @PostMapping("/create/{userId}")
+    public WalletModel createWallet(@PathVariable UUID userId) {
+        return walletService.createWallet(userId);
+    }
 
-        return Map.of(
-                "results", walletDatas
-        );
+    @GetMapping("/{userId}")
+    public WalletModel getWallet(@PathVariable UUID userId) {
+        return walletService.getWalletByUserId(userId);
     }
 }

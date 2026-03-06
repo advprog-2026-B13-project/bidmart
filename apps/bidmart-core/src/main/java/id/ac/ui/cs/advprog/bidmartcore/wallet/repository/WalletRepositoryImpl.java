@@ -10,8 +10,22 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class WalletRepositoryImpl implements WalletRepository{
-    private final WalletSpringRepository springRepository;
+    private final WalletSpringRepository walletSpringRepository;
 
+    public WalletRepositoryImpl(WalletSpringRepository walletSpringRepository) {
+        this.walletSpringRepository = walletSpringRepository;
+    }
+
+    @Override
+    public WalletModel save(WalletModel wallet) {
+        return walletSpringRepository.save(wallet);
+    }
+
+    @Override
+    public WalletModel findByUserId(UUID userId) {
+        return walletSpringRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Wallet not found"));
+    }
     @Override
     public List<WalletModel> findAll() {
         return springRepository.findAll();
