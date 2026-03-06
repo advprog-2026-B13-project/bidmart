@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
+      SQLX_OFFLINE: true
     steps:
       - uses: actions/checkout@v4
 
