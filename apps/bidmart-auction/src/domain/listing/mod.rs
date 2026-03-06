@@ -2,7 +2,7 @@
 
 use std::time::SystemTime;
 
-use super::types::{ListingId, Money, UserId};
+use crate::domain::types::{ListingId, Money, UserId};
 
 #[derive(Clone, Debug)]
 pub struct Listing {

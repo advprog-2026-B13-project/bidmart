@@ -5,9 +5,9 @@ use std::sync::Arc;
 use axum::routing::{get, post};
 use axum::Router;
 
-use crate::app::get_highest_bid::GetHighestBidUseCase;
-use crate::app::place_bid::PlaceBidUseCase;
-use crate::app::register_listing::RegisterListingUseCase;
+use crate::app::use_case::get_highest_bid::GetHighestBidUseCase;
+use crate::app::use_case::place_bid::PlaceBidUseCase;
+use crate::app::use_case::register_listing::RegisterListingUseCase;
 
 use super::handlers;
 

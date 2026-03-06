@@ -82,7 +82,7 @@ pub async fn get_highest_bid(
 ) -> Result<Json<Option<HighestBidResponse>>, ApiError> {
     let cmd = GetHighestBidCommand { listing_id };
 
-    let result = state.get_highest_bid.execute(cmd).await?;
+    let result: Option<_> = state.get_highest_bid.execute(cmd).await?;
 
     let response = result.map(|res| HighestBidResponse {
         buyer_id: res.buyer_id,

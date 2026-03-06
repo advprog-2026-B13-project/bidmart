@@ -11,14 +11,15 @@ mod app;
 mod config;
 mod domain;
 mod port;
+mod shared;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use adapter::http::routes::{create_router, AppState};
-use app::place_bid::PlaceBidUseCase;
+use app::use_case::place_bid::PlaceBidUseCase;
 
-use crate::adapter::repository::{PostgresBidRepository, PostgresListingRepository};
+use crate::adapter::repository::postgres::{PostgresBidRepository, PostgresListingRepository};
 use crate::port::{BidRepository, ListingRepository};
 
 use crate::config::app_config::AppConfig;
@@ -49,12 +50,11 @@ async fn main() {
     let listing_repo: Arc<dyn ListingRepository> = Arc::new(PostgresListingRepository::new(pool));
     // Create use case with injected dependencies
     let place_bid = Arc::new(PlaceBidUseCase::new(bid_repo, listing_repo.clone())); // Update constructor
-    let get_highest_bid = Arc::new(app::get_highest_bid::GetHighestBidUseCase::new(
+    let get_highest_bid = Arc::new(app::use_case::get_highest_bid::GetHighestBidUseCase::new(
         place_bid.bid_repo.clone(),
     ));
-    let register_listing = Arc::new(app::register_listing::RegisterListingUseCase::new(
-        listing_repo,
-    ));
+    let register_listing =
+        Arc::new(app::use_case::register_listing::RegisterListingUseCase::new(listing_repo));
 
     // Build app state
     let state = AppState {

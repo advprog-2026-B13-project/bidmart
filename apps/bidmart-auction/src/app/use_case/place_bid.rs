@@ -5,8 +5,8 @@ use std::time::SystemTime;
 
 use crate::app::dto::{PlaceBidCommand, PlaceBidResult};
 use crate::app::error::AppError;
+use crate::domain::bid::bid_validator::BidValidator;
 use crate::domain::bid::Bid;
-use crate::domain::bid_validator::BidValidator;
 use crate::domain::error::DomainError;
 use crate::domain::types::{IdempotencyKey, ListingId, Money, UserId};
 use crate::port::bid_repository::BidRepository;

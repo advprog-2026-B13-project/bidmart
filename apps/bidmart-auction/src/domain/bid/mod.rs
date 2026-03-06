@@ -2,7 +2,7 @@
 
 use std::time::SystemTime;
 
-use super::types::{BidId, IdempotencyKey, ListingId, Money, UserId};
+use crate::domain::types::{BidId, IdempotencyKey, ListingId, Money, UserId};
 
 /// A bid placed by a user on a listing.
 #[derive(Clone, Debug)]
@@ -32,3 +32,5 @@ impl Bid {
         }
     }
 }
+
+pub mod bid_validator;
