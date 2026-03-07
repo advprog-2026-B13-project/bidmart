@@ -40,3 +40,15 @@ pub struct RegisterListingCommand {
 pub struct RegisterListingResult {
     pub listing_id: Uuid,
 }
+
+/// Input for DeleteListingUseCase.
+#[derive(Debug, Deserialize)]
+pub struct DeleteListingCommand {
+    pub listing_id: Uuid,
+}
+
+/// Output from DeleteListingUseCase.
+#[derive(Debug, Serialize)]
+pub struct DeleteListingResult {
+    pub listing_id: Uuid,
+}

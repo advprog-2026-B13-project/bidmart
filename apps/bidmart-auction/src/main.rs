@@ -54,13 +54,16 @@ async fn main() {
         place_bid.bid_repo.clone(),
     ));
     let register_listing =
-        Arc::new(app::use_case::register_listing::RegisterListingUseCase::new(listing_repo));
+        Arc::new(app::use_case::register_listing::RegisterListingUseCase::new(listing_repo.clone()));
+    let delete_listing =
+        Arc::new(app::use_case::delete_listing::DeleteListingUseCase::new(listing_repo));
 
     // Build app state
     let state = AppState {
         place_bid: place_bid.clone(),
         get_highest_bid: get_highest_bid.clone(),
         register_listing: register_listing.clone(),
+        delete_listing,
     };
 
     // Create router

@@ -128,4 +128,25 @@ impl ListingRepository for PostgresListingRepository {
 
         Ok(())
     }
+
+    async fn delete(&self, id: &ListingId) -> Result<(), ListingRepositoryError> {
+        tracing::info!("Deleting listing: id={}", id.0);
+
+        let result = sqlx::query!(
+            r#"
+            DELETE FROM listings
+            WHERE id = $1
+            "#,
+            id.0
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ListingRepositoryError::InfrastructureError(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(ListingRepositoryError::NotFound(*id));
+        }
+
+        Ok(())
+    }
 }

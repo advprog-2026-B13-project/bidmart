@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::adapter::http::error::ApiError;
 use crate::adapter::http::routes::AppState;
-use crate::app::dto::{GetHighestBidCommand, PlaceBidCommand, RegisterListingCommand};
+use crate::app::dto::{DeleteListingCommand, GetHighestBidCommand, PlaceBidCommand, RegisterListingCommand};
 
 /// POST /api/listing/{id}/bids request body.
 #[derive(Debug, Deserialize)]
@@ -107,6 +107,30 @@ pub struct RegisterListingRequest {
 #[derive(Debug, Serialize)]
 pub struct RegisterListingResponse {
     pub listing_id: Uuid,
+}
+
+/// Response returned by delete_listing.
+#[derive(Debug, Serialize)]
+pub struct DeleteListingResponse {
+    pub listing_id: Uuid,
+}
+
+/// DELETE /api/listing/{listing_id}
+///
+/// Deletes a listing by ID. Returns 404 if listing doesn't exist.
+pub async fn delete_listing(
+    State(state): State<AppState>,
+    Path(listing_id): Path<Uuid>,
+) -> Result<Json<DeleteListingResponse>, ApiError> {
+    tracing::info!("Received delete listing request: id={}", listing_id);
+
+    let cmd = DeleteListingCommand { listing_id };
+
+    let result = state.delete_listing.execute(cmd).await?;
+
+    Ok(Json(DeleteListingResponse {
+        listing_id: result.listing_id,
+    }))
 }
 
 /// POST /api/listing/new

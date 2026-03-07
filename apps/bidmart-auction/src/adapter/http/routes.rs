@@ -2,9 +2,10 @@
 
 use std::sync::Arc;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
+use crate::app::use_case::delete_listing::DeleteListingUseCase;
 use crate::app::use_case::get_highest_bid::GetHighestBidUseCase;
 use crate::app::use_case::place_bid::PlaceBidUseCase;
 use crate::app::use_case::register_listing::RegisterListingUseCase;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub place_bid: Arc<PlaceBidUseCase>,
     pub get_highest_bid: Arc<GetHighestBidUseCase>,
     pub register_listing: Arc<RegisterListingUseCase>,
+    pub delete_listing: Arc<DeleteListingUseCase>,
 }
 
 /// Build the Axum router with all routes.
@@ -30,5 +32,6 @@ pub fn create_router(state: AppState) -> Router {
             get(handlers::get_highest_bid),
         )
         .route("/api/listing/new", post(handlers::register_listing))
+        .route("/api/listing/:listing_id", delete(handlers::delete_listing))
         .with_state(state)
 }

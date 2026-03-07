@@ -29,4 +29,7 @@ pub trait ListingRepository: Send + Sync {
 
     #[allow(dead_code)]
     async fn update(&self, listing: &Listing) -> Result<(), ListingRepositoryError>;
+
+    /// Delete a listing by ID.
+    async fn delete(&self, id: &ListingId) -> Result<(), ListingRepositoryError>;
 }
