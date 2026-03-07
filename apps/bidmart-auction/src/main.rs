@@ -53,10 +53,12 @@ async fn main() {
     let get_highest_bid = Arc::new(app::use_case::get_highest_bid::GetHighestBidUseCase::new(
         place_bid.bid_repo.clone(),
     ));
-    let register_listing =
-        Arc::new(app::use_case::register_listing::RegisterListingUseCase::new(listing_repo.clone()));
-    let delete_listing =
-        Arc::new(app::use_case::delete_listing::DeleteListingUseCase::new(listing_repo));
+    let register_listing = Arc::new(
+        app::use_case::register_listing::RegisterListingUseCase::new(listing_repo.clone()),
+    );
+    let delete_listing = Arc::new(app::use_case::delete_listing::DeleteListingUseCase::new(
+        listing_repo,
+    ));
 
     // Build app state
     let state = AppState {

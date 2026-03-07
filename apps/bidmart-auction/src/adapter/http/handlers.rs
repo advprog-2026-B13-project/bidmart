@@ -7,7 +7,9 @@ use uuid::Uuid;
 
 use crate::adapter::http::error::ApiError;
 use crate::adapter::http::routes::AppState;
-use crate::app::dto::{DeleteListingCommand, GetHighestBidCommand, PlaceBidCommand, RegisterListingCommand};
+use crate::app::dto::{
+    DeleteListingCommand, GetHighestBidCommand, PlaceBidCommand, RegisterListingCommand,
+};
 
 /// POST /api/listing/{id}/bids request body.
 #[derive(Debug, Deserialize)]
