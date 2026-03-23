@@ -8,4 +8,5 @@ public interface ListingService {
     Listing updateListing(UUID id, Listing updatedListing);
     Listing getListingById(UUID id);
     void deleteListing(UUID id);
+    void updateCurrentPriceAndWinner(UUID listingId, java.math.BigDecimal newPrice, UUID winnerId);
 }

@@ -3,7 +3,9 @@ package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -42,5 +44,15 @@ public class ListingServiceImpl implements ListingService {
             throw new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan");
         }
         listingRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public void updateCurrentPriceAndWinner(UUID listingId, BigDecimal newPrice, UUID winnerId) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+        listing.setCurrentPrice(newPrice);
+        listing.setWinnerId(winnerId);
+        listingRepository.save(listing);
     }
 }

@@ -69,6 +69,9 @@ public class Listing {
     @Column(nullable = false)
     private ListingStatus status = ListingStatus.DRAFT;
 
+    @Column(name = "winner_id")
+    private UUID winnerId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
