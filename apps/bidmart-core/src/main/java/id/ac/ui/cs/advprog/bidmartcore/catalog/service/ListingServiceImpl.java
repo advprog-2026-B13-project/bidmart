@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,15 @@ public class ListingServiceImpl implements ListingService {
                 .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
         listing.setCurrentPrice(newPrice);
         listing.setWinnerId(winnerId);
+        listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public void updateStatus(UUID listingId, ListingStatus status) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+        listing.setStatus(status);
         listingRepository.save(listing);
     }
 }

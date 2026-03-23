@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
+
 import java.util.UUID;
 
 public interface ListingService {
@@ -9,4 +11,5 @@ public interface ListingService {
     Listing getListingById(UUID id);
     void deleteListing(UUID id);
     void updateCurrentPriceAndWinner(UUID listingId, java.math.BigDecimal newPrice, UUID winnerId);
+    void updateStatus(UUID listingId, ListingStatus status);
 }
