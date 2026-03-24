@@ -161,54 +161,7 @@ jobs:
         run: pnpm build
 
   # ========== SONARCLOUD SCANS ==========
-
-  sonar-core:
-    needs: [detect-changes, core]
-    if: needs.detect-changes.outputs.core == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v2
-        with:
-          version: latest
-
-      - name: Run services
-        working-directory: infra
-        run: docker compose -f dev-compose.yml up -d
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Make gradlew executable
-        working-directory: apps/bidmart-core
-        run: chmod +x gradlew
-
-      - name: Run tests + JaCoCo
-        working-directory: apps/bidmart-core
-        run: ./gradlew test jacocoTestReport
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: apps/bidmart-core
-
-      - name: Cleanup
-        if: always()
-        working-directory: infra
-        run: docker compose -f dev-compose.yml down
-
+  
   sonar-fe:
     needs: [detect-changes, fe]
     if: needs.detect-changes.outputs.fe == 'true'
