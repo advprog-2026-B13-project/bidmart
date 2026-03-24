@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.application.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -31,7 +32,7 @@ public class EnglishAuctionValidator {
             throw new IllegalArgumentException("Lelang belum aktif atau sudah ditutup");
         }
 
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
         if (now.isAfter(listing.endTime())) {
             throw new IllegalArgumentException("Lelang sudah berakhir");
         }

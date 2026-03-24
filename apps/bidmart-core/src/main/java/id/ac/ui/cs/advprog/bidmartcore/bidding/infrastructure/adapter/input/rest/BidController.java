@@ -29,23 +29,19 @@ public class BidController {
     @RequireLogin
     @Operation(summary = "Place a bid on a listing")
     public ResponseEntity<ApiResponse<BidResponse>> placeBid(@Valid @RequestBody BidRequest request) {
-        try {
-            UUID bidderId = authContext.getUserId();
-            BidResult result = biddingUseCase.placeBid(request.getListingId(), request.getAmount(), bidderId);
+        UUID bidderId = authContext.getUserId();
+        BidResult result = biddingUseCase.placeBid(request.getListingId(), request.getAmount(), bidderId);
 
-            BidResponse response = new BidResponse(
-                    result.bidId(),
-                    result.listingId(),
-                    result.bidderId(),
-                    result.amount(),
-                    result.status(),
-                    result.createdAt()
-            );
+        BidResponse response = new BidResponse(
+                result.bidId(),
+                result.listingId(),
+                result.bidderId(),
+                result.amount(),
+                result.status(),
+                result.createdAt()
+        );
 
-            return ResponseEntity.ok(ApiResponse.success("Penawaran berhasil", response));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
+        return ResponseEntity.ok(ApiResponse.success("Penawaran berhasil", response));
     }
 
     @GetMapping("/listings/{listingId}/bids")
@@ -83,19 +79,14 @@ public class BidController {
     @GetMapping("/listings/{listingId}/status")
     @Operation(summary = "Get auction status for a listing")
     public ResponseEntity<ApiResponse<AuctionStatusResponse>> getAuctionStatus(@PathVariable UUID listingId) {
-        try {
-            AuctionStatusResult result = biddingUseCase.getAuctionStatus(listingId);
-            AuctionStatusResponse response = new AuctionStatusResponse(
-                    result.listingId(),
-                    result.currentPrice(),
-                    result.currentWinnerId(),
-                    result.myHighestBid(),
-                    result.endTime(),
-                    result.status()
-            );
-            return ResponseEntity.ok(ApiResponse.success(response));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
+        AuctionStatusResult result = biddingUseCase.getAuctionStatus(listingId);
+        AuctionStatusResponse response = new AuctionStatusResponse(
+                result.listingId(),
+                result.currentPrice(),
+                result.currentWinnerId(),
+                result.endTime(),
+                result.status()
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

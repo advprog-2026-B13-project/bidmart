@@ -9,7 +9,6 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.OutbidEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.EventPublisherPort;
 import lombok.RequiredArgsConstructor;
 
-// might change to use RabbitMQ in the future
 @Component
 @RequiredArgsConstructor
 public class SpringEventPublisherAdapter implements EventPublisherPort {

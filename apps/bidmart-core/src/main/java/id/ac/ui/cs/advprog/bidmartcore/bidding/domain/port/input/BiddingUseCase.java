@@ -25,7 +25,6 @@ public interface BiddingUseCase {
             UUID listingId,
             BigDecimal currentPrice,
             UUID currentWinnerId,
-            BigDecimal myHighestBid,
             LocalDateTime endTime,
             String status
     ) {}

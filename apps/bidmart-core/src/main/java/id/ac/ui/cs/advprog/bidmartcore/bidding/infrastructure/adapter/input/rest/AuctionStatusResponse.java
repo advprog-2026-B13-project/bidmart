@@ -17,7 +17,6 @@ public class AuctionStatusResponse {
     private UUID listingId;
     private BigDecimal currentPrice;
     private UUID currentWinnerId;
-    private BigDecimal myHighestBid;
     private LocalDateTime endTime;
     private String status;
 }

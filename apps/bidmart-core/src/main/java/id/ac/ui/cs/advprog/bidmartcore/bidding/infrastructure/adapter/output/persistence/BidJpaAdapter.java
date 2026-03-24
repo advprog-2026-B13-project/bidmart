@@ -38,7 +38,6 @@ public class BidJpaAdapter implements BidRepositoryPort {
 
     @Override
     public Optional<Bid> findTopBid(UUID listingId) {
-        List<Bid> bids = bidRepository.findByListingIdOrderByAmountDescCreatedAtAsc(listingId);
-        return bids.isEmpty() ? Optional.empty() : Optional.of(bids.get(0));
+        return bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtAsc(listingId);
     }
 }

@@ -127,7 +127,6 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 listingId,
                 listing.currentPrice(),
                 topBid.map(Bid::getBidderId).orElse(null),
-                null,
                 listing.endTime(),
                 listing.status().name()
         );
