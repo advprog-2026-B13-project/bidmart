@@ -1,41 +1,39 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.output.catalog;
 
+import java.util.UUID;
+
+import org.springframework.stereotype.Component;
+
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ConcurrencyPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort;
-import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class ListingCatalogAdapter implements ListingPort {
 
     private final ListingService listingService;
+    private final ConcurrencyPort concurrencyPort;
 
     @Override
     public ListingInfo getListingInfo(UUID listingId) {
         Listing listing = listingService.getListingById(listingId);
-        return new ListingInfo(
+        ListingInfo info = new ListingInfo(
                 listing.getSellerId(),
                 listing.getStatus(),
                 listing.getStartingPrice(),
                 listing.getCurrentPrice(),
-                listing.getEndTime()
+                listing.getReservePrice(),
+                listing.getEndTime(),
+                listing.getWinnerId()
         );
-    }
 
-    @Override
-    public void updateCurrentPriceAndWinner(UUID listingId, BigDecimal newPrice, UUID winnerId) {
-        listingService.updateCurrentPriceAndWinner(listingId, newPrice, winnerId);
-    }
-
-    @Override
-    public void updateStatus(UUID listingId, ListingStatus status) {
-        listingService.updateStatus(listingId, status);
+        if (listing.getStatus() == ListingStatus.ACTIVE) {
+            concurrencyPort.cacheAuction(listingId, info);
+        }
+        return info;
     }
 }

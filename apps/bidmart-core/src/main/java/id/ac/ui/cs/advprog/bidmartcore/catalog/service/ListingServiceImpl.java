@@ -1,13 +1,15 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
-import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.UUID;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 
 @Service
 public class ListingServiceImpl implements ListingService {
@@ -63,6 +65,15 @@ public class ListingServiceImpl implements ListingService {
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
         listing.setStatus(status);
+        listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public void updateEndTime(UUID listingId, LocalDateTime endTime) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+        listing.setEndTime(endTime);
         listingRepository.save(listing);
     }
 }

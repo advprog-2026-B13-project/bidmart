@@ -40,4 +40,14 @@ public class BidJpaAdapter implements BidRepositoryPort {
     public Optional<Bid> findTopBid(UUID listingId) {
         return bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtAsc(listingId);
     }
+
+    @Override
+    public Optional<Bid> findTopByListingAndBidder(UUID listingId, UUID bidderId) {
+        return bidRepository.findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtAsc(listingId, bidderId);
+    }
+
+    @Override
+    public Optional<Bid> findPreviousWinningBidByBidder(UUID listingId, UUID bidderId, UUID excludeBidId) {
+        return bidRepository.findFirstByListingIdAndBidderIdAndIdNotOrderByAmountDescCreatedAtAsc(listingId, bidderId, excludeBidId);
+    }
 }
