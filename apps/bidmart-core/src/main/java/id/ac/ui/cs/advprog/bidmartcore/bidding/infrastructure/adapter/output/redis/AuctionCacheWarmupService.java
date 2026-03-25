@@ -40,6 +40,7 @@ public class AuctionCacheWarmupService {
                     listing.getStartingPrice(),
                     listing.getCurrentPrice(),
                     listing.getReservePrice(),
+                    listing.getMinBidIncrement(),
                     listing.getEndTime(),
                     listing.getWinnerId()
             );

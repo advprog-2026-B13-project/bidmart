@@ -4,6 +4,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ public class ListingController {
         newListing.setImageUrl(requestDTO.getImageUrl());
         newListing.setStartingPrice(requestDTO.getStartingPrice());
         newListing.setReservePrice(requestDTO.getReservePrice());
+        newListing.setMinBidIncrement(requestDTO.getMinBidIncrement());
         newListing.setStartTime(requestDTO.getStartTime());
         newListing.setEndTime(requestDTO.getEndTime());
         Category category = new Category();
@@ -51,6 +53,11 @@ public class ListingController {
     public ResponseEntity<Listing> updateListing(
             @PathVariable UUID id,
             @Valid @RequestBody ListingUpdateRequest requestDTO) {
+
+        Listing existing = listingService.getListingById(id);
+        if (existing.getStatus() != ListingStatus.DRAFT) {
+            return ResponseEntity.badRequest().build();
+        }
 
         Listing updateData = new Listing();
         updateData.setDescription(requestDTO.getDescription());

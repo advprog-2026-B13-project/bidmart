@@ -56,7 +56,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
 
         // Redis atomic execution with bounded retry
         long bidRupiah = amount.longValue();
-        long minIncrementRupiah = properties.getMinBidIncrement().longValue();
+        long minIncrementRupiah = listing.minBidIncrement().longValue();
         long antiSnipeThresholdMillis = properties.getAntiSnipeSecondsBeforeClose() * 1000L;
         long antiSnipeExtensionMillis = properties.getAntiSnipeExtensionSeconds() * 1000L;
 

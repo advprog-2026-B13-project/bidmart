@@ -15,6 +15,7 @@ public interface ListingPort {
             BigDecimal startingPrice,
             BigDecimal currentPrice,
             BigDecimal reservePrice,
+            BigDecimal minBidIncrement,
             LocalDateTime endTime,
             UUID winnerId
     ) {}
