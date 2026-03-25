@@ -8,14 +8,15 @@ import java.util.UUID;
 
 public interface ListingPort {
     ListingInfo getListingInfo(UUID listingId);
-    void updateCurrentPriceAndWinner(UUID listingId, BigDecimal newPrice, UUID winnerId);
-    void updateStatus(UUID listingId, ListingStatus status);
 
     record ListingInfo(
             UUID sellerId,
             ListingStatus status,
             BigDecimal startingPrice,
             BigDecimal currentPrice,
-            LocalDateTime endTime
+            BigDecimal reservePrice,
+            BigDecimal minBidIncrement,
+            LocalDateTime endTime,
+            UUID winnerId
     ) {}
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.Setter;
@@ -53,6 +54,11 @@ public class Listing {
     @Column(name = "reserve_price", nullable = false)
     private BigDecimal reservePrice;
 
+    @NotNull(message = "Minimal increment harus diisi")
+    @Positive(message = "Minimal increment harus lebih dari nol")
+    @Column(name = "min_bid_increment", nullable = false)
+    private BigDecimal minBidIncrement;
+
     @Column(name = "current_price", nullable = false)
     private BigDecimal currentPrice;
 
@@ -86,6 +92,10 @@ public class Listing {
 
         if (currentPrice == null) {
             currentPrice = startingPrice;
+        }
+
+        if (minBidIncrement == null) {
+            minBidIncrement = BigDecimal.ONE;
         }
 
         createdAt = LocalDateTime.now();

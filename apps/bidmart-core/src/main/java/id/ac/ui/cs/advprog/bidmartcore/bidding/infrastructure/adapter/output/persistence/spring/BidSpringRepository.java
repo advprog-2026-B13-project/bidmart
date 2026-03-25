@@ -13,4 +13,6 @@ public interface BidSpringRepository extends JpaRepository<Bid, UUID> {
     List<Bid> findByListingIdOrderByAmountDescCreatedAtAsc(UUID listingId);
     List<Bid> findByBidderIdOrderByCreatedAtDesc(UUID bidderId);
     Optional<Bid> findFirstByListingIdOrderByAmountDescCreatedAtAsc(UUID listingId);
+    Optional<Bid> findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtAsc(UUID listingId, UUID bidderId);
+    Optional<Bid> findFirstByListingIdAndBidderIdAndIdNotOrderByAmountDescCreatedAtAsc(UUID listingId, UUID bidderId, UUID excludeBidId);
 }
