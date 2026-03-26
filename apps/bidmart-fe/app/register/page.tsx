@@ -3,9 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Failed to create account. Please try again.";
+}
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -35,9 +44,21 @@ export default function RegisterPage() {
       setError("Please agree to the Terms of Service.");
       return;
     }
+
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    router.push("/login?registered=true");
+
+    try {
+      await register({
+        email: formData.email,
+        password: formData.password,
+        displayName: formData.name || undefined,
+      });
+      router.push("/login?registered=true");
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

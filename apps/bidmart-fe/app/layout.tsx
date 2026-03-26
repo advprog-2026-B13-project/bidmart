@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import { AuthProvider } from "@/components/auth-provider";
+import { AuthNavActions } from "@/components/auth-nav-actions";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -73,12 +75,7 @@ function NavBar() {
               </svg>
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-hot text-white text-[10px] font-black flex items-center justify-center">3</span>
             </button>
-            <Link href="/login" className="btn btn-ghost btn-sm">
-              Sign In
-            </Link>
-            <Link href="/register" className="btn btn-acid btn-sm">
-              Join Free
-            </Link>
+            <AuthNavActions />
           </div>
         </div>
       </div>
@@ -147,12 +144,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${dmSans.variable} antialiased`}>
-        <div className="min-h-screen flex flex-col bg-white">
-          <NavBar />
-          <MarqueeStrip />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
+        <AuthProvider>
+          <div className="min-h-screen flex flex-col bg-white">
+            <NavBar />
+            <MarqueeStrip />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

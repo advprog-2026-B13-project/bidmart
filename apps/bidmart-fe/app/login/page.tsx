@@ -1,31 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
+import { requestEmailOtp } from "@/lib/auth/auth-api";
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Request failed. Please try again.";
+}
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, verifyMfa, isAuthenticated, isHydrating } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [showMfa, setShowMfa] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
+  const [preAuthToken, setPreAuthToken] = useState("");
+  const [mfaType, setMfaType] = useState("");
+
+  useEffect(() => {
+    if (!isHydrating && isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isAuthenticated, isHydrating, router]);
+
+  useEffect(() => {
+    if (searchParams.get("registered") === "true") {
+      setSuccessMessage("Account created. Please sign in.");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    if (email === "demo@bidmart.com" && password === "demo") {
-      setShowMfa(true);
-      setIsLoading(false);
-    } else if (email && password) {
-      router.push("/");
-    } else {
-      setError("Please enter your email and password.");
+
+    try {
+      const result = await login({ email, password });
+
+      if (result.requiresMfa) {
+        setPreAuthToken(result.preAuthToken);
+        setMfaType(result.mfaType || "");
+        setShowMfa(true);
+
+        if (result.mfaType?.toUpperCase() === "EMAIL") {
+          await requestEmailOtp(result.preAuthToken);
+          setSuccessMessage("A verification code was sent to your email.");
+        }
+      } else {
+        router.push("/");
+      }
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    } finally {
       setIsLoading(false);
     }
   };
@@ -33,12 +71,22 @@ export default function LoginPage() {
   const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
+
+    if (!preAuthToken) {
+      setError("MFA session expired. Please login again.");
+      setShowMfa(false);
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    if (mfaCode === "123456") {
+
+    try {
+      await verifyMfa({ preAuthToken, code: mfaCode });
       router.push("/");
-    } else {
-      setError("Invalid verification code. Try 123456 for demo.");
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    } finally {
       setIsLoading(false);
     }
   };
@@ -106,6 +154,12 @@ export default function LoginPage() {
               {error && (
                 <div className="mb-5 p-4 bg-hot/10 border-2 border-hot text-hot text-sm font-bold">
                   {error}
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="mb-5 p-4 bg-acid/20 border-2 border-black text-black text-sm font-bold">
+                  {successMessage}
                 </div>
               )}
 
@@ -221,13 +275,21 @@ export default function LoginPage() {
                   VERIFY
                 </h1>
                 <p className="text-gray-500 font-medium">
-                  Enter the 6-digit code sent to your email
+                  {mfaType.toUpperCase() === "TOTP"
+                    ? "Enter the 6-digit authenticator code"
+                    : "Enter the 6-digit code sent to your email"}
                 </p>
               </div>
 
               {error && (
                 <div className="mb-5 p-4 bg-hot/10 border-2 border-hot text-hot text-sm font-bold text-center">
                   {error}
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="mb-5 p-4 bg-acid/20 border-2 border-black text-black text-sm font-bold text-center">
+                  {successMessage}
                 </div>
               )}
 
@@ -243,7 +305,7 @@ export default function LoginPage() {
                     required
                   />
                   <p className="text-xs text-center text-gray-400 mt-3 font-medium">
-                    Demo: use <span className="font-black text-electric">123456</span>
+                    Enter your current 6-digit verification code.
                   </p>
                 </div>
 
@@ -257,7 +319,14 @@ export default function LoginPage() {
               </form>
 
               <button
-                onClick={() => { setShowMfa(false); setMfaCode(""); setError(""); }}
+                onClick={() => {
+                  setShowMfa(false);
+                  setMfaCode("");
+                  setPreAuthToken("");
+                  setMfaType("");
+                  setError("");
+                  setSuccessMessage("");
+                }}
                 className="mt-5 lg:mt-6 btn btn-ghost w-full font-bold uppercase text-[11px] lg:text-sm"
               >
                 ← Back to login
