@@ -5,7 +5,7 @@ import { categories } from "@/lib/mock-data";
 
 export default function CategoriesPage() {
   const featured = categories.slice(0, 3);
-  const rest = categories.slice(3);
+  // const rest = categories.slice(3);
 
   return (
     <div>

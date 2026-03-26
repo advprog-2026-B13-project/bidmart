@@ -10,7 +10,7 @@ function CountdownTimer({ endTime }: { endTime: Date }) {
   const urgency = getTimeUrgency(endTime);
 
   useEffect(() => {
-    setMounted(true);
+    (() => setMounted(true))();
     const update = () => setTimeLeft(formatTimeRemaining(endTime));
     update();
     const interval = setInterval(update, 1000);

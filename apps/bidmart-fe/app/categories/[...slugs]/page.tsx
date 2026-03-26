@@ -105,7 +105,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
   }
 
   // Get listings for this category (including subcategory listings)
-  let listings = mockListings.filter(l => {
+  let listings = mockListings.filter(() => {
     const catPath = categoryTree.find(c => c.slug === slugs[0]);
     if (!catPath) return false;
 
@@ -158,7 +158,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
             alt={category.name}
             className="w-full h-full object-cover opacity-40"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-r from-black via-black/90 to-transparent" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 py-12">
           {/* Breadcrumb */}
@@ -211,7 +211,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                     alt={child.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">
                     <h3 className="font-black text-base text-white uppercase tracking-tight mb-1">
                       {child.name}
@@ -247,7 +247,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="input py-2 px-4 text-sm font-bold w-auto min-w-[180px]"
+                  className="input py-2 px-4 text-sm font-bold w-auto min-w-45"
                 >
                   <option value="ending-soon">ENDING SOON</option>
                   <option value="price-low">PRICE: LOW → HIGH</option>
@@ -260,7 +260,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="input py-2 px-4 text-sm font-bold w-auto min-w-[160px] hidden md:block"
+                className="input py-2 px-4 text-sm font-bold w-auto min-w-40 hidden md:block"
               >
                 <option value="all">ALL STATUS</option>
                 <option value="active">ACTIVE ONLY</option>
