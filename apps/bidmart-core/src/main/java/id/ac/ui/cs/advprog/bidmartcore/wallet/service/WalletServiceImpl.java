@@ -2,18 +2,24 @@ package id.ac.ui.cs.advprog.bidmartcore.wallet.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletRepository;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletTransactionModel;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletTransactionRepository;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.TransactionType;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
+    private final WalletTransactionRepository transactionRepository;
 
     @Override
     public WalletModel createWallet(UUID userId) {
@@ -42,5 +48,135 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public List<WalletModel> findAll() {
         return walletRepository.findAll();
+    }
+
+    @Override
+    @Transactional
+    public WalletModel withdraw(UUID userId, BigDecimal amount) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Insufficient balance");
+        }
+
+        wallet.setAvailableBalance(
+                wallet.getAvailableBalance().subtract(amount)
+        );
+
+        walletRepository.save(wallet);
+
+        transactionRepository.save(
+                new WalletTransactionModel(
+                        null,
+                        wallet.getId(),
+                        TransactionType.WITHDRAW,
+                        amount,
+                        null,
+                        LocalDateTime.now()
+                )
+        );
+
+        return wallet;
+    }
+
+    @Override
+    public List<WalletTransactionModel> getTransactions(UUID userId) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+        return transactionRepository.findByWalletId(wallet.getId());
+    }
+
+    @Override
+    @Transactional
+    public WalletModel convertHoldToPayment(UUID userId, BigDecimal amount) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        if (wallet.getHeldBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Insufficient held balance");
+        }
+
+        wallet.setHeldBalance(
+                wallet.getHeldBalance().subtract(amount)
+        );
+
+        walletRepository.save(wallet);
+
+        transactionRepository.save(
+                new WalletTransactionModel(
+                        null,
+                        wallet.getId(),
+                        TransactionType.PAYMENT,
+                        amount,
+                        null,
+                        LocalDateTime.now()
+                )
+        );
+
+        return wallet;
+    }
+
+    @Override
+    @Transactional
+    public WalletModel releaseBalance(UUID userId, BigDecimal amount) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        if (wallet.getHeldBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Insufficient held balance");
+        }
+
+        wallet.setHeldBalance(
+                wallet.getHeldBalance().subtract(amount)
+        );
+
+        wallet.setAvailableBalance(
+                wallet.getAvailableBalance().add(amount)
+        );
+
+        walletRepository.save(wallet);
+
+        transactionRepository.save(
+                new WalletTransactionModel(
+                        null,
+                        wallet.getId(),
+                        TransactionType.RELEASE,
+                        amount,
+                        null,
+                        LocalDateTime.now()
+                )
+        );
+
+        return wallet;
+    }
+
+    @Override
+    @Transactional
+    public WalletModel holdBalance(UUID userId, BigDecimal amount) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Insufficient available balance");
+        }
+
+        wallet.setAvailableBalance(
+                wallet.getAvailableBalance().subtract(amount)
+        );
+
+        wallet.setHeldBalance(
+                wallet.getHeldBalance().add(amount)
+        );
+
+        walletRepository.save(wallet);
+
+        transactionRepository.save(
+                new WalletTransactionModel(
+                        null,
+                        wallet.getId(),
+                        TransactionType.HOLD,
+                        amount,
+                        null,
+                        LocalDateTime.now()
+                )
+        );
+
+        return wallet;
     }
 }
