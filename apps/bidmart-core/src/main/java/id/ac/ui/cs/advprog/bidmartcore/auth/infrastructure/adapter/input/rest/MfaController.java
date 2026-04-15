@@ -28,14 +28,14 @@ public class MfaController {
                     + "The TOTP is not active until confirmed via `/confirm-totp`."
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "TOTP setup initiated — returns `secret` and `otpAuthUrl`"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "TOTP setup initiated - returns `secret` and `otpAuthUrl`"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "TOTP is already set up and active"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<ApiResponse<Map<String, Object>>> setupTotp() {
+    public ResponseEntity<ApiResponse<TotpSetupResponse>> setupTotp() {
         try {
             Map<String, Object> result = mfaUseCase.setupTotp(authContext.getUserId());
-            return ResponseEntity.ok(ApiResponse.success("TOTP setup initiated", result));
+            return ResponseEntity.ok(ApiResponse.success("TOTP setup initiated", TotpSetupResponse.fromMap(result)));
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
@@ -96,7 +96,7 @@ public class MfaController {
     @Operation(
             summary = "Request Email OTP",
             description = "Sends a 6-digit OTP to the user's registered email. Requires a valid `preAuthToken` obtained from the login endpoint. "
-                    + "No Bearer token is needed — this is a pre-authentication step.",
+                    + "No Bearer token is needed - this is a pre-authentication step.",
             security = {}
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -117,17 +117,17 @@ public class MfaController {
             summary = "Verify MFA code and complete login",
             description = "Verifies the TOTP or Email OTP code against the pre-authentication session. "
                     + "On success, the pre-auth session is consumed and a full session with `accessToken` and `refreshToken` is returned. "
-                    + "No Bearer token is needed — this is a pre-authentication step.",
+                    + "No Bearer token is needed - this is a pre-authentication step.",
             security = {}
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified — returns `accessToken` and `refreshToken`"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified - returns `accessToken` and `refreshToken`"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid code, expired token, or unknown MFA type")
     })
-    public ResponseEntity<ApiResponse<Map<String, Object>>> verifyMfa(@RequestBody MfaVerifyRequest request) {
+    public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(@RequestBody MfaVerifyRequest request) {
         try {
             Map<String, Object> result = mfaUseCase.verifyMfa(request.getPreAuthToken(), request.getCode());
-            return ResponseEntity.ok(ApiResponse.success("MFA verified", result));
+            return ResponseEntity.ok(ApiResponse.success("MFA verified", TokenResponse.fromMap(result)));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }

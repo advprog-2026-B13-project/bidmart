@@ -22,7 +22,7 @@ public class AuthContext {
     private boolean authenticated;
 
     public boolean hasPermission(PermissionValue permission) {
-        return permissions != null && permissions.contains(permission);
+        return permissions != null && (permissions.contains(permission) || permissions.contains(PermissionValue.ADMIN));
     }
 }
 

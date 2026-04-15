@@ -9,7 +9,8 @@ public enum PermissionValue {
     AUCTION_CREATE("auction:create"),
     AUCTION_DELETE("auction:delete"),
     ACCOUNT_DEACTIVATE("account:deactivate"),
-    USER_MANAGE("user:manage")
+    USER_MANAGE("user:manage"),
+    ADMIN("admin:all")
     ;
 
     private final String permissionName;
