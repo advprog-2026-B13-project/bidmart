@@ -3,25 +3,115 @@ name: CD
 on:
   workflow_call:
 
+concurrency:
+  group: vercel-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy-staging:
     name: Deploy to Staging
     if: github.ref == 'refs/heads/staging'
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
-      - name: Staging Deployment
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Validate required Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to STAGING server..."
-          echo "✅ Staging is up to date!"
+          [ -n "$VERCEL_TOKEN" ] || { echo "Missing secret: VERCEL_TOKEN"; exit 1; }
+          [ -n "$VERCEL_ORG_ID" ] || { echo "Missing secret: VERCEL_ORG_ID"; exit 1; }
+          [ -n "$VERCEL_PROJECT_ID" ] || { echo "Missing secret: VERCEL_PROJECT_ID"; exit 1; }
+
+      - name: Pull Vercel project settings (preview)
+        working-directory: apps/bidmart-fe
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Deploy preview from staging branch
+        id: deploy
+        working-directory: apps/bidmart-fe
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          DEPLOYMENT_URL="$(vercel deploy --yes --token="$VERCEL_TOKEN")"
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Publish staging summary
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          echo "### Staging deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-main:
     name: Deploy to Production
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
-      - name: Production Deployment
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Validate required Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to PRODUCTION server..."
-          echo "🚀 Production is live!"
+          [ -n "$VERCEL_TOKEN" ] || { echo "Missing secret: VERCEL_TOKEN"; exit 1; }
+          [ -n "$VERCEL_ORG_ID" ] || { echo "Missing secret: VERCEL_ORG_ID"; exit 1; }
+          [ -n "$VERCEL_PROJECT_ID" ] || { echo "Missing secret: VERCEL_PROJECT_ID"; exit 1; }
+
+      - name: Pull Vercel project settings (production)
+        working-directory: apps/bidmart-fe
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Deploy production from main branch
+        id: deploy
+        working-directory: apps/bidmart-fe
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          DEPLOYMENT_URL="$(vercel deploy --yes --prod --token="$VERCEL_TOKEN")"
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Publish production summary
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
