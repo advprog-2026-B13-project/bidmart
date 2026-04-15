@@ -11,7 +11,12 @@ public interface ConcurrencyPort {
                                UUID bidderId, long currentTimeMillis,
                                long antiSnipeThresholdMillis, long antiSnipeExtensionMillis);
 
-    void rollback(UUID listingId, long priceToRestore, String winnerToRestore, long endTimeToRestore);
+    void rollback(UUID listingId,
+                  long priceToRestore,
+                  String winnerToRestore,
+                  long endTimeToRestore,
+                  long expectedCurrentPrice,
+                  String expectedCurrentWinner);
 
     void cacheAuction(UUID listingId, ListingInfo info);
 

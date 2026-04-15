@@ -49,9 +49,13 @@ public class BiddingServiceImpl implements BiddingUseCase {
         // Static validation
         validator.validateStatic(listing.sellerId(), amount, bidderId);
 
-        // Wallet pre-check (fail-fast)
-        if (walletPort.getAvailableBalance(bidderId).compareTo(amount) < 0) {
+        // Reserve funds before mutating auction state.
+        try {
+            walletPort.holdFunds(bidderId, amount);
+        } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Saldo tidak mencukupi");
+        } catch (Exception e) {
+            throw new IllegalStateException("Gagal menahan saldo");
         }
 
         // Redis atomic execution with bounded retry
@@ -77,24 +81,18 @@ public class BiddingServiceImpl implements BiddingUseCase {
         }
 
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
+            walletPort.releaseFunds(bidderId, amount);
             throw new IllegalStateException("System unavailable, please try again.");
         }
 
         if (result.status() != BidAcceptance.ACCEPTED) {
-            throw switch (result.status()) {
-                case REJECTED -> new IllegalArgumentException("Penawaran terlalu rendah");
-                case NOT_ACTIVE -> new IllegalArgumentException("Lelang tidak aktif");
-                case ENDED -> new IllegalArgumentException("Lelang sudah berakhir");
-                default -> new IllegalArgumentException("Penawaran ditolak");
-            };
-        }
-
-        // Wallet hold
-        try {
-            walletPort.holdFunds(bidderId, amount);
-        } catch (Exception e) {
-            concurrencyPort.rollback(listingId, result.oldPrice(), result.oldWinner(), result.oldEndTime());
-            throw new IllegalStateException("Gagal menahan saldo");
+            walletPort.releaseFunds(bidderId, amount);
+            switch (result.status()) {
+                case REJECTED -> throw new IllegalArgumentException("Penawaran terlalu rendah");
+                case NOT_ACTIVE -> throw new IllegalArgumentException("Lelang tidak aktif");
+                case ENDED -> throw new IllegalArgumentException("Lelang sudah berakhir");
+                default -> throw new IllegalArgumentException("Penawaran ditolak");
+            }
         }
 
         // Cold storage
@@ -151,7 +149,13 @@ public class BiddingServiceImpl implements BiddingUseCase {
         } catch (Exception e) {
             // Rollback wallet hold and Redis state
             walletPort.releaseFunds(bidderId, amount);
-            concurrencyPort.rollback(listingId, result.oldPrice(), result.oldWinner(), result.oldEndTime());
+            concurrencyPort.rollback(
+                    listingId,
+                    result.oldPrice(),
+                    result.oldWinner(),
+                    result.oldEndTime(),
+                    bidRupiah,
+                    bidderId.toString());
             throw e;
         }
     }

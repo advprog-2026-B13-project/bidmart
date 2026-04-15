@@ -50,7 +50,21 @@ public final class RedisLuaScripts {
     // ARGV[1] = priceToRestore (long)
     // ARGV[2] = winnerToRestore (string)
     // ARGV[3] = endTimeToRestore (long)
+    // ARGV[4] = expectedCurrentPrice (long)
+    // ARGV[5] = expectedCurrentWinner (string)
     public static final String ROLLBACK_LUA = """
+        local state = redis.call('HMGET', KEYS[1], 'price', 'winner')
+        local currentPrice = tonumber(state[1])
+        local currentWinner = state[2] or ''
+
+        if not currentPrice then
+            return 0
+        end
+
+        if currentPrice ~= tonumber(ARGV[4]) or currentWinner ~= ARGV[5] then
+            return 0
+        end
+
         redis.call('HMSET', KEYS[1], 'price', ARGV[1], 'winner', ARGV[2], 'endTime', ARGV[3])
         return 1
         """;

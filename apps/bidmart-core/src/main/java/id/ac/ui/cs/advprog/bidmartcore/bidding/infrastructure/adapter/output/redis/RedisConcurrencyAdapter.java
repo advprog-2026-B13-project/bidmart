@@ -64,12 +64,19 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     }
 
     @Override
-    public void rollback(UUID listingId, long priceToRestore, String winnerToRestore, long endTimeToRestore) {
+    public void rollback(UUID listingId,
+                         long priceToRestore,
+                         String winnerToRestore,
+                         long endTimeToRestore,
+                         long expectedCurrentPrice,
+                         String expectedCurrentWinner) {
         redis.execute(rollbackScript,
                 Collections.singletonList(key(listingId)),
                 String.valueOf(priceToRestore),
                 winnerToRestore == null ? "" : winnerToRestore,
-                String.valueOf(endTimeToRestore));
+                String.valueOf(endTimeToRestore),
+                String.valueOf(expectedCurrentPrice),
+                expectedCurrentWinner == null ? "" : expectedCurrentWinner);
     }
 
     @Override
