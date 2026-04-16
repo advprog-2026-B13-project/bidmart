@@ -1,10 +1,11 @@
 package id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.config;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
@@ -15,13 +16,17 @@ public class GlobalCorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins(corsProperties.getAllowedOrigins().toArray(new String[0]))
-                .allowedMethods(corsProperties.getAllowedMethods().toArray(new String[0]))
-                .allowedHeaders(corsProperties.getAllowedHeaders().toArray(new String[0]))
-                .exposedHeaders(corsProperties.getExposedHeaders().toArray(new String[0]))
+        var corsMapping = registry.addMapping("/**")
+                .allowedOrigins(corsProperties.getAllowedOrigins().toArray(String[]::new))
+                .allowedMethods(corsProperties.getAllowedMethods().toArray(String[]::new))
+                .allowedHeaders(corsProperties.getAllowedHeaders().toArray(String[]::new))
+                .exposedHeaders(corsProperties.getExposedHeaders().toArray(String[]::new))
                 .allowCredentials(corsProperties.isAllowCredentials())
                 .maxAge(corsProperties.getMaxAge());
+
+        if (!corsProperties.getAllowedOriginPatterns().isEmpty()) {
+            corsMapping.allowedOriginPatterns(corsProperties.getAllowedOriginPatterns().toArray(String[]::new));
+        }
     }
 }
 
