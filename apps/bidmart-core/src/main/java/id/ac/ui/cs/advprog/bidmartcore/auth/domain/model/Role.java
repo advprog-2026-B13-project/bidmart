@@ -13,7 +13,8 @@ import lombok.Setter;
 @Table(name="roles")
 public class Role {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @SequenceGenerator(name = "role_seq_gen", sequenceName = "role_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "role_seq_gen")
     private int id;
 
     @Column(name = "name", length=32, nullable = false)
