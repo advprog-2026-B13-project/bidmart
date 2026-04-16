@@ -16,7 +16,8 @@ import {
   register as registerRequest,
   verifyMfa as verifyMfaRequest,
 } from "@/lib/auth/auth-api";
-import { hasSessionToken } from "@/lib/auth/token-storage";
+import { usePathname, useRouter } from "next/navigation";
+import { ApiError } from "@/lib/auth/api-client";
 import type {
   LoginInput,
   LoginResult,
@@ -40,6 +41,8 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<ProfileResponse | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
 
@@ -76,22 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     async function initAuth() {
-      if (!hasSessionToken()) {
-        if (isMounted) {
-          setUser(null);
-          setIsHydrating(false);
-        }
-        return;
-      }
-
       try {
         const profile = await getProfileRequest();
         if (isMounted) {
           setUser(profile);
         }
-      } catch {
+      } catch (error) {
         if (isMounted) {
           setUser(null);
+        }
+
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          console.error("Failed to restore auth session", error);
         }
       } finally {
         if (isMounted) {
@@ -102,19 +101,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    const onSessionCleared = () => {
+    const onUnauthorized = () => {
       if (isMounted) {
         setUser(null);
       }
+
+      const publicPaths = ["/login", "/register", "/verify-email"];
+      const isPublicPath = publicPaths.some((publicPath) => pathname?.startsWith(publicPath));
+
+      if (!isPublicPath) {
+        router.replace("/login");
+      }
     };
 
-    window.addEventListener("auth:tokens-cleared", onSessionCleared);
+    window.addEventListener("auth:unauthorized", onUnauthorized);
 
     return () => {
       isMounted = false;
-      window.removeEventListener("auth:tokens-cleared", onSessionCleared);
+      window.removeEventListener("auth:unauthorized", onUnauthorized);
     };
-  }, []);
+  }, [pathname, router]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

@@ -21,6 +21,8 @@ export type RegisterResponse = {
   userId: string;
   email: string;
   displayName?: string;
+  requiresEmailVerification?: boolean;
+  verificationToken?: string;
 };
 
 export type ProfileResponse = {
@@ -35,11 +37,6 @@ export type ProfileResponse = {
   role?: string;
 };
 
-export type SessionTokens = {
-  accessToken: string;
-  refreshToken: string;
-};
-
 export type LoginInput = {
   email: string;
   password: string;
@@ -51,6 +48,16 @@ export type RegisterInput = {
   displayName?: string;
 };
 
+export type VerifyEmailInput = {
+  email: string;
+  code: string;
+};
+
+export type ResendVerificationOtpInput = {
+  email: string;
+  verificationToken: string;
+};
+
 export type MfaVerifyInput = {
   preAuthToken: string;
   code: string;
@@ -59,7 +66,6 @@ export type MfaVerifyInput = {
 export type LoginResult =
   | {
       requiresMfa: false;
-      tokens: SessionTokens;
     }
   | {
       requiresMfa: true;

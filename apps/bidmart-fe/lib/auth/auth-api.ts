@@ -1,5 +1,4 @@
 import { apiFetch, ApiError } from "./api-client";
-import { clearSessionTokens, setSessionTokens } from "./token-storage";
 import type {
   ApiResponse,
   LoginInput,
@@ -7,9 +6,10 @@ import type {
   LoginResult,
   MfaVerifyInput,
   ProfileResponse,
+  ResendVerificationOtpInput,
   RegisterInput,
   RegisterResponse,
-  TokenPair,
+  VerifyEmailInput,
 } from "./types";
 
 function unwrapOrThrow<T>(payload: ApiResponse<T>) {
@@ -48,20 +48,8 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     };
   }
 
-  if (!data.accessToken || !data.refreshToken) {
-    throw new Error("Login succeeded, but token pair is missing");
-  }
-
-  const tokens = {
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-  };
-
-  setSessionTokens(tokens);
-
   return {
     requiresMfa: false,
-    tokens,
   };
 }
 
@@ -78,8 +66,40 @@ export async function register(input: RegisterInput): Promise<RegisterResponse> 
   return unwrapOrThrow(payload);
 }
 
-export async function verifyMfa(input: MfaVerifyInput): Promise<TokenPair> {
-  const payload = await apiFetch<ApiResponse<TokenPair>>(
+export async function verifyRegistrationEmail(input: VerifyEmailInput): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/verify-email",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Email verification failed");
+  }
+}
+
+export async function resendRegistrationVerificationOtp(
+  input: ResendVerificationOtpInput,
+): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/resend-verification-otp",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to resend verification OTP");
+  }
+}
+
+export async function verifyMfa(input: MfaVerifyInput): Promise<void> {
+  const payload = await apiFetch<ApiResponse<unknown>>(
     "/api/auth/mfa/verify",
     {
       method: "POST",
@@ -88,18 +108,9 @@ export async function verifyMfa(input: MfaVerifyInput): Promise<TokenPair> {
     { auth: false },
   );
 
-  const tokens = unwrapOrThrow(payload);
-
-  if (!tokens.accessToken || !tokens.refreshToken) {
-    throw new Error("MFA verification succeeded, but token pair is missing");
+  if (payload.success === false) {
+    throw new Error(payload.message || "MFA verification failed");
   }
-
-  setSessionTokens({
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-  });
-
-  return tokens;
 }
 
 export async function requestEmailOtp(preAuthToken: string): Promise<void> {
@@ -138,7 +149,5 @@ export async function logout(): Promise<void> {
     if (!(error instanceof ApiError)) {
       throw error;
     }
-  } finally {
-    clearSessionTokens();
   }
 }
