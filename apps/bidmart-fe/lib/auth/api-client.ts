@@ -1,10 +1,28 @@
 import { clearSessionTokens, getAccessToken, getRefreshToken, setSessionTokens } from "./token-storage";
 import type { ApiResponse, TokenPair } from "./types";
 
-const AUTH_BASE_URL =
-  process.env.NEXT_PUBLIC_AUTH_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:8080";
+function resolveAuthBaseUrl() {
+  const configuredBaseUrl =
+    process.env.NEXT_PUBLIC_AUTH_API_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/+$/, "");
+  }
+
+  if (typeof window === "undefined") {
+    return "http://localhost:8080";
+  }
+
+  const host = window.location.hostname;
+  const isLocalhost = host === "localhost" || host === "127.0.0.1";
+
+  if (isLocalhost) {
+    return "http://localhost:8080";
+  }
+
+  return "";
+}
 
 export class ApiError extends Error {
   status: number;
@@ -23,9 +41,14 @@ function joinUrl(path: string) {
     return path;
   }
 
-  const normalizedBase = AUTH_BASE_URL.replace(/\/+$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${normalizedBase}${normalizedPath}`;
+  const resolvedBaseUrl = resolveAuthBaseUrl();
+
+  if (!resolvedBaseUrl) {
+    return normalizedPath;
+  }
+
+  return `${resolvedBaseUrl}${normalizedPath}`;
 }
 
 async function parseJsonSafe<T>(response: Response): Promise<T | null> {
