@@ -89,7 +89,7 @@ jobs:
             --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
             --vpc-connector "$VPC_CONNECTOR" \
             --vpc-egress private-ranges-only \
-            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart_staging,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
+            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart_staging,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,SPRING_DATA_REDIS_DATABASE=1,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
 
       - name: Publish API staging summary
         env:
@@ -183,8 +183,7 @@ jobs:
             --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
             --vpc-connector "$VPC_CONNECTOR" \
             --vpc-egress private-ranges-only \
-            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
-
+            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,SPRING_DATA_REDIS_DATABASE=0,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
       - name: Publish API production summary
         env:
           IMAGE_NAME: ${{ steps.image.outputs.image }}
