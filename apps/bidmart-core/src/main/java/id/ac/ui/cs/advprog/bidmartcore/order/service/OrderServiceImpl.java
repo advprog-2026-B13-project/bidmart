@@ -44,4 +44,21 @@ public class OrderServiceImpl implements OrderService {
 
         return orderRepository.save(order);
     }
+
+    @Override
+    public Order confirmDelivery(UUID orderId, UUID buyerId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Pesanan dengan ID " + orderId + " tidak ditemukan"));
+
+        if (!order.getBuyerId().equals(buyerId)) {
+            throw new RuntimeException("Anda bukan pembeli dari pesanan ini.");
+        }
+
+        if (order.getStatus() != OrderStatus.SHIPPED) {
+            throw new IllegalStateException("Pesanan belum dikirim (Status saat ini: " + order.getStatus() + ").");
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+        return orderRepository.save(order);
+    }
 }

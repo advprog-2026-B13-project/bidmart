@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface OrderService {
     List<Order> getOrdersByBuyerId(UUID buyerId);
     Order updateShipmentStatus(UUID orderId, UUID sellerId, OrderStatus newStatus, String trackingNumber);
+    Order confirmDelivery(UUID orderId, UUID buyerId);
 }

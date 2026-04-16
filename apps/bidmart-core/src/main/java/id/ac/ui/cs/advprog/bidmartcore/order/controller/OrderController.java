@@ -39,4 +39,13 @@ public class OrderController {
         Order updatedOrder = orderService.updateShipmentStatus(orderId, currentSellerId, status, trackingNumber);
         return ResponseEntity.ok(updatedOrder);
     }
+
+    @PutMapping("/{orderId}/confirm")
+    @RequireLogin
+    public ResponseEntity<Order> confirmDelivery(@PathVariable UUID orderId) {
+        UUID currentBuyerId = authContext.getUserId();
+
+        Order confirmedOrder = orderService.confirmDelivery(orderId, currentBuyerId);
+        return ResponseEntity.ok(confirmedOrder);
+    }
 }
