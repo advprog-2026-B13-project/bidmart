@@ -15,4 +15,7 @@ jobs:
     needs: ci
     if: github.event_name == 'push'
     uses: ./.github/workflows/cd.yml
+    permissions:
+      contents: read
+      id-token: write
     secrets: inherit
