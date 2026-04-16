@@ -1,11 +1,13 @@
 package id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.adapter.input.rest;
 
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.input.MfaUseCase;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthCookieService;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +21,7 @@ public class MfaController {
 
     private final MfaUseCase mfaUseCase;
     private final AuthContext authContext;
+    private final AuthCookieService authCookieService;
 
     @PostMapping("/setup-totp")
     @RequireLogin
@@ -116,20 +119,34 @@ public class MfaController {
     @Operation(
             summary = "Verify MFA code and complete login",
             description = "Verifies the TOTP or Email OTP code against the pre-authentication session. "
-                    + "On success, the pre-auth session is consumed and a full session with `accessToken` and `refreshToken` is returned. "
+                    + "On success, the pre-auth session is consumed and auth cookies are set (HttpOnly). "
                     + "No Bearer token is needed - this is a pre-authentication step.",
             security = {}
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified - returns `accessToken` and `refreshToken`"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified and cookies issued"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid code, expired token, or unknown MFA type")
     })
     public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(@RequestBody MfaVerifyRequest request) {
         try {
             Map<String, Object> result = mfaUseCase.verifyMfa(request.getPreAuthToken(), request.getCode());
-            return ResponseEntity.ok(ApiResponse.success("MFA verified", TokenResponse.fromMap(result)));
+            String accessToken = (String) result.get("accessToken");
+            String refreshToken = (String) result.get("refreshToken");
+
+            ResponseEntity.BodyBuilder builder = addCookies(
+                    ResponseEntity.ok(),
+                    authCookieService.buildAuthCookies(accessToken, refreshToken)
+            );
+            return builder.body(ApiResponse.success("MFA verified", TokenResponse.fromMap(result)));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    private ResponseEntity.BodyBuilder addCookies(ResponseEntity.BodyBuilder builder, Iterable<String> cookies) {
+        for (String cookie : cookies) {
+            builder.header(HttpHeaders.SET_COOKIE, cookie);
+        }
+        return builder;
     }
 }

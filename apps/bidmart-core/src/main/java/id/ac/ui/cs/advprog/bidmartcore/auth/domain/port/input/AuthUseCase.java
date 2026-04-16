@@ -4,6 +4,8 @@ import java.util.Map;
 
 public interface AuthUseCase {
     Map<String, Object> register(String email, String password, String displayName);
+    void verifyEmailOtp(String email, String otpCode);
+    void resendVerificationOtp(String email, String verificationToken);
     Map<String, Object> login(String email, String password);
     void logout(String sessionId);
     Map<String, Object> refreshToken(String refreshToken);

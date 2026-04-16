@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 @Aspect
 @Component
@@ -35,6 +34,7 @@ public class SecurityAspect {
     private final SessionRepositoryPort sessionRepository;
     private final RolePermissionPort rolePermissionPort;
     private final AuthContext authContext;
+    private final AuthCookieService authCookieService;
 
     @Around("@annotation(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin) || " +
             "@within(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin)")
@@ -81,12 +81,13 @@ public class SecurityAspect {
     }
 
     private Session resolveSession() {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String token = authCookieService.resolveAccessToken(request)
+                .orElseGet(this::extractBearerToken);
+
+        if (token == null) {
             return null;
         }
 
-        String token = authHeader.substring(7);
         if (!jwtUtil.isTokenValid(token) || jwtUtil.isRefreshToken(token)) {
             return null;
         }
@@ -115,11 +116,19 @@ public class SecurityAspect {
         }
 
         User user = session.getUser();
-        if (user == null || user.getStatus() == UserStatus.SUSPENDED) {
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
             return null;
         }
 
         return session;
+    }
+
+    private String extractBearerToken() {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authHeader.substring(7);
     }
 
     private void populateAuthContext(Session session) {
@@ -137,4 +146,3 @@ public class SecurityAspect {
         }
     }
 }
-

@@ -30,6 +30,7 @@ public class MfaServiceImpl implements MfaUseCase {
     private final PreAuthSessionPort preAuthSessionPort;
     private final SessionUseCase sessionUseCase;
     private final PasswordEncoder passwordEncoder;
+    private final EmailOtpSenderPort emailOtpSenderPort;
 
     private final GoogleAuthenticator googleAuthenticator = new GoogleAuthenticator();
     private final SecureRandom secureRandom = new SecureRandom();
@@ -146,9 +147,7 @@ public class MfaServiceImpl implements MfaUseCase {
         emailOtp.setCreatedAt(Instant.now());
         emailOtpRepository.save(emailOtp);
 
-        // TODO: Integrate with notification module to actually send the email
-        // For now the OTP is generated and stored; in production,
-        // delegate to an EmailSenderPort / NotificationService
+        emailOtpSenderPort.sendOtpEmail(user.getEmail(), otp, preAuthTtlSeconds);
     }
 
     @Override

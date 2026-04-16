@@ -6,9 +6,9 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@Schema(description = "Request body for token refresh")
+@Schema(description = "Request body for token refresh. Optional fallback when refresh cookie is unavailable.")
 public class RefreshTokenRequest {
 
-    @Schema(description = "The refresh token obtained from login or previous refresh", example = "eyJhbGciOiJIUzI1NiJ9...", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Optional fallback refresh token when cookie is not sent", example = "eyJhbGciOiJIUzI1NiJ9...", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String refreshToken;
 }

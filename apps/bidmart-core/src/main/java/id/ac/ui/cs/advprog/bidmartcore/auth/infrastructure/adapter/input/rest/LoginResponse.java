@@ -12,16 +12,16 @@ import java.util.Map;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Login result payload. Returns token pair directly, or pre-auth fields when MFA is required")
+@Schema(description = "Login result payload. Token cookies are set by server when MFA is not required.")
 public class LoginResponse {
 
-    @Schema(description = "Whether the user must complete MFA before receiving full session tokens", example = "false")
+    @Schema(description = "Whether the user must complete MFA before receiving full session cookies", example = "false")
     private Boolean requiresMfa;
 
-    @Schema(description = "JWT access token (present when MFA is not required)")
+    @Schema(description = "Deprecated: access token body field, now delivered via HttpOnly cookie")
     private String accessToken;
 
-    @Schema(description = "JWT refresh token (present when MFA is not required)")
+    @Schema(description = "Deprecated: refresh token body field, now delivered via HttpOnly cookie")
     private String refreshToken;
 
     @Schema(description = "Pre-authentication token used for MFA verification flow (present when MFA is required)")
@@ -40,4 +40,3 @@ public class LoginResponse {
         );
     }
 }
-
