@@ -36,6 +36,11 @@ cd apps/bidmart-core
 ./gradlew bootRun
 ```
 
+Use `dev` profile (recommended while frontend runs on localhost):
+```bash
+SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
+```
+
 The server runs on `http://localhost:8080` (default Spring Boot port)
 
 ### Build
@@ -69,3 +74,27 @@ src/
     └── resources/      # Test configs
 ```
 
+## CORS Configuration
+
+CORS is configured globally via `app.cors.*` properties and can be set per environment.
+
+Default properties are in `src/main/resources/application.properties`, with profile overrides in:
+- `src/main/resources/application-dev.properties`
+- `src/main/resources/application-prod.properties`
+
+### Dev example (frontend on localhost:3000)
+```bash
+SPRING_PROFILES_ACTIVE=dev APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 ./gradlew bootRun
+```
+
+### Prod example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://app.bidmart.com ./gradlew bootRun
+```
+
+You can also override additional settings:
+- `APP_CORS_ALLOWED_METHODS` (comma separated)
+- `APP_CORS_ALLOWED_HEADERS` (comma separated)
+- `APP_CORS_EXPOSED_HEADERS` (comma separated)
+- `APP_CORS_ALLOW_CREDENTIALS` (`true` or `false`)
+- `APP_CORS_MAX_AGE` (seconds)

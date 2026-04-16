@@ -11,9 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth/sessions")
@@ -34,16 +32,16 @@ public class SessionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sessions retrieved"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listSessions() {
+    public ResponseEntity<ApiResponse<List<SessionSummaryResponse>>> listSessions() {
         List<Session> sessions = sessionUseCase.listSessions(authContext.getUserId());
-        List<Map<String, Object>> result = sessions.stream().map(s -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("sessionId", s.getId());
-            map.put("isActive", s.isActive());
-            map.put("expiresAt", s.getExpiresAt().toString());
-            map.put("isCurrent", s.getId().equals(authContext.getSessionId()));
-            return map;
-        }).toList();
+        List<SessionSummaryResponse> result = sessions.stream()
+                .map(s -> new SessionSummaryResponse(
+                        s.getId(),
+                        s.isActive(),
+                        s.getExpiresAt().toString(),
+                        s.getId().equals(authContext.getSessionId())
+                ))
+                .toList();
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 

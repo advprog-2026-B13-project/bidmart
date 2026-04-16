@@ -37,6 +37,11 @@ cd apps/bidmart-fe
 pnpm install
 ```
 
+4. Configure environment variables:
+```bash
+cp .env.example .env.local
+```
+
 ## Running
 
 ### Development server
@@ -45,6 +50,8 @@ pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+API calls default to [http://localhost:8080](http://localhost:8080). Override with `NEXT_PUBLIC_AUTH_API_URL` in your env file when needed.
 
 The app auto-refreshes as you edit files.
 

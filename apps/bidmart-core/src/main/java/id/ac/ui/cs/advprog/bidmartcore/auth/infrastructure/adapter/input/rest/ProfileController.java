@@ -13,8 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -36,9 +34,9 @@ public class ProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getProfile() {
+    public ResponseEntity<ApiResponse<ProfileResponse>> getProfile() {
         User user = profileUseCase.getProfile(authContext.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(toProfileMap(user)));
+        return ResponseEntity.ok(ApiResponse.success(ProfileResponse.fromUser(user)));
     }
 
     @PutMapping
@@ -52,7 +50,7 @@ public class ProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<ApiResponse<Map<String, Object>>> updateProfile(@RequestBody ProfileUpdateRequest request) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateProfile(@RequestBody ProfileUpdateRequest request) {
         try {
             User user = profileUseCase.updateProfile(
                     authContext.getUserId(),
@@ -60,7 +58,7 @@ public class ProfileController {
                     request.getPhotoUrl(),
                     request.getShippingAddress()
             );
-            return ResponseEntity.ok(ApiResponse.success("Profile updated", toProfileMap(user)));
+            return ResponseEntity.ok(ApiResponse.success("Profile updated", ProfileResponse.fromUser(user)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
@@ -76,7 +74,7 @@ public class ProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Account deactivated"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "User not found"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — missing permission")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - missing permission")
     })
     public ResponseEntity<ApiResponse<Void>> deactivateAccount(
             @Parameter(description = "UUID of the user account to deactivate") @PathVariable UUID targetUserId) {
@@ -86,21 +84,5 @@ public class ProfileController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
-    }
-
-    private Map<String, Object> toProfileMap(User user) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("userId", user.getId());
-        map.put("email", user.getEmail());
-        map.put("displayName", user.getDisplayName());
-        map.put("photoUrl", user.getPhotoUrl());
-        map.put("shippingAddress", user.getShippingAddress());
-        map.put("status", user.getStatus().name());
-        map.put("default2FAMethod", user.getDefault2FAMethod().name());
-        map.put("createdAt", user.getCreatedAt().toString());
-        if (user.getRole() != null) {
-            map.put("role", user.getRole().getName());
-        }
-        return map;
     }
 }

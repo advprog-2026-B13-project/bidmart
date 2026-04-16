@@ -15,7 +15,8 @@ import lombok.Setter;
 @Table(name="permissions")
 public class Permission {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @SequenceGenerator(name = "permission_seq_gen", sequenceName = "permission_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "permission_seq_gen")
     private int id;
 
     @Column(name = "name", nullable = false)
