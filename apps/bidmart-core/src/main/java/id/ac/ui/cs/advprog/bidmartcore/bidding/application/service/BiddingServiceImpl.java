@@ -182,6 +182,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
             ConcurrencyResult result) {
         walletPort.releaseFunds(bidderId, submittedAmount);
 
+        markPreviousWinningBidAsOutbid(listingId);
+
         LocalDateTime now = LocalDateTime.now();
         BigDecimal visiblePrice = BigDecimal.valueOf(result.visiblePrice());
         List<Runnable> publishActions = new ArrayList<>();
