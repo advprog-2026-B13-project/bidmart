@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice(basePackages = "id.ac.ui.cs.advprog.bidmartcore.catalog")
-public class GlobalExceptionHandler {
+public class CatalogExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
