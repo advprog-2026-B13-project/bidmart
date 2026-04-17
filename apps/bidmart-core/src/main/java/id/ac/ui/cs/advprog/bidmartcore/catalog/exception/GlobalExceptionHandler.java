@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice(value = "catalogGlobalExceptionHandler", basePackages = "id.ac.ui.cs.advprog.bidmartcore.catalog")
+@RestControllerAdvice(basePackages = "id.ac.ui.cs.advprog.bidmartcore.catalog")
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
