@@ -12,6 +12,7 @@ export function AuthNavActions() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const displayName = user?.displayName || user?.email || "Account";
+  const isAdmin = (user?.role || "").toUpperCase().includes("ADMIN");
 
   const handleLogout = async () => {
     setIsSubmitting(true);
@@ -64,6 +65,22 @@ export function AuthNavActions() {
       >
         My Bids (Dummy)
       </button>
+      <button
+        type="button"
+        onClick={() => router.push("/sessions")}
+        className="btn btn-ghost btn-sm"
+      >
+        Sessions
+      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => router.push("/admin")}
+          className="btn btn-ghost btn-sm"
+        >
+          Admin
+        </button>
+      )}
       <button
         type="button"
         onClick={handleLogout}

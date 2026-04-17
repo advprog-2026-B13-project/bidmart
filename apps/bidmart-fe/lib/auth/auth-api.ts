@@ -1,11 +1,18 @@
 import { apiFetch, ApiError } from "./api-client";
 import type {
+  AdminAssignUserRoleInput,
+  AdminCreateRoleInput,
+  AdminManagedUsersPageResponse,
+  AdminRoleResponse,
+  AdminSetRolePermissionsInput,
   ApiResponse,
   LoginInput,
   LoginResponse,
   LoginResult,
   MfaVerifyInput,
   ProfileResponse,
+  SessionReplacementConfirmationInput,
+  SessionSummaryResponse,
   ResendVerificationOtpInput,
   RegisterInput,
   RegisterResponse,
@@ -39,6 +46,50 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   if (data.requiresMfa) {
     if (!data.preAuthToken) {
       throw new Error("Login requires MFA, but preAuthToken is missing");
+    }
+
+    return {
+      requiresMfa: true,
+      preAuthToken: data.preAuthToken,
+      mfaType: data.mfaType,
+    };
+  }
+
+  if (data.requiresSessionReplacement) {
+    if (!data.sessionReplacementToken) {
+      throw new Error("Login requires session replacement confirmation, but token is missing");
+    }
+
+    return {
+      requiresMfa: false,
+      requiresSessionReplacement: true,
+      sessionReplacementToken: data.sessionReplacementToken,
+      activeSessions: data.activeSessions || [],
+    };
+  }
+
+  return {
+    requiresMfa: false,
+  };
+}
+
+export async function confirmSessionReplacement(
+  input: SessionReplacementConfirmationInput,
+): Promise<LoginResult> {
+  const payload = await apiFetch<ApiResponse<LoginResponse>>(
+    "/api/auth/confirm-session-replacement",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  const data = unwrapOrThrow(payload);
+
+  if (data.requiresMfa) {
+    if (!data.preAuthToken) {
+      throw new Error("Session replacement confirmation returned MFA without preAuthToken");
     }
 
     return {
@@ -134,6 +185,132 @@ export async function getProfile(): Promise<ProfileResponse> {
   });
 
   return unwrapOrThrow(payload);
+}
+
+export async function listSessions(): Promise<SessionSummaryResponse[]> {
+  const payload = await apiFetch<ApiResponse<SessionSummaryResponse[]>>("/api/auth/sessions", {
+    method: "GET",
+  });
+
+  return unwrapOrThrow(payload);
+}
+
+export async function revokeSession(sessionId: string): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(`/api/auth/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to revoke session");
+  }
+}
+
+export async function revokeOtherSessions(): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>("/api/auth/sessions", {
+    method: "DELETE",
+  });
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to revoke other sessions");
+  }
+}
+
+export async function listAdminRoles(): Promise<AdminRoleResponse[]> {
+  const payload = await apiFetch<ApiResponse<AdminRoleResponse[]>>("/api/auth/admin/rbac/roles", {
+    method: "GET",
+  });
+
+  return unwrapOrThrow(payload);
+}
+
+export async function createAdminRole(input: AdminCreateRoleInput): Promise<AdminRoleResponse> {
+  const payload = await apiFetch<ApiResponse<AdminRoleResponse>>(
+    "/api/auth/admin/rbac/roles",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function updateAdminRolePermissions(
+  roleId: number,
+  input: AdminSetRolePermissionsInput,
+): Promise<AdminRoleResponse> {
+  const payload = await apiFetch<ApiResponse<AdminRoleResponse>>(
+    `/api/auth/admin/rbac/roles/${roleId}/permissions`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function deleteAdminRole(roleId: number): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(`/api/auth/admin/rbac/roles/${roleId}`, {
+    method: "DELETE",
+  });
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to delete role");
+  }
+}
+
+export async function listAdminPermissions(): Promise<string[]> {
+  const payload = await apiFetch<ApiResponse<string[]>>("/api/auth/admin/rbac/permissions", {
+    method: "GET",
+  });
+
+  return unwrapOrThrow(payload);
+}
+
+export async function listAdminManagedUsers(page = 0, size = 20): Promise<AdminManagedUsersPageResponse> {
+  const payload = await apiFetch<ApiResponse<AdminManagedUsersPageResponse>>(
+    `/api/auth/admin/rbac/users?page=${page}&size=${size}`,
+    {
+      method: "GET",
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function assignRoleToUser(userId: string, input: AdminAssignUserRoleInput): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    `/api/auth/admin/rbac/users/${userId}/role`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to assign role");
+  }
+}
+
+export async function unassignRoleFromUser(userId: string): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(`/api/auth/admin/rbac/users/${userId}/role`, {
+    method: "DELETE",
+  });
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to unassign role");
+  }
+}
+
+export async function deactivateAccount(targetUserId: string): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(`/api/auth/profile/deactivate/${targetUserId}`, {
+    method: "POST",
+  });
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to deactivate account");
+  }
 }
 
 export async function logout(): Promise<void> {
