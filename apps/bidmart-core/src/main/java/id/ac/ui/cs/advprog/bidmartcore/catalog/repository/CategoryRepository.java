@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
+@Repository("catalogCategoryRepository")
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
     List<Category> findByParentCategoryIsNull();
     List<Category> findByParentCategoryId(Integer parentId);

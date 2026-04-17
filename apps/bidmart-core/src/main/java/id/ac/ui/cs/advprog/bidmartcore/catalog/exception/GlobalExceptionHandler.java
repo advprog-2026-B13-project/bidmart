@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice
+@RestControllerAdvice("catalogGlobalExceptionHandler")
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)

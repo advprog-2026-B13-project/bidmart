@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-@Repository
+@Repository("catalogListingRepository")
 public interface ListingRepository extends JpaRepository<Listing, UUID>, JpaSpecificationExecutor<Listing> {
     List<Listing> findByTitleContainingIgnoreCase(String keyword);
     List<Listing> findByCategoryId(Integer categoryId);

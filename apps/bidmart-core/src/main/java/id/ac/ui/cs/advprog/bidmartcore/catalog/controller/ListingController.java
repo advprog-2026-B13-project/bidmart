@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-@RestController
+@RestController("catalogListingController")
 @RequestMapping("/api/catalog/listings")
 @RequiredArgsConstructor
 public class ListingController {

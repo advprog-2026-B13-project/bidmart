@@ -22,7 +22,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-@Service
+@Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
 
     private final ListingRepository listingRepository;
