@@ -89,12 +89,23 @@ SPRING_PROFILES_ACTIVE=dev APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 ./grad
 
 ### Prod example
 ```bash
-SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://app.bidmart.com ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://bidmart.store ./gradlew bootRun
+```
+
+### Prod with staging subdomains example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://bidmart.store APP_CORS_ALLOWED_ORIGIN_PATTERNS=https://*.bidmart.store ./gradlew bootRun
+```
+
+### Staging with temporary GCP frontend URL example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://staging.bidmart.store APP_CORS_ALLOWED_ORIGIN_PATTERNS=https://*.run.app ./gradlew bootRun
 ```
 
 You can also override additional settings:
 - `APP_CORS_ALLOWED_METHODS` (comma separated)
 - `APP_CORS_ALLOWED_HEADERS` (comma separated)
 - `APP_CORS_EXPOSED_HEADERS` (comma separated)
+- `APP_CORS_ALLOWED_ORIGIN_PATTERNS` (comma separated, supports wildcard subdomains)
 - `APP_CORS_ALLOW_CREDENTIALS` (`true` or `false`)
 - `APP_CORS_MAX_AGE` (seconds)
