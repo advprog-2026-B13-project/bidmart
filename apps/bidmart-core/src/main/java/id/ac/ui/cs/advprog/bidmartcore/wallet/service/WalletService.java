@@ -13,6 +13,7 @@ public interface WalletService {
     WalletModel getWalletByUserId(UUID userId);
     WalletModel topUp(UUID userId, BigDecimal amount);
     WalletModel withdraw(UUID userId, BigDecimal amount);
+    WalletModel deposit(UUID userId, BigDecimal amount);
     WalletModel holdBalance(UUID userId, BigDecimal amount);
     WalletModel releaseBalance(UUID userId, BigDecimal amount);
     WalletModel convertHoldToPayment(UUID userId, BigDecimal amount);

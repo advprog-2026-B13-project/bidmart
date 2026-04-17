@@ -179,4 +179,29 @@ public class WalletServiceImpl implements WalletService {
 
         return wallet;
     }
+
+    @Override
+    @Transactional
+    public WalletModel deposit(UUID userId, BigDecimal amount) {
+        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        wallet.setAvailableBalance(
+                wallet.getAvailableBalance().add(amount)
+        );
+
+        walletRepository.save(wallet);
+
+        transactionRepository.save(
+                new WalletTransactionModel(
+                        null,
+                        wallet.getId(),
+                        TransactionType.TOP_UP,
+                        amount,
+                        null,
+                        LocalDateTime.now()
+                )
+        );
+
+        return wallet;
+    }
 }
