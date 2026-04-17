@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.input.res
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.adapter.input.rest.ApiResponse;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.input.BiddingUseCase;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.input.BiddingUseCase.AuctionStatusResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.input.BiddingUseCase.BidResult;
@@ -30,7 +31,8 @@ public class BidController {
     @Operation(summary = "Place a bid on a listing")
     public ResponseEntity<ApiResponse<BidResponse>> placeBid(@Valid @RequestBody BidRequest request) {
         UUID bidderId = authContext.getUserId();
-        BidResult result = biddingUseCase.placeBid(request.getListingId(), request.getAmount(), bidderId);
+        BidResult result = biddingUseCase.placeBid(request.getListingId(), request.getAmount(), bidderId,
+                request.getBidType());
 
         BidResponse response = new BidResponse(
                 result.bidId(),
