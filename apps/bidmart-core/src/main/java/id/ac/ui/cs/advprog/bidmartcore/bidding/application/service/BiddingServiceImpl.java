@@ -1,7 +1,10 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.application.service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +18,9 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionTimeExtendedE
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.BidPlacedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.OutbidEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.Bid;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidSource;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidStatus;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult.BidAcceptance;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.input.BiddingUseCase;
@@ -38,18 +43,53 @@ public class BiddingServiceImpl implements BiddingUseCase {
     private final EventPublisherPort eventPublisher;
     private final ConcurrencyPort concurrencyPort;
     private final WalletPort walletPort;
-    private final EnglishAuctionValidator validator;
+    private final AuctionValidator validator;
     private final BiddingProperties properties;
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Jakarta");
+    private static final int MAX_CACHE_RETRIES = 3;
+
+    private record BidProcessingOutcome(BidResult bidResult, List<Runnable> publishActions) {
+    }
 
     @Override
     @Transactional
-    public BidResult placeBid(UUID listingId, BigDecimal amount, UUID bidderId) {
+    public BidResult placeBid(UUID listingId, BigDecimal bidAmount, UUID bidderId, BidType bidType) {
         ListingInfo listing = listingPort.getListingInfo(listingId);
+        validateAndHoldFunds(listing, bidAmount, bidderId);
 
-        // Static validation
+        long bidRupiah = bidAmount.longValue();
+        long minIncrementRupiah = listing.minBidIncrement().longValue();
+        ConcurrencyResult result = runRedisWithRetry(listingId, listing, bidRupiah, minIncrementRupiah, bidderId,
+                bidType);
+
+        if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
+            walletPort.releaseFunds(bidderId, bidAmount);
+            throw new IllegalStateException("System unavailable, please try again.");
+        }
+
+        boolean stateMutated = result.status() == BidAcceptance.LEADING || result.status() == BidAcceptance.OUTBID;
+
+        try {
+            BidProcessingOutcome outcome = switch (result.status()) {
+                case LEADING -> handleLeading(listingId, listing, bidderId, bidAmount, result);
+                case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
+                default -> handleReject(bidderId, bidAmount, result.status());
+            };
+
+            outcome.publishActions().forEach(Runnable::run);
+            return outcome.bidResult();
+        } catch (Exception e) {
+            if (stateMutated) {
+                compensate(listingId, listing, bidderId, bidAmount, result);
+            }
+            throw e;
+        }
+    }
+
+    private void validateAndHoldFunds(ListingInfo listing, BigDecimal amount, UUID bidderId) {
         validator.validateStatic(listing.sellerId(), amount, bidderId);
 
-        // Reserve funds before mutating auction state.
         try {
             walletPort.holdFunds(bidderId, amount);
         } catch (IllegalArgumentException e) {
@@ -57,20 +97,30 @@ public class BiddingServiceImpl implements BiddingUseCase {
         } catch (Exception e) {
             throw new IllegalStateException("Gagal menahan saldo");
         }
+    }
 
-        // Redis atomic execution with bounded retry
-        long bidRupiah = amount.longValue();
-        long minIncrementRupiah = listing.minBidIncrement().longValue();
+    private ConcurrencyResult runRedisWithRetry(UUID listingId,
+            ListingInfo listing,
+            long bidRupiah,
+            long minIncrementRupiah,
+            UUID bidderId,
+            BidType bidType) {
         long antiSnipeThresholdMillis = properties.getAntiSnipeSecondsBeforeClose() * 1000L;
         long antiSnipeExtensionMillis = properties.getAntiSnipeExtensionSeconds() * 1000L;
 
         int retries = 0;
         ConcurrencyResult result = null;
-        while (retries < 3) {
+        while (retries < MAX_CACHE_RETRIES) {
             long nowMillis = System.currentTimeMillis();
             result = concurrencyPort.placeBid(
-                    listingId, bidRupiah, minIncrementRupiah, bidderId,
-                    nowMillis, antiSnipeThresholdMillis, antiSnipeExtensionMillis);
+                    listingId,
+                    bidRupiah,
+                    minIncrementRupiah,
+                    bidderId,
+                    bidType,
+                    nowMillis,
+                    antiSnipeThresholdMillis,
+                    antiSnipeExtensionMillis);
 
             if (result.status() == BidAcceptance.CACHE_MISS) {
                 concurrencyPort.cacheAuction(listingId, listing);
@@ -80,84 +130,206 @@ public class BiddingServiceImpl implements BiddingUseCase {
             break;
         }
 
-        if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
-            walletPort.releaseFunds(bidderId, amount);
-            throw new IllegalStateException("System unavailable, please try again.");
+        return result;
+    }
+
+    private BidProcessingOutcome handleLeading(UUID listingId,
+            ListingInfo listing,
+            UUID bidderId,
+            BigDecimal submittedAmount,
+            ConcurrencyResult result) {
+        LocalDateTime now = LocalDateTime.now();
+        BigDecimal visiblePrice = BigDecimal.valueOf(result.visiblePrice());
+        List<Runnable> publishActions = new ArrayList<>();
+
+        Bid previousWinningBid = markPreviousWinningBidAsOutbid(listingId);
+
+        Bid savedBid = saveBid(listingId, bidderId, visiblePrice, submittedAmount, BidSource.MANUAL,
+                BidStatus.ACCEPTED);
+        BidPlacedEvent bidPlacedEvent = new BidPlacedEvent(
+                listingId,
+                savedBid.getId(),
+                bidderId,
+                visiblePrice,
+                now);
+        publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
+
+        AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
+                listingId,
+                listing.endTime(),
+                result.endTime());
+        if (extensionEvent != null) {
+            publishActions.add(() -> eventPublisher.publishAuctionTimeExtended(extensionEvent));
         }
 
-        if (result.status() != BidAcceptance.ACCEPTED) {
-            walletPort.releaseFunds(bidderId, amount);
-            switch (result.status()) {
-                case REJECTED -> throw new IllegalArgumentException("Penawaran terlalu rendah");
-                case NOT_ACTIVE -> throw new IllegalArgumentException("Lelang tidak aktif");
-                case ENDED -> throw new IllegalArgumentException("Lelang sudah berakhir");
-                default -> throw new IllegalArgumentException("Penawaran ditolak");
-            }
-        }
-
-        // Cold storage
-        try {
-            Bid bid = new Bid();
-            bid.setListingId(listingId);
-            bid.setBidderId(bidderId);
-            bid.setAmount(amount);
-            bid.setStatus(BidStatus.ACCEPTED);
-            Bid savedBid = bidRepository.save(bid);
-
-            // Mark previous winning bid as OUTBID
-            if (result.oldWinner() != null && !result.oldWinner().isEmpty()) {
-                UUID outbidBidderId = UUID.fromString(result.oldWinner());
-                bidRepository
-                        .findPreviousWinningBidByBidder(listingId, outbidBidderId, savedBid.getId())
-                        .ifPresent(prevBid -> {
-                            prevBid.setStatus(BidStatus.OUTBID);
-                            bidRepository.save(prevBid);
-                        });
-            }
-
-            eventPublisher.publishBidPlaced(new BidPlacedEvent(
-                    listingId, savedBid.getId(), bidderId, amount, LocalDateTime.now()));
-
-            // Sync extended endTime back to PSQL
-            long currentEndTimeMillis = concurrencyPort.getAuctionEndTime(listingId);
-            if (currentEndTimeMillis != result.oldEndTime()) {
-                LocalDateTime newEndTime = LocalDateTime.ofInstant(
-                        java.time.Instant.ofEpochMilli(currentEndTimeMillis),
-                        java.time.ZoneId.of("Asia/Jakarta"));
-                LocalDateTime previousEndTime = LocalDateTime.ofInstant(
-                        java.time.Instant.ofEpochMilli(result.oldEndTime()),
-                        java.time.ZoneId.of("Asia/Jakarta"));
-                eventPublisher.publishAuctionTimeExtended(
-                        new AuctionTimeExtendedEvent(listingId, previousEndTime, newEndTime));
-            }
-
-            // Only alert previous winner if they are different from the new winner
-            if (result.oldWinner() != null && !result.oldWinner().isEmpty()
-                    && !result.oldWinner().equals(bidderId.toString())) {
-                eventPublisher.publishOutbid(new OutbidEvent(
-                        listingId,
-                        UUID.fromString(result.oldWinner()),
-                        BigDecimal.valueOf(result.oldPrice()),
-                        amount,
-                        LocalDateTime.now()));
-            }
-
-            return new BidResult(
-                    savedBid.getId(), listingId, bidderId, amount,
-                    BidStatus.ACCEPTED.name(), savedBid.getCreatedAt());
-
-        } catch (Exception e) {
-            // Rollback wallet hold and Redis state
-            walletPort.releaseFunds(bidderId, amount);
-            concurrencyPort.rollback(
+        if (previousWinningBid != null && !previousWinningBid.getBidderId().equals(bidderId)) {
+            OutbidEvent outbidEvent = new OutbidEvent(
                     listingId,
-                    result.oldPrice(),
-                    result.oldWinner(),
-                    result.oldEndTime(),
-                    bidRupiah,
-                    bidderId.toString());
-            throw e;
+                    previousWinningBid.getBidderId(),
+                    previousWinningBid.getAmount(),
+                    visiblePrice,
+                    now);
+            publishActions.add(() -> eventPublisher.publishOutbid(outbidEvent));
         }
+
+        return new BidProcessingOutcome(toBidResult(savedBid), publishActions);
+    }
+
+    private BidProcessingOutcome handleOutbid(UUID listingId,
+            ListingInfo listing,
+            UUID bidderId,
+            BigDecimal submittedAmount,
+            ConcurrencyResult result) {
+        walletPort.releaseFunds(bidderId, submittedAmount);
+
+        LocalDateTime now = LocalDateTime.now();
+        BigDecimal visiblePrice = BigDecimal.valueOf(result.visiblePrice());
+        List<Runnable> publishActions = new ArrayList<>();
+        Bid savedBid = saveBid(
+                listingId,
+                bidderId,
+                visiblePrice,
+                submittedAmount,
+                BidSource.MANUAL,
+                BidStatus.OUTBID);
+
+        BidPlacedEvent bidPlacedEvent = new BidPlacedEvent(
+                listingId,
+                savedBid.getId(),
+                bidderId,
+                visiblePrice,
+                now);
+        publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
+
+        if (result.proxyVisiblePrice() != null && result.proxyWinnerId() != null && !result.proxyWinnerId().isBlank()) {
+            UUID proxyWinnerId = UUID.fromString(result.proxyWinnerId());
+            BigDecimal proxyVisiblePrice = BigDecimal.valueOf(result.proxyVisiblePrice());
+            Bid proxyBid = saveBid(
+                    listingId,
+                    proxyWinnerId,
+                    proxyVisiblePrice,
+                    proxyVisiblePrice,
+                    BidSource.PROXY,
+                    BidStatus.ACCEPTED);
+
+            BidPlacedEvent proxyBidPlacedEvent = new BidPlacedEvent(
+                    listingId,
+                    proxyBid.getId(),
+                    proxyWinnerId,
+                    proxyVisiblePrice,
+                    now);
+            publishActions.add(() -> eventPublisher.publishBidPlaced(proxyBidPlacedEvent));
+        }
+
+        AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
+                listingId,
+                listing.endTime(),
+                result.endTime());
+        if (extensionEvent != null) {
+            publishActions.add(() -> eventPublisher.publishAuctionTimeExtended(extensionEvent));
+        }
+
+        return new BidProcessingOutcome(toBidResult(savedBid), publishActions);
+    }
+
+    private Bid markPreviousWinningBidAsOutbid(UUID listingId) {
+        Bid previousWinningBid = bidRepository.findTopBid(listingId).orElse(null);
+        if (previousWinningBid != null) {
+            previousWinningBid.setStatus(BidStatus.OUTBID);
+            bidRepository.save(previousWinningBid);
+        }
+
+        return previousWinningBid;
+    }
+
+    private BidProcessingOutcome handleReject(UUID bidderId, BigDecimal submittedAmount, BidAcceptance status) {
+        walletPort.releaseFunds(bidderId, submittedAmount);
+        switch (status) {
+            case REJECTED -> throw new IllegalArgumentException("Penawaran terlalu rendah");
+            case NOT_ACTIVE -> throw new IllegalArgumentException("Lelang tidak aktif");
+            case ENDED -> throw new IllegalArgumentException("Lelang sudah berakhir");
+            default -> throw new IllegalArgumentException("Penawaran ditolak");
+        }
+    }
+
+    private void compensate(UUID listingId,
+            ListingInfo listing,
+            UUID bidderId,
+            BigDecimal submittedAmount,
+            ConcurrencyResult result) {
+        if (result.status() == BidAcceptance.LEADING) {
+            walletPort.releaseFunds(bidderId, submittedAmount);
+        }
+
+        long priceToRestore = resolveListingPrice(listing);
+        String winnerToRestore = listing.winnerId() != null ? listing.winnerId().toString() : "";
+        long endTimeToRestore = toEpochMillis(listing.endTime());
+        String expectedCurrentWinner = result.winnerId() != null ? result.winnerId() : "";
+        long expectedCurrentPrice = resolveExpectedCurrentPrice(result);
+
+        concurrencyPort.rollback(
+                listingId,
+                priceToRestore,
+                winnerToRestore,
+                endTimeToRestore,
+                expectedCurrentPrice,
+                expectedCurrentWinner);
+    }
+
+    private long resolveExpectedCurrentPrice(ConcurrencyResult result) {
+        // OUTBID returns challenger visible price and winner counter visible price.
+        if (result.status() == BidAcceptance.OUTBID && result.proxyVisiblePrice() != null) {
+            return result.proxyVisiblePrice();
+        }
+        return result.visiblePrice();
+    }
+
+    private Bid saveBid(UUID listingId,
+            UUID bidderId,
+            BigDecimal visibleAmount,
+            BigDecimal maxAmount,
+            BidSource bidSource,
+            BidStatus status) {
+        Bid bid = new Bid();
+        bid.setListingId(listingId);
+        bid.setBidderId(bidderId);
+        bid.setAmount(visibleAmount);
+        bid.setMaxAmount(maxAmount);
+        bid.setSource(bidSource);
+        bid.setStatus(status);
+        return bidRepository.save(bid);
+    }
+
+    private AuctionTimeExtendedEvent buildAuctionExtensionEventIfNeeded(UUID listingId,
+            LocalDateTime previousEndTime,
+            long newEndTimeMillis) {
+        if (toEpochMillis(previousEndTime) == newEndTimeMillis) {
+            return null;
+        }
+
+        LocalDateTime newEndTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(newEndTimeMillis), BUSINESS_ZONE);
+        return new AuctionTimeExtendedEvent(listingId, previousEndTime, newEndTime);
+    }
+
+    private long resolveListingPrice(ListingInfo listing) {
+        if (listing.currentPrice() != null) {
+            return listing.currentPrice().longValue();
+        }
+        return listing.startingPrice().longValue();
+    }
+
+    private long toEpochMillis(LocalDateTime time) {
+        return time.atZone(BUSINESS_ZONE).toInstant().toEpochMilli();
+    }
+
+    private BidResult toBidResult(Bid bid) {
+        return new BidResult(
+                bid.getId(),
+                bid.getListingId(),
+                bid.getBidderId(),
+                bid.getAmount(),
+                bid.getStatus().name(),
+                bid.getCreatedAt());
     }
 
     @Override

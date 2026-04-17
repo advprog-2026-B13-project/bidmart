@@ -1,14 +1,15 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output;
 
+import java.util.UUID;
+
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
-
-import java.util.UUID;
 
 public interface ConcurrencyPort {
 
     ConcurrencyResult placeBid(UUID listingId, long bidAmount, long minIncrement,
-                               UUID bidderId, long currentTimeMillis,
+            UUID bidderId, BidType bidType, long currentTimeMillis,
                                long antiSnipeThresholdMillis, long antiSnipeExtensionMillis);
 
     void rollback(UUID listingId,
