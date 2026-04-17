@@ -2,45 +2,41 @@ package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/catalog/listings")
+@RequiredArgsConstructor
 public class ListingController {
 
     private final ListingService listingService;
 
-    public ListingController(ListingService listingService) {
-        this.listingService = listingService;
-    }
-
-    @PostMapping("/create")
-    public ResponseEntity<Listing> createListing(@Valid @RequestBody ListingCreateRequest requestDTO) {
-        Listing newListing = new Listing();
-        newListing.setSellerId(requestDTO.getSellerId());
-        newListing.setTitle(requestDTO.getTitle());
-        newListing.setDescription(requestDTO.getDescription());
-        newListing.setImageUrl(requestDTO.getImageUrl());
-        newListing.setStartingPrice(requestDTO.getStartingPrice());
-        newListing.setReservePrice(requestDTO.getReservePrice());
-        newListing.setMinBidIncrement(requestDTO.getMinBidIncrement());
-        newListing.setStartTime(requestDTO.getStartTime());
-        newListing.setEndTime(requestDTO.getEndTime());
-        Category category = new Category();
-        category.setId(requestDTO.getCategoryId());
-        newListing.setCategory(category);
-
-        Listing savedListing = listingService.createListing(newListing);
-        return new ResponseEntity<>(savedListing, HttpStatus.CREATED);
+    @GetMapping("/search")
+    public ResponseEntity<Page<Listing>> searchListings(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "endTime"));
+        Page<Listing> results = listingService.searchListings(keyword, minPrice, maxPrice, categoryId, pageable);
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/detail/{id}")
@@ -49,27 +45,33 @@ public class ListingController {
         return ResponseEntity.ok(listing);
     }
 
+    @PostMapping("/create")
+    public ResponseEntity<Listing> createListing(@Valid @RequestBody ListingCreateRequest requestDTO) {
+        Listing savedListing = listingService.createListing(requestDTO);
+        return new ResponseEntity<>(savedListing, HttpStatus.CREATED);
+    }
+
     @PutMapping("/update/{id}")
     public ResponseEntity<Listing> updateListing(
             @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID requesterId,
             @Valid @RequestBody ListingUpdateRequest requestDTO) {
 
-        Listing existing = listingService.getListingById(id);
-        if (existing.getStatus() != ListingStatus.DRAFT) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        Listing updateData = new Listing();
-        updateData.setDescription(requestDTO.getDescription());
-        updateData.setImageUrl(requestDTO.getImageUrl());
-
-        Listing updatedListing = listingService.updateListing(id, updateData);
+        Listing updatedListing = listingService.updateListing(id, requesterId, requestDTO);
         return ResponseEntity.ok(updatedListing);
     }
 
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> deleteListing(@PathVariable UUID id) {
-        listingService.deleteListing(id);
+    public ResponseEntity<Void> deleteListing(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID requesterId) {
+        listingService.deleteListing(id, requesterId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/validate")
+    public ResponseEntity<Boolean> validateListingForBid(@PathVariable UUID id) {
+        boolean isValid = listingService.isListingValidForBid(id);
+        return ResponseEntity.ok(isValid);
     }
 }

@@ -8,4 +8,6 @@ public interface CategoryService {
     List<Category> getMainCategories();
     List<Category> getSubCategories(Integer parentId);
     Category getCategoryById(Integer id);
+    Category updateCategory(Integer id, Category categoryDetails);
+    void deleteCategory(Integer id);
 }
