@@ -43,6 +43,13 @@ public class Bid {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "max_amount", precision = 19, scale = 2)
+    private BigDecimal maxAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", nullable = false)
+    private BidSource source;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BidStatus status;
@@ -57,6 +64,12 @@ public class Bid {
         }
         if (status == null) {
             status = BidStatus.ACCEPTED;
+        }
+        if (source == null) {
+            source = BidSource.MANUAL;
+        }
+        if (maxAmount == null) {
+            maxAmount = amount;
         }
     }
 }
