@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.auth.application.service;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.EmailOtp;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.Role;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.Session;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.SessionClientInfo;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.User;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.MFAType;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.UserStatus;
@@ -156,7 +157,7 @@ public class AuthServiceImpl implements AuthUseCase {
 
     @Override
     @Transactional
-    public Map<String, Object> login(String email, String password) {
+    public Map<String, Object> login(String email, String password, SessionClientInfo clientInfo) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
@@ -186,7 +187,15 @@ public class AuthServiceImpl implements AuthUseCase {
         }
 
         // No 2FA, create session directly
-        Map<String, Object> tokens = sessionUseCase.createSession(user.getId());
+        Map<String, Object> tokens = sessionUseCase.createSession(user.getId(), clientInfo);
+        tokens.put("requiresMfa", false);
+        return tokens;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> confirmSessionReplacement(String replacementToken, boolean shouldReplace, SessionClientInfo clientInfo) {
+        Map<String, Object> tokens = sessionUseCase.confirmSessionReplacement(replacementToken, shouldReplace, clientInfo);
         tokens.put("requiresMfa", false);
         return tokens;
     }
@@ -232,6 +241,7 @@ public class AuthServiceImpl implements AuthUseCase {
 
         session.setRefreshToken(newRefreshToken.getToken());
         session.setExpiresAt(newRefreshToken.getExpirationTime());
+        session.setLastLoginAt(Instant.now());
         sessionRepository.save(session);
 
         long redisTtl = newRefreshToken.getExpirationTime().toEpochMilli() - System.currentTimeMillis();

@@ -25,6 +25,7 @@ public class AuthController {
     private final AuthUseCase authUseCase;
     private final AuthContext authContext;
     private final AuthCookieService authCookieService;
+    private final SessionClientInfoResolver sessionClientInfoResolver;
 
     @PostMapping("/register")
     @Operation(
@@ -101,23 +102,30 @@ public class AuthController {
     @Operation(
             summary = "Login with email and password",
             description = """
-                    Authenticates the user. Two possible outcomes:
-                    - **2FA disabled**: authentication cookies are set directly (HttpOnly)
+                    Authenticates the user. Three possible outcomes:
+                    - **2FA disabled + session available**: authentication cookies are set directly (HttpOnly)
                     - **2FA enabled**: returns `preAuthToken` and `mfaType` - use `/api/auth/mfa/verify` to complete login
+                    - **Session limit reached + confirmation strategy**: returns `sessionReplacementToken` and `activeSessions`
                     Accounts with unverified email cannot login.
                     """,
             security = {}
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful or 2FA required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful, 2FA required, or session replacement required"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid email or password"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Account is suspended")
     })
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request,
+                                                            HttpServletRequest httpRequest) {
         try {
-            Map<String, Object> result = authUseCase.login(request.getEmail(), request.getPassword());
+            Map<String, Object> result = authUseCase.login(
+                    request.getEmail(),
+                    request.getPassword(),
+                    sessionClientInfoResolver.resolve(httpRequest)
+            );
 
-            if (Boolean.FALSE.equals(result.get("requiresMfa"))) {
+            if (Boolean.FALSE.equals(result.get("requiresMfa"))
+                    && Boolean.FALSE.equals(result.getOrDefault("requiresSessionReplacement", false))) {
                 String accessToken = (String) result.get("accessToken");
                 String refreshToken = (String) result.get("refreshToken");
 
@@ -128,11 +136,46 @@ public class AuthController {
                 return builder.body(ApiResponse.success("Login successful", LoginResponse.fromMap(result)));
             }
 
-            return ResponseEntity.ok(ApiResponse.success("Login successful", LoginResponse.fromMap(result)));
+            return ResponseEntity.ok(ApiResponse.success("Login requires additional step", LoginResponse.fromMap(result)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/confirm-session-replacement")
+    @Operation(
+            summary = "Confirm replacing oldest active session",
+            description = "Completes login when session limit strategy is confirmation-based. If confirmed, oldest active session is revoked and new cookies are issued.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Confirmation processed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid/expired token or user canceled"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid request")
+    })
+    public ResponseEntity<ApiResponse<LoginResponse>> confirmSessionReplacement(
+            @RequestBody SessionReplacementConfirmationRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            boolean shouldReplace = Boolean.TRUE.equals(request.getReplaceOldestSession());
+            Map<String, Object> result = authUseCase.confirmSessionReplacement(
+                    request.getSessionReplacementToken(),
+                    shouldReplace,
+                    sessionClientInfoResolver.resolve(httpRequest)
+            );
+
+            String accessToken = (String) result.get("accessToken");
+            String refreshToken = (String) result.get("refreshToken");
+
+            ResponseEntity.BodyBuilder builder = addCookies(
+                    ResponseEntity.ok(),
+                    authCookieService.buildAuthCookies(accessToken, refreshToken)
+            );
+            return builder.body(ApiResponse.success("Login successful", LoginResponse.fromMap(result)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
         }
     }
 

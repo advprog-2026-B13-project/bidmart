@@ -6,6 +6,7 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ public class MfaController {
     private final MfaUseCase mfaUseCase;
     private final AuthContext authContext;
     private final AuthCookieService authCookieService;
+    private final SessionClientInfoResolver sessionClientInfoResolver;
 
     @PostMapping("/setup-totp")
     @RequireLogin
@@ -119,25 +121,35 @@ public class MfaController {
     @Operation(
             summary = "Verify MFA code and complete login",
             description = "Verifies the TOTP or Email OTP code against the pre-authentication session. "
-                    + "On success, the pre-auth session is consumed and auth cookies are set (HttpOnly). "
+                    + "On success, pre-auth session is consumed; if session limit is reached with confirmation strategy, returns session replacement token instead of cookies. "
                     + "No Bearer token is needed - this is a pre-authentication step.",
             security = {}
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified and cookies issued"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "MFA verified, or session replacement confirmation required"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid code, expired token, or unknown MFA type")
     })
-    public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(@RequestBody MfaVerifyRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> verifyMfa(@RequestBody MfaVerifyRequest request,
+                                                                HttpServletRequest httpRequest) {
         try {
-            Map<String, Object> result = mfaUseCase.verifyMfa(request.getPreAuthToken(), request.getCode());
-            String accessToken = (String) result.get("accessToken");
-            String refreshToken = (String) result.get("refreshToken");
-
-            ResponseEntity.BodyBuilder builder = addCookies(
-                    ResponseEntity.ok(),
-                    authCookieService.buildAuthCookies(accessToken, refreshToken)
+            Map<String, Object> result = mfaUseCase.verifyMfa(
+                    request.getPreAuthToken(),
+                    request.getCode(),
+                    sessionClientInfoResolver.resolve(httpRequest)
             );
-            return builder.body(ApiResponse.success("MFA verified", TokenResponse.fromMap(result)));
+
+            if (Boolean.FALSE.equals(result.getOrDefault("requiresSessionReplacement", false))) {
+                String accessToken = (String) result.get("accessToken");
+                String refreshToken = (String) result.get("refreshToken");
+
+                ResponseEntity.BodyBuilder builder = addCookies(
+                        ResponseEntity.ok(),
+                        authCookieService.buildAuthCookies(accessToken, refreshToken)
+                );
+                return builder.body(ApiResponse.success("MFA verified", LoginResponse.fromMap(result)));
+            }
+
+            return ResponseEntity.ok(ApiResponse.success("Session replacement confirmation required", LoginResponse.fromMap(result)));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }

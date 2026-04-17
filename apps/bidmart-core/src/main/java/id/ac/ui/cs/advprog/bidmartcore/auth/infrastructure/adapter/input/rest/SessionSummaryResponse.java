@@ -19,10 +19,24 @@ public class SessionSummaryResponse {
     @Schema(description = "Whether this session is currently active", example = "true")
     private Boolean isActive;
 
-    @Schema(description = "Session expiry timestamp in ISO-8601 format", example = "2026-03-26T12:00:00Z")
+    @Schema(description = "Session creation timestamp in ISO-8601 format", example = "2026-03-26T10:00:00Z")
+    private String createdAt;
+
+    @Schema(description = "Last login/refresh timestamp in ISO-8601 format", example = "2026-03-26T12:00:00Z")
+    private String lastLoginAt;
+
+    @Schema(description = "Session expiry timestamp in ISO-8601 format", example = "2026-03-26T12:30:00Z")
     private String expiresAt;
+
+    @Schema(description = "Detected client device", example = "Mozilla/5.0 (X11; Linux x86_64)")
+    private String deviceInfo;
+
+    @Schema(description = "Detected client IP address", example = "203.0.113.5")
+    private String ipAddress;
+
+    @Schema(description = "Best-effort location label", example = "ID")
+    private String locationLabel;
 
     @Schema(description = "Whether this session is the same one as caller's current session", example = "false")
     private Boolean isCurrent;
 }
-

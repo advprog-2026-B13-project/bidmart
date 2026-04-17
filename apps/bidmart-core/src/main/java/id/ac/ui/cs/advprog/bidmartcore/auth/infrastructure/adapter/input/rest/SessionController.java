@@ -26,7 +26,7 @@ public class SessionController {
     @GetMapping
     @Operation(
             summary = "List all sessions",
-            description = "Returns all sessions for the current user, including active/inactive status and which one is the current session."
+            description = "Returns all sessions for the current user, including active/inactive status, session metadata, and which one is the current session."
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sessions retrieved"),
@@ -38,7 +38,12 @@ public class SessionController {
                 .map(s -> new SessionSummaryResponse(
                         s.getId(),
                         s.isActive(),
-                        s.getExpiresAt().toString(),
+                        s.getCreatedAt() != null ? s.getCreatedAt().toString() : null,
+                        s.getLastLoginAt() != null ? s.getLastLoginAt().toString() : null,
+                        s.getExpiresAt() != null ? s.getExpiresAt().toString() : null,
+                        s.getDeviceInfo(),
+                        s.getIpAddress(),
+                        s.getLocationLabel(),
                         s.getId().equals(authContext.getSessionId())
                 ))
                 .toList();

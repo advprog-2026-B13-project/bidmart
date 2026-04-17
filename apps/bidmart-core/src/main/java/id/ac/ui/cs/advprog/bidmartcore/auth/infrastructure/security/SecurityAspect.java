@@ -69,8 +69,7 @@ public class SecurityAspect {
 
         if (annotation != null) {
             PermissionValue[] required = annotation.value();
-            Set<PermissionValue> userPermissions = authContext.getPermissions();
-            boolean hasAll = Arrays.stream(required).allMatch(userPermissions::contains);
+            boolean hasAll = Arrays.stream(required).allMatch(authContext::hasPermission);
             if (!hasAll) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("success", false, "message", "Forbidden"));
