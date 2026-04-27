@@ -140,7 +140,7 @@ export default function AdminUserRolesPage() {
           ) : users.length === 0 ? (
             <p className="font-bold text-sm uppercase text-gray-600">No users found.</p>
           ) : (
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-205 text-sm">
               <thead>
                 <tr className="text-left border-b-2 border-black">
                   <th className="py-2 pr-3 font-black uppercase tracking-wide">Email</th>
@@ -155,7 +155,17 @@ export default function AdminUserRolesPage() {
                 {users.map((user) => (
                   <tr key={user.userId} className="border-b border-gray-200 align-top">
                     <td className="py-3 pr-3 font-semibold">{user.email}</td>
-                    <td className="py-3 pr-3">{user.displayName || "-"}</td>
+                    <td className="py-3 pr-3">
+                      <div className="flex flex-col gap-1">
+                        <span>{user.displayName || "-"}</span>
+                        <Link
+                          href={`/profile/${user.userId}`}
+                          className="text-[10px] font-black uppercase tracking-widest text-electric hover:underline"
+                        >
+                          View Profile
+                        </Link>
+                      </div>
+                    </td>
                     <td className="py-3 pr-3">{user.roleName || "Unassigned"}</td>
                     <td className="py-3 pr-3">{user.status || "UNKNOWN"}</td>
                     <td className="py-3 pr-3">

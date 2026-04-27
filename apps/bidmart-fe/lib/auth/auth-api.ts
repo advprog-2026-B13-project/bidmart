@@ -6,16 +6,20 @@ import type {
   AdminRoleResponse,
   AdminSetRolePermissionsInput,
   ApiResponse,
+  BidResponse,
   LoginInput,
   LoginResponse,
   LoginResult,
   MfaVerifyInput,
+  OtherUserProfileResponse,
+  ProfileUpdateInput,
   ProfileResponse,
   SessionReplacementConfirmationInput,
   SessionSummaryResponse,
   ResendVerificationOtpInput,
   RegisterInput,
   RegisterResponse,
+  TotpSetupResponse,
   VerifyEmailInput,
 } from "./types";
 
@@ -185,6 +189,88 @@ export async function getProfile(): Promise<ProfileResponse> {
   });
 
   return unwrapOrThrow(payload);
+}
+
+export async function getOtherUserProfile(targetUserId: string): Promise<OtherUserProfileResponse> {
+  const payload = await apiFetch<ApiResponse<OtherUserProfileResponse>>(
+    `/api/auth/profile/users/${targetUserId}`,
+    {
+      method: "GET",
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function listMyBids(): Promise<BidResponse[]> {
+  const payload = await apiFetch<ApiResponse<BidResponse[]>>("/api/bidding/my-bids", {
+    method: "GET",
+  });
+
+  return unwrapOrThrow(payload);
+}
+
+export async function updateProfile(input: ProfileUpdateInput): Promise<ProfileResponse> {
+  const payload = await apiFetch<ApiResponse<ProfileResponse>>(
+    "/api/auth/profile",
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function setupTotp(): Promise<TotpSetupResponse> {
+  const payload = await apiFetch<ApiResponse<TotpSetupResponse>>(
+    "/api/auth/mfa/setup-totp",
+    {
+      method: "POST",
+    },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function confirmTotp(code: string): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/mfa/confirm-totp",
+    {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to confirm TOTP");
+  }
+}
+
+export async function enableEmailMfa(): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/mfa/enable-email",
+    {
+      method: "POST",
+    },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to enable email MFA");
+  }
+}
+
+export async function disableMfa(): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/mfa/disable",
+    {
+      method: "POST",
+    },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to disable MFA");
+  }
 }
 
 export async function listSessions(): Promise<SessionSummaryResponse[]> {

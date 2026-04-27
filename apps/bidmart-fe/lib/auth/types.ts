@@ -52,6 +52,46 @@ export type ProfileResponse = {
   role?: string;
 };
 
+export type BidResponse = {
+  bidId: string;
+  listingId: string;
+  bidderId?: string;
+  amount: number;
+  status?: string;
+  createdAt?: string;
+};
+
+export type OtherUserBidResponse = {
+  bidId: string;
+  listingId: string;
+  amount: number;
+  status?: string;
+  createdAt?: string;
+};
+
+export type OtherUserProfileResponse = {
+  userId: string;
+  email: string;
+  displayName?: string;
+  photoUrl?: string;
+  shippingAddress?: string;
+  status?: string;
+  biddingHistoryVisible?: boolean;
+  previousBids?: OtherUserBidResponse[];
+  ongoingBids?: OtherUserBidResponse[];
+};
+
+export type ProfileUpdateInput = {
+  displayName?: string | null;
+  photoUrl?: string | null;
+  shippingAddress?: string | null;
+};
+
+export type TotpSetupResponse = {
+  secret: string;
+  otpAuthUrl: string;
+};
+
 export type LoginInput = {
   email: string;
   password: string;
