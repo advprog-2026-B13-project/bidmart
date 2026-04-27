@@ -7,6 +7,9 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.input.ProfileUseCase;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionCachePort;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionRepositoryPort;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.UserRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.Bid;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidStatus;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BidRepositoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,7 @@ public class ProfileServiceImpl implements ProfileUseCase {
     private final UserRepositoryPort userRepository;
     private final SessionRepositoryPort sessionRepository;
     private final SessionCachePort sessionCache;
+    private final BidRepositoryPort bidRepository;
 
     @Override
     public User getProfile(UUID userId) {
@@ -48,6 +52,42 @@ public class ProfileServiceImpl implements ProfileUseCase {
     }
 
     @Override
+    public OtherUserProfileView getOtherUserProfile(UUID targetUserId, boolean includeBidHistory) {
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!includeBidHistory) {
+            return new OtherUserProfileView(targetUser, List.of(), List.of());
+        }
+
+        List<Bid> bids = bidRepository.findByBidder(targetUserId);
+
+        List<BidView> previousBids = bids.stream()
+                .filter(bid -> bid.getStatus() != BidStatus.ACCEPTED)
+                .map(bid -> new BidView(
+                        bid.getId(),
+                        bid.getListingId(),
+                        bid.getAmount(),
+                        bid.getStatus() != null ? bid.getStatus().name() : null,
+                        bid.getCreatedAt()
+                ))
+                .toList();
+
+        List<BidView> ongoingBids = bids.stream()
+                .filter(bid -> bid.getStatus() == BidStatus.ACCEPTED)
+                .map(bid -> new BidView(
+                        bid.getId(),
+                        bid.getListingId(),
+                        bid.getAmount(),
+                        bid.getStatus().name(),
+                        bid.getCreatedAt()
+                ))
+                .toList();
+
+        return new OtherUserProfileView(targetUser, previousBids, ongoingBids);
+    }
+
+    @Override
     @Transactional
     public void deactivateAccount(UUID targetUserId) {
         User user = userRepository.findById(targetUserId)
@@ -67,4 +107,3 @@ public class ProfileServiceImpl implements ProfileUseCase {
         }
     }
 }
-
