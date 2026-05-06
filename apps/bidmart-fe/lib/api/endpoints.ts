@@ -166,6 +166,20 @@ export async function getSubCategories(parentId: number) {
   }));
 }
 
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export async function getNotifications(userId: string) {
+  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as NotificationItem[];
+  return Array.isArray(raw) ? raw : [];
+}
+
 export async function getCategoryById(id: number) {
   const raw = await apiFetch(`/api/catalog/categories/${id}`, { method: "GET" }, { auth: false }) as { id: number; name: string; parentId: number | null } | null;
   if (!raw || Array.isArray(raw)) return null;
