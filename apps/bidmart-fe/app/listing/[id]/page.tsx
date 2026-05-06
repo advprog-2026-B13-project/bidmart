@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { mockListings, mockBids, formatCurrency, formatTimeRemaining, getTimeUrgency, type Listing, type Bid } from "@/lib/mock-data";
+import { getListingById, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
@@ -157,7 +158,7 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-function BidHistory({ bids }: { bids: Bid[] }) {
+function BidHistory({ bids }: { bids: BidResult[] }) {
   if (bids.length === 0) {
     return (
       <div className="text-center py-12 border-2 border-dashed border-gray-300">
@@ -170,7 +171,7 @@ function BidHistory({ bids }: { bids: Bid[] }) {
     <div className="space-y-0">
       {bids.map((bid, index) => (
         <div
-          key={bid.id}
+          key={bid.bidId}
           className={`flex items-center justify-between py-4 ${
             index === 0 ? "bg-acid/10 border-b-3 border-black" : "border-b border-gray-200"
           }`}
@@ -178,8 +179,8 @@ function BidHistory({ bids }: { bids: Bid[] }) {
           <div className="flex items-center gap-4">
             <div className="relative">
               <img
-                src={bid.bidder.avatar}
-                alt={bid.bidder.name}
+                src="https://i.pravatar.cc/150?u=bidder"
+                alt="Bidder"
                 className="w-12 h-12 rounded-full object-cover border-2 border-black"
               />
               {index === 0 && (
@@ -190,10 +191,10 @@ function BidHistory({ bids }: { bids: Bid[] }) {
             </div>
             <div>
               <p className={`font-black text-sm uppercase tracking-tight ${index === 0 ? "text-black" : "text-gray-600"}`}>
-                {bid.bidder.name}
+                Bidder {bid.bidderId.slice(0, 8)}
               </p>
               <p className="text-xs text-gray-400 font-medium">
-                {new Date(bid.timestamp).toLocaleString()}
+                {new Date(bid.createdAt).toLocaleString()}
               </p>
             </div>
           </div>
@@ -209,7 +210,7 @@ function BidHistory({ bids }: { bids: Bid[] }) {
   );
 }
 
-function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
+function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[] }) {
   const [bidAmount, setBidAmount] = useState(listing.currentPrice + 50);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -232,11 +233,15 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
     setIsSubmitting(true);
     setError("");
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setIsSubmitting(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    try {
+      await placeBid({ listingId: listing.id, amount: bidAmount, bidType: "MANUAL" });
+      setIsSubmitting(false);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      setIsSubmitting(false);
+      setError(err instanceof Error ? err.message : "Bid failed");
+    }
   };
 
   return (
@@ -365,10 +370,14 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
   );
 }
 
-function RelatedListings({ category, currentId }: { category: string; currentId: string }) {
-  const related = mockListings
-    .filter(l => l.category === category && l.id !== currentId)
-    .slice(0, 4);
+function RelatedListings({ categoryId, categoryName, currentId }: { categoryId: number; categoryName: string; currentId: string }) {
+  const [related, setRelated] = useState<ParsedListing[]>([]);
+
+  useEffect(() => {
+    getListings({ categoryId, size: 4 }).then(r => {
+      setRelated(r.listings.filter(l => l.id !== currentId));
+    });
+  }, [categoryId, currentId]);
 
   if (related.length === 0) return null;
 
@@ -376,9 +385,9 @@ function RelatedListings({ category, currentId }: { category: string; currentId:
     <section className="border-t-3 border-black pt-16 mt-16">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-3xl font-black uppercase tracking-tighter">
-          More in {category}
+          More in {categoryName}
         </h2>
-        <Link href={`/categories/${category.toLowerCase()}`} className="btn btn-ghost btn-sm font-bold uppercase">
+        <Link href={`/categories/${categoryName.toLowerCase().replace(/\s+/g, '-')}`} className="btn btn-ghost btn-sm font-bold uppercase">
           View All
         </Link>
       </div>
@@ -422,16 +431,24 @@ function RelatedListings({ category, currentId }: { category: string; currentId:
 }
 
 export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [bids, setBids] = useState<Bid[]>([]);
+  const [listing, setListing] = useState<ParsedListing | null>(null);
+  const [bids, setBids] = useState<BidResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    params.then(({ id }) => {
-      const found = mockListings.find(l => l.id === id);
-      setListing(found || null);
-      setBids(mockBids[id] || []);
-      setLoading(false);
+    params.then(async ({ id }) => {
+      try {
+        const [listingData, bidsData] = await Promise.all([
+          getListingById(id),
+          getBidsForListing(id),
+        ]);
+        setListing(listingData);
+        setBids(bidsData);
+      } catch {
+        setListing(null);
+      } finally {
+        setLoading(false);
+      }
     });
   }, [params]);
 
@@ -471,8 +488,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           <Link href={`/categories/${listing.category.toLowerCase()}`} className="hover:text-black transition-colors">
             {listing.category}
           </Link>
-          <span>/</span>
-          <span className="text-black truncate max-w-50">{listing.title}</span>
         </nav>
       </div>
 
@@ -531,7 +546,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Related Listings */}
-            <RelatedListings category={listing.category} currentId={listing.id} />
+            <RelatedListings categoryId={listing.categoryId} categoryName={listing.category} currentId={listing.id} />
           </div>
 
           {/* Right Column - Bid Panel */}

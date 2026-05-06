@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mockListings, categories, formatCurrency, formatTimeRemaining, getTimeUrgency, type Listing } from "@/lib/mock-data";
+import { getListings, getCategories, type ParsedListing } from "@/lib/api/endpoints";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
@@ -24,7 +25,7 @@ function CountdownTimer({ endTime }: { endTime: Date }) {
   );
 }
 
-function ListingCard({ listing, index }: { listing: Listing; index: number }) {
+function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
   const urgency = getTimeUrgency(listing.endTime);
 
   return (
@@ -99,15 +100,15 @@ function ListingCard({ listing, index }: { listing: Listing; index: number }) {
   );
 }
 
-function FeaturedAuction() {
-  const featured = mockListings[0];
+function FeaturedAuction({ listing }: { listing: ParsedListing | null }) {
+  if (!listing) return null;
 
   return (
     <div className="relative overflow-hidden border-3 border-black bg-black">
       <div className="absolute inset-0">
         <img
-          src={featured.imageUrl}
-          alt={featured.title}
+          src={listing.imageUrl}
+          alt={listing.title}
           className="w-full h-full object-cover opacity-30"
         />
         <div className="absolute inset-0 bg-linear-to-r from-black via-black/90 to-transparent" />
@@ -118,18 +119,18 @@ function FeaturedAuction() {
           <span className="badge badge-acid mb-6">FEATURED AUCTION</span>
 
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-black text-white mb-6 leading-[0.95] tracking-tighter uppercase">
-            {featured.title}
+            {listing.title}
           </h2>
 
           <p className="text-gray-400 text-lg mb-8 max-w-lg leading-relaxed">
-            {featured.description.slice(0, 120)}...
+            {listing.description.slice(0, 120)}...
           </p>
 
           <div className="flex flex-wrap items-center gap-6 mb-8">
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-1">Current Bid</p>
               <p className="text-5xl font-black text-acid">
-                {formatCurrency(featured.currentPrice)}
+                {formatCurrency(listing.currentPrice)}
               </p>
             </div>
             <div>
@@ -138,20 +139,20 @@ function FeaturedAuction() {
                 <svg className="w-6 h-6 text-acid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <CountdownTimer endTime={featured.endTime} />
+                <CountdownTimer endTime={listing.endTime} />
               </div>
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-1">Bids</p>
-              <p className="text-3xl font-black text-white">{featured.bidCount}</p>
+              <p className="text-3xl font-black text-white">{listing.bidCount}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href={`/listing/${featured.id}`} className="btn btn-acid btn-lg font-black">
+            <Link href={`/listing/${listing.id}`} className="btn btn-acid btn-lg font-black">
               Place Bid
             </Link>
-            <Link href={`/listing/${featured.id}`} className="btn btn-lg font-bold bg-white text-black border-white hover:bg-gray-100">
+            <Link href={`/listing/${listing.id}`} className="btn btn-lg font-bold bg-white text-black border-white hover:bg-gray-100">
               View Details
             </Link>
           </div>
@@ -171,7 +172,7 @@ function FeaturedAuction() {
   );
 }
 
-function CategoryCard({ category, index }: { category: typeof categories[0]; index: number }) {
+function CategoryCard({ category, index }: { category: { slug: string; name: string; coverImage: string; count?: number }; index: number }) {
   return (
     <Link
       href={`/categories/${category.slug}`}
@@ -197,7 +198,31 @@ function CategoryCard({ category, index }: { category: typeof categories[0]; ind
 }
 
 export default function HomePage() {
-  const endingSoonListings = mockListings.filter(l => l.status === "ending-soon" || l.status === "active").slice(0, 4);
+  const [listings, setListings] = useState<ParsedListing[]>([]);
+  const [categories, setCategories] = useState<{ slug: string; name: string; coverImage: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      getListings({ size: 100 }),
+      getCategories(),
+    ]).then(([listingsResult, cats]) => {
+      setListings(listingsResult.listings);
+      setCategories(cats);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const featured = listings[0] || null;
+  const endingSoonListings = listings.filter(l => l.status === "active" || l.status === "ending-soon").slice(0, 4);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -247,7 +272,7 @@ export default function HomePage() {
 
       {/* Featured Auction */}
       <section className="max-w-7xl mx-auto px-4 py-16">
-        <FeaturedAuction />
+        <FeaturedAuction listing={featured} />
       </section>
 
       {/* Categories */}
@@ -302,7 +327,7 @@ export default function HomePage() {
               <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">
                 All Auctions
               </h2>
-              <p className="text-gray-500 font-bold mt-2 uppercase text-sm tracking-wide">{mockListings.length} items waiting</p>
+              <p className="text-gray-500 font-bold mt-2 uppercase text-sm tracking-wide">{listings.length} items waiting</p>
             </div>
             <div className="flex items-center gap-3">
               <select className="input py-2 px-3 text-sm font-bold w-auto bg-white">
@@ -315,7 +340,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {mockListings.map((listing, i) => (
+            {listings.map((listing, i) => (
               <ListingCard key={listing.id} listing={listing} index={i} />
             ))}
           </div>

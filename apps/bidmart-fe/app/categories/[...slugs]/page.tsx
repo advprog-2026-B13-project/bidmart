@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mockListings, categoryTree, findCategoryByPath, formatCurrency, formatTimeRemaining, getTimeUrgency, type Category, type Listing } from "@/lib/mock-data";
+import { getListings, getCategories, getSubCategories, type ParsedListing } from "@/lib/api/endpoints";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
 
-function ListingCard({ listing, index }: { listing: Listing; index: number }) {
+function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
   const urgency = getTimeUrgency(listing.endTime);
 
   return (
@@ -82,19 +83,58 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
   const [priceMax, setPriceMax] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [categoryMap, setCategoryMap] = useState<Record<string, { id: number; name: string; parentId: number | null; slug: string }>>({});
+  const [currentCategory, setCurrentCategory] = useState<{ id: number; name: string; slug: string; parentId: number | null } | null>(null);
+  const [listings, setListings] = useState<ParsedListing[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    params.then(({ slugs }) => setSlugs(slugs || []));
+    params.then(async ({ slugs: resolvedSlugs }) => {
+      setSlugs(resolvedSlugs || []);
+
+      if (!resolvedSlugs || resolvedSlugs.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Load categories and build map
+      const [mainCats, ...subCatResults] = await Promise.all([
+        getCategories(),
+      ]);
+
+      const map: Record<string, { id: number; name: string; parentId: number | null; slug: string }> = {};
+      for (const cat of mainCats) {
+        map[cat.slug] = cat;
+        const subs = await getSubCategories(cat.id);
+        for (const sub of subs) {
+          map[sub.slug] = sub;
+        }
+      }
+      setCategoryMap(map);
+
+      // Find current category by slugs
+      const cat = map[resolvedSlugs[resolvedSlugs.length - 1]];
+      setCurrentCategory(cat || null);
+
+      // Fetch listings
+      if (cat) {
+        const result = await getListings({ categoryId: cat.id, size: 100 });
+        setListings(result.listings);
+      }
+      setLoading(false);
+    });
   }, [params]);
 
-  const { category, breadcrumb } = findCategoryByPath(slugs);
-
   if (slugs.length === 0) {
-    // Root categories page
     return <RootCategoriesPage />;
   }
 
-  if (!category) {
+  if (!currentCategory) {
+    if (loading) return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
         <h1 className="text-5xl font-black text-black mb-4 uppercase tracking-tighter">404</h1>
@@ -104,49 +144,30 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
     );
   }
 
-  // Get listings for this category (including subcategory listings)
-  let listings = mockListings.filter(() => {
-    const catPath = categoryTree.find(c => c.slug === slugs[0]);
-    if (!catPath) return false;
-
-    // Check if listing matches this category or any subcategory
-    const checkCategory = (cat: Category): boolean => {
-      if (cat.slug === category.slug) return true;
-      if (cat.children) {
-        return cat.children.some(child => checkCategory(child));
-      }
-      return false;
-    };
-
-    return checkCategory(catPath);
-  });
-
   // Apply filters
+  let filtered = [...listings];
   if (status === "ending-soon") {
-    listings = listings.filter(l => l.status === "ending-soon");
+    filtered = filtered.filter(l => l.status === "ending-soon");
   } else if (status === "active") {
-    listings = listings.filter(l => l.status === "active");
+    filtered = filtered.filter(l => l.status === "active");
   }
-
   if (priceMin) {
-    listings = listings.filter(l => l.currentPrice >= Number(priceMin));
+    filtered = filtered.filter(l => l.currentPrice >= Number(priceMin));
   }
   if (priceMax) {
-    listings = listings.filter(l => l.currentPrice <= Number(priceMax));
+    filtered = filtered.filter(l => l.currentPrice <= Number(priceMax));
   }
 
   // Sort
   if (sortBy === "ending-soon") {
-    listings.sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
+    filtered.sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
   } else if (sortBy === "price-low") {
-    listings.sort((a, b) => a.currentPrice - b.currentPrice);
+    filtered.sort((a, b) => a.currentPrice - b.currentPrice);
   } else if (sortBy === "price-high") {
-    listings.sort((a, b) => b.currentPrice - a.currentPrice);
+    filtered.sort((a, b) => b.currentPrice - a.currentPrice);
   } else if (sortBy === "most-bids") {
-    listings.sort((a, b) => b.bidCount - a.bidCount);
+    filtered.sort((a, b) => b.bidCount - a.bidCount);
   }
-
-  const hasChildren = category.children && category.children.length > 0;
 
   return (
     <div>
@@ -154,8 +175,8 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
       <section className="relative overflow-hidden bg-black border-b-3 border-black">
         <div className="absolute inset-0">
           <img
-            src={category.coverImage}
-            alt={category.name}
+            src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80"
+            alt={currentCategory.name}
             className="w-full h-full object-cover opacity-40"
           />
           <div className="absolute inset-0 bg-linear-to-r from-black via-black/90 to-transparent" />
@@ -166,48 +187,38 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
             <Link href="/categories" className="hover:text-white transition-colors">
               All Categories
             </Link>
-            {breadcrumb.map((crumb, i) => (
-              <span key={crumb.slug} className="flex items-center gap-2">
-                <span>/</span>
-                {i === breadcrumb.length - 1 ? (
-                  <span className="text-white">{crumb.name}</span>
-                ) : (
-                  <Link href={`/categories/${breadcrumb.slice(0, i + 1).map(c => c.slug).join('/')}`} className="hover:text-white transition-colors">
-                    {crumb.name}
-                  </Link>
-                )}
-              </span>
-            ))}
+            <span>/</span>
+            <span className="text-white">{currentCategory.name}</span>
           </nav>
 
           <div>
             <h1 className="text-5xl md:text-6xl font-black text-white mb-3 uppercase tracking-tighter">
-              {category.name}
+              {currentCategory.name}
             </h1>
-            <p className="text-gray-400 text-lg mb-4">{category.description}</p>
             <span className="bg-acid text-black text-xs font-black px-4 py-2 uppercase tracking-widest">
-              {category.count} LISTINGS
+              {listings.length} LISTINGS
             </span>
           </div>
         </div>
       </section>
 
-      {/* Subcategories Grid (if has children) */}
-      {hasChildren && (
-        <section className="max-w-7xl mx-auto px-4 py-12">
-          <h2 className="text-2xl font-black uppercase tracking-tight mb-6">
-            Subcategories
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {category.children!.map((child) => (
+      {/* Subcategories Grid */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <h2 className="text-2xl font-black uppercase tracking-tight mb-6">
+          Subcategories
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Object.values(categoryMap)
+            .filter(c => c.parentId === currentCategory.id)
+            .map((child) => (
               <Link
                 key={child.slug}
-                href={`/categories/${[...slugs, child.slug].join('/')}`}
+                href={`/categories/${child.slug}`}
                 className="card group overflow-hidden"
               >
                 <div className="relative aspect-4/3 overflow-hidden">
                   <img
-                    src={child.coverImage}
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
                     alt={child.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -216,21 +227,18 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                     <h3 className="font-black text-base text-white uppercase tracking-tight mb-1">
                       {child.name}
                     </h3>
-                    <p className="text-white/70 text-xs font-medium uppercase">{child.count} items</p>
                   </div>
                 </div>
               </Link>
             ))}
-          </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* Filters Bar */}
       <section className="sticky top-16 z-40 bg-white border-b-3 border-black">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between py-4 gap-4">
             <div className="flex items-center gap-3 flex-1">
-              {/* Mobile filter toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="lg:hidden btn btn-sm font-bold uppercase gap-2"
@@ -241,22 +249,17 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                 Filters
               </button>
 
-              {/* Sort */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide hidden md:block">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="input py-2 px-4 text-sm font-bold w-auto min-w-45"
-                >
-                  <option value="ending-soon">ENDING SOON</option>
-                  <option value="price-low">PRICE: LOW → HIGH</option>
-                  <option value="price-high">PRICE: HIGH → LOW</option>
-                  <option value="most-bids">MOST BIDS</option>
-                </select>
-              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="input py-2 px-4 text-sm font-bold w-auto min-w-45"
+              >
+                <option value="ending-soon">ENDING SOON</option>
+                <option value="price-low">PRICE: LOW → HIGH</option>
+                <option value="price-high">PRICE: HIGH → LOW</option>
+                <option value="most-bids">MOST BIDS</option>
+              </select>
 
-              {/* Status filter */}
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
@@ -267,63 +270,19 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                 <option value="ending-soon">ENDING SOON</option>
               </select>
 
-              {/* Results count */}
               <div className="hidden lg:block ml-4">
                 <span className="text-sm font-bold text-gray-500">
-                  <span className="text-black font-black">{listings.length}</span> items
+                  <span className="text-black font-black">{filtered.length}</span> items
                 </span>
               </div>
             </div>
           </div>
-
-          {/* Expanded Filters */}
-          {showFilters && (
-            <div className="lg:hidden border-t-2 border-black py-4 space-y-4 animate-fade-in">
-              {/* Price Range */}
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Price Range</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value)}
-                    className="input py-2 px-3 text-sm w-28"
-                  />
-                  <span className="font-bold text-gray-400">—</span>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value)}
-                    className="input py-2 px-3 text-sm w-28"
-                  />
-                </div>
-              </div>
-
-              {/* Apply */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setPriceMin(""); setPriceMax(""); }}
-                  className="btn btn-sm font-bold uppercase"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="btn btn-sm btn-black font-bold uppercase"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Listings Grid */}
       <section className="max-w-7xl mx-auto px-4 py-12">
-        {listings.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="text-center py-24 border-3 border-dashed border-gray-300">
             <div className="text-6xl mb-6">📦</div>
             <h2 className="text-3xl font-black text-black mb-3 uppercase tracking-tight">No Listings Found</h2>
@@ -337,47 +296,32 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {listings.map((listing, i) => (
+            {filtered.map((listing, i) => (
               <ListingCard key={listing.id} listing={listing} index={i} />
             ))}
           </div>
         )}
       </section>
-
-      {/* Related Categories */}
-      {listings.length > 0 && (
-        <section className="bg-gray-100 border-t-3 border-black py-16">
-          <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-3xl font-black uppercase tracking-tighter mb-8">
-              Explore Other Categories
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {categoryTree.filter(c => c.slug !== slugs[0]).slice(0, 5).map(cat => (
-                <Link
-                  key={cat.slug}
-                  href={`/categories/${cat.slug}`}
-                  className="card p-4 flex items-center gap-3 group"
-                >
-                  <img
-                    src={cat.coverImage}
-                    alt={cat.name}
-                    className="w-12 h-12 object-cover border-2 border-black shrink-0"
-                  />
-                  <span className="font-black text-sm uppercase tracking-tight group-hover:text-electric transition-colors">
-                    {cat.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
 
 function RootCategoriesPage() {
-  const featured = categoryTree.slice(0, 3);
+  const [allCategories, setAllCategories] = useState<{ slug: string; name: string }[]>([]);
+
+  useEffect(() => {
+    getCategories().then(setAllCategories);
+  }, []);
+
+  if (allCategories.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
+
+  const featured = allCategories.slice(0, 3);
 
   return (
     <div>
@@ -415,7 +359,7 @@ function RootCategoriesPage() {
             >
               <div className="absolute inset-0">
                 <img
-                  src={cat.coverImage}
+                  src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80"
                   alt={cat.name}
                   className="w-full h-full object-cover"
                 />
@@ -429,11 +373,7 @@ function RootCategoriesPage() {
                   }`}>
                     {cat.name}
                   </h2>
-                  <p className="text-white/70 text-sm font-medium mb-4 max-w-xs">{cat.description}</p>
                   <div className="flex items-center gap-2">
-                    <span className="bg-white text-black text-xs font-black px-3 py-1">
-                      {cat.count} LISTINGS
-                    </span>
                     <svg className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
@@ -452,11 +392,11 @@ function RootCategoriesPage() {
             <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">
               All Categories
             </h2>
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">{categoryTree.length} Categories</span>
+            <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">{allCategories.length} Categories</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {categoryTree.map((cat, i) => (
+            {allCategories.map((cat, i) => (
               <Link
                 key={cat.slug}
                 href={`/categories/${cat.slug}`}
@@ -465,7 +405,7 @@ function RootCategoriesPage() {
               >
                 <div className="relative aspect-4/3 overflow-hidden">
                   <img
-                    src={cat.coverImage}
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
                     alt={cat.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -474,7 +414,6 @@ function RootCategoriesPage() {
                     <h3 className="font-black text-lg text-white uppercase tracking-tight mb-1">
                       {cat.name}
                     </h3>
-                    <p className="text-white/70 text-xs font-medium uppercase">{cat.count} items</p>
                   </div>
                 </div>
               </Link>
@@ -490,7 +429,7 @@ function RootCategoriesPage() {
             {["HOTTEST BIDS", "ENDING SOON", "NEW LISTINGS", "VERIFIED SELLERS", "FREE SHIPPING", "BUYER PROTECTED", "ANTI-SNIPE"].map((item, i) => (
               <span key={i} className="marquee-strip-item">{item}</span>
             ))}
-            {[...["HOTTEST BIDS", "ENDING SOON", "NEW LISTINGS", "VERIFIED SELLERS", "FREE SHIPPING", "BUYER PROTECTED", "ANTI-SNIPE"]].map((item, i) => (
+            {["HOTTEST BIDS", "ENDING SOON", "NEW LISTINGS", "VERIFIED SELLERS", "FREE SHIPPING", "BUYER PROTECTED", "ANTI-SNIPE"].map((item, i) => (
               <span key={`dup-${i}`} className="marquee-strip-item">{item}</span>
             ))}
           </div>

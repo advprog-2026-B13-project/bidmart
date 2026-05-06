@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
 
-      const publicPaths = ["/login", "/register", "/verify-email"];
+      const publicPaths = ["/", "/login", "/register", "/verify-email"];
       const isPublicPath = publicPaths.some((publicPath) => pathname?.startsWith(publicPath));
 
       if (!isPublicPath) {
