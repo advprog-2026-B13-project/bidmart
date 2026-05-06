@@ -21,6 +21,14 @@ public class WalletServiceImpl implements WalletService {
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
 
+    private WalletModel getOrCreateWallet(UUID userId) {
+        try {
+            return walletRepository.findByUserId(userId);
+        } catch (Exception e) {
+            return createWallet(userId);
+        }
+    }
+
     @Override
     public WalletModel createWallet(UUID userId) {
         WalletModel wallet = new WalletModel();
@@ -183,7 +191,8 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public WalletModel deposit(UUID userId, BigDecimal amount) {
-        WalletModel wallet = walletRepository.findByUserId(userId);
+
+        WalletModel wallet = getOrCreateWallet(userId);
 
         wallet.setAvailableBalance(
                 wallet.getAvailableBalance().add(amount)

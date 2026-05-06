@@ -26,24 +26,31 @@ public class PaymentCallbackController {
     }
 
     @PostMapping("/callback")
-    public void handleCallback(@RequestBody Map<String, Object> payload) {
+    public Map<String, String> handleCallback(@RequestBody Map<String, Object> payload) {
 
         String orderId = (String) payload.get("order_id");
         String status = (String) payload.get("transaction_status");
 
-        if (!"settlement".equals(status)) return;
+        if (!"settlement".equals(status)) {
+            return Map.of("message", "ignored");
+        }
 
         PaymentModel payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow();
 
+        if ("SUCCESS".equals(payment.getStatus())) {
+            return Map.of("message", "already processed");
+        }
+
         payment.setStatus("SUCCESS");
         payment.setUpdatedAt(LocalDateTime.now());
-
         paymentRepository.save(payment);
 
         walletService.deposit(
                 payment.getUserId(),
                 payment.getAmount()
         );
+
+        return Map.of("message", "wallet updated");
     }
 }

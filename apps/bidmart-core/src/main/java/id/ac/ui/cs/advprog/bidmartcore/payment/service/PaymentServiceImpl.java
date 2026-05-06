@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartcore.payment.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.payment.repository.PaymentSpringRepository;
 import id.ac.ui.cs.advprog.bidmartcore.payment.model.PaymentModel;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -18,6 +19,9 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Autowired
     private PaymentSpringRepository paymentRepository;
+
+    @Autowired
+    private WalletService walletService;
 
     @Value("${midtrans.server-key}")
     private String serverKey;
