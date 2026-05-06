@@ -42,6 +42,7 @@ export interface ParsedListing {
   startingPrice: number;
   currentPrice: number;
   reservePrice: number | null;
+  minBidIncrement: number;
   bidCount: number;
   startTime: Date;
   endTime: Date;
@@ -111,6 +112,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     startingPrice: Number(listing.startingPrice),
     currentPrice: Number(listing.currentPrice),
     reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,
+    minBidIncrement: Number(listing.minBidIncrement),
     bidCount: (listing.bidCount as number) ?? 0,
     startTime: new Date(listing.startTime as string),
     endTime: new Date(listing.endTime as string),

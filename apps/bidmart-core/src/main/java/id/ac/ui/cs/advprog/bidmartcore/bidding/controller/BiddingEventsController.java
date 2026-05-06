@@ -44,6 +44,12 @@ public class BiddingEventsController {
         redisContainer.addMessageListener(listener, new ChannelTopic(channel));
         log.debug("SSE client subscribed to {}", channel);
 
+        try {
+            emitter.send(SseEmitter.event().name("open").data("connected"));
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+
         emitter.onCompletion(() -> {
             redisContainer.removeMessageListener(listener, new ChannelTopic(channel));
             log.debug("SSE client unsubscribed from {}", channel);

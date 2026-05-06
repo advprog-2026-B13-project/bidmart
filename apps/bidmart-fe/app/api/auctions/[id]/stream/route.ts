@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { Agent } from "undici";
 
 const BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8080";
 
@@ -10,11 +9,6 @@ export async function GET(
   const { id } = await params;
   const url = `${BASE_URL}/api/bidding/auctions/${id}/stream`;
 
-  const dispatcher = new Agent({
-    headersTimeout: 0,
-    bodyTimeout: 0,
-  });
-
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -23,7 +17,6 @@ export async function GET(
       Authorization: req.headers.get("authorization") ?? "",
     },
     cache: "no-store",
-    dispatcher,
   });
 
   if (!response.ok) {

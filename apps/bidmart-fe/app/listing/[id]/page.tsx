@@ -244,7 +244,8 @@ function BidHistory({ bids }: { bids: BidResult[] }) {
 }
 
 function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[] }) {
-  const [bidAmount, setBidAmount] = useState(Math.ceil(listing.currentPrice / 100) * 100 + 50);
+  const initialBid = listing.currentPrice + listing.minBidIncrement;
+  const [bidAmount, setBidAmount] = useState(initialBid);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -253,12 +254,12 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
   const now = new Date();
   const hasStarted = now.getTime() >= listing.startTime.getTime();
 
-  const minBid = listing.currentPrice + 1;
+  const minBid = listing.currentPrice + listing.minBidIncrement;
   const suggestedBids = [
-    Math.ceil(listing.currentPrice / 100) * 100 + 50,
-    Math.ceil(listing.currentPrice / 100) * 100 + 100,
-    Math.ceil(listing.currentPrice / 100) * 100 + 250,
-    Math.ceil(listing.currentPrice / 100) * 100 + 500,
+    minBid,
+    minBid + listing.minBidIncrement,
+    minBid + listing.minBidIncrement * 2,
+    minBid + listing.minBidIncrement * 5,
   ];
 
   const handleBid = async () => {
@@ -356,7 +357,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
             onChange={(e) => setBidAmount(Number(e.target.value))}
             className="input pl-48 pr-12 text-2xl font-black"
             min={minBid}
-            step="1"
+            step={listing.minBidIncrement}
           />
           </div>
         </div>

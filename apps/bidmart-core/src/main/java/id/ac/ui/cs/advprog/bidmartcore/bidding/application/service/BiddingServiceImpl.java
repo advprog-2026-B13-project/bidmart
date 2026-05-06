@@ -91,6 +91,10 @@ public class BiddingServiceImpl implements BiddingUseCase {
 
     private void validateAndHoldFunds(ListingInfo listing, BigDecimal amount, UUID bidderId) {
         validator.validateStatic(listing.sellerId(), amount, bidderId);
+        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        if (listing.startTime() != null && now.isBefore(listing.startTime())) {
+            throw new IllegalStateException("Lelang belum dimulai");
+        }
 
         try {
             walletPort.holdFunds(bidderId, amount);

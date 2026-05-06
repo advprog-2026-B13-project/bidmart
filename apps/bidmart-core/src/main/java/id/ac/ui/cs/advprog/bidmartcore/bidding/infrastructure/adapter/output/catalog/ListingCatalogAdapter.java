@@ -28,6 +28,7 @@ public class ListingCatalogAdapter implements ListingPort {
                 listing.getCurrentPrice(),
                 listing.getReservePrice(),
                 listing.getMinBidIncrement(),
+                listing.getStartTime(),
                 listing.getEndTime(),
                 listing.getWinnerId()
         );
