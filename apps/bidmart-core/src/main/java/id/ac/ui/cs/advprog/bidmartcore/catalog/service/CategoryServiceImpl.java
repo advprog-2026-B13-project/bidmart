@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -34,5 +35,24 @@ public class CategoryServiceImpl implements CategoryService {
     public Category getCategoryById(Integer id) {
         return categoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Kategori dengan ID " + id + " tidak ditemukan"));
+    }
+
+    @Override
+    @Transactional
+    public Category updateCategory(Integer id, Category categoryDetails) {
+        Category category = getCategoryById(id);
+        category.setName(categoryDetails.getName());
+        category.setParentCategory(categoryDetails.getParentCategory());
+        return categoryRepository.save(category);
+    }
+
+    @Override
+    @Transactional
+    public void deleteCategory(Integer id) {
+        Category category = getCategoryById(id);
+        if (category.getSubCategories() != null && !category.getSubCategories().isEmpty()) {
+            throw new IllegalStateException("Kategori tidak bisa dihapus karena masih memiliki sub-kategori.");
+        }
+        categoryRepository.delete(category);
     }
 }

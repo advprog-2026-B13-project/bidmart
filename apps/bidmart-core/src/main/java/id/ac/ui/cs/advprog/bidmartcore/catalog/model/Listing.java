@@ -62,6 +62,10 @@ public class Listing {
     @Column(name = "current_price", nullable = false)
     private BigDecimal currentPrice;
 
+    @NotNull(message = "Jumlah bid tidak boleh kosong")
+    @Column(name = "bid_count", nullable = false)
+    private Integer bidCount = 0;
+
     @NotNull(message = "Waktu mulai tidak boleh kosong")
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
@@ -96,6 +100,10 @@ public class Listing {
 
         if (minBidIncrement == null) {
             minBidIncrement = BigDecimal.ONE;
+        }
+
+        if (bidCount == null) {
+            bidCount = 0;
         }
 
         createdAt = LocalDateTime.now();
