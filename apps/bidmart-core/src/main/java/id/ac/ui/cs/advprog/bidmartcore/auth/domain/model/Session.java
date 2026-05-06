@@ -5,7 +5,6 @@ import lombok.*;
 
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Getter @Setter
@@ -28,4 +27,19 @@ public class Session implements Serializable {
 
     @Column(name="is_active", nullable = false)
     private boolean isActive;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "last_login_at", nullable = false)
+    private Instant lastLoginAt;
+
+    @Column(name = "device_info")
+    private String deviceInfo;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "location_label")
+    private String locationLabel;
 }

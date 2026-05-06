@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { requestEmailOtp } from "@/lib/auth/auth-api";
+import { confirmSessionReplacement, requestEmailOtp } from "@/lib/auth/auth-api";
+import type { SessionSummaryResponse } from "@/lib/auth/types";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -24,9 +25,13 @@ export default function Login() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [showMfa, setShowMfa] = useState(false);
+  const [showSessionReplacement, setShowSessionReplacement] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const [preAuthToken, setPreAuthToken] = useState("");
   const [mfaType, setMfaType] = useState("");
+  const [sessionReplacementToken, setSessionReplacementToken] = useState("");
+  const [activeSessions, setActiveSessions] = useState<SessionSummaryResponse[]>([]);
+  const [isConfirmingReplacement, setIsConfirmingReplacement] = useState(false);
 
   useEffect(() => {
     if (!isHydrating && isAuthenticated) {
@@ -49,6 +54,13 @@ export default function Login() {
     try {
       const result = await login({ email, password });
 
+      if (result.requiresSessionReplacement) {
+        setSessionReplacementToken(result.sessionReplacementToken);
+        setActiveSessions(result.activeSessions);
+        setShowSessionReplacement(true);
+        return;
+      }
+
       if (result.requiresMfa) {
         setPreAuthToken(result.preAuthToken);
         setMfaType(result.mfaType || "");
@@ -65,6 +77,54 @@ export default function Login() {
       setError(getErrorMessage(submitError));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSessionReplacementDecision = async (replaceOldestSession: boolean) => {
+    if (!sessionReplacementToken) {
+      setError("Session replacement token expired. Please login again.");
+      setShowSessionReplacement(false);
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+    setIsConfirmingReplacement(true);
+
+    try {
+      if (!replaceOldestSession) {
+        setShowSessionReplacement(false);
+        setError("Login cancelled. No session was replaced.");
+        return;
+      }
+
+      const result = await confirmSessionReplacement({
+        sessionReplacementToken,
+        replaceOldestSession,
+      });
+
+      setShowSessionReplacement(false);
+      setSessionReplacementToken("");
+      setActiveSessions([]);
+
+      if (result.requiresMfa) {
+        setPreAuthToken(result.preAuthToken);
+        setMfaType(result.mfaType || "");
+        setShowMfa(true);
+
+        if (result.mfaType?.toUpperCase() === "EMAIL") {
+          await requestEmailOtp(result.preAuthToken);
+          setSuccessMessage("A verification code was sent to your email.");
+        }
+
+        return;
+      }
+
+      router.push("/");
+    } catch (decisionError) {
+      setError(getErrorMessage(decisionError));
+    } finally {
+      setIsConfirmingReplacement(false);
     }
   };
 
@@ -335,6 +395,76 @@ export default function Login() {
           )}
         </div>
       </div>
+
+      {showSessionReplacement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl border-3 border-black bg-white p-6 shadow-[10px_10px_0_#0A0A0A]">
+            <h2 className="text-2xl lg:text-3xl font-black uppercase tracking-tighter mb-2">
+              Session Limit Reached
+            </h2>
+            <p className="text-gray-600 text-sm lg:text-base mb-5">
+              You have reached the active session limit. Replace the oldest session to continue signing in?
+            </p>
+
+            {activeSessions.length > 0 && (
+              <div className="mb-5 border-2 border-black bg-gray-50 p-4">
+                <p className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3">
+                  Current Active Sessions
+                </p>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {activeSessions.map((session) => (
+                    <div
+                      key={session.sessionId}
+                      className="flex items-center justify-between gap-3 border border-black bg-white px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-black text-black">
+                          {session.deviceInfo || "Unknown device"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {session.locationLabel || session.ipAddress || "Unknown location"}
+                        </p>
+                      </div>
+                      <div className="text-right text-xs text-gray-500">
+                        {session.isCurrent ? (
+                          <span className="font-black text-electric uppercase">Current</span>
+                        ) : (
+                          <span>Expires {session.expiresAt || "soon"}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="mb-4 p-3 bg-hot/10 border-2 border-hot text-hot text-sm font-bold">
+                {error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSessionReplacementDecision(true)}
+                disabled={isConfirmingReplacement}
+                className="btn btn-black w-full text-sm font-bold uppercase tracking-wide"
+              >
+                {isConfirmingReplacement ? "Processing..." : "Replace Oldest Session"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSessionReplacementDecision(false)}
+                disabled={isConfirmingReplacement}
+                className="btn btn-ghost w-full text-sm font-bold uppercase tracking-wide"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

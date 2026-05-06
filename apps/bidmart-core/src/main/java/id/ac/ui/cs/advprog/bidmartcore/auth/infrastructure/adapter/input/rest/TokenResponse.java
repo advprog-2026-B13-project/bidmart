@@ -9,13 +9,13 @@ import java.util.Map;
 
 @Getter @Setter
 @AllArgsConstructor
-@Schema(description = "JWT token pair payload")
+@Schema(description = "Token payload. In normal flow tokens are issued via HttpOnly cookies.")
 public class TokenResponse {
 
-    @Schema(description = "Short-lived JWT access token")
+    @Schema(description = "Deprecated: access token body field, now delivered via HttpOnly cookie")
     private String accessToken;
 
-    @Schema(description = "Long-lived JWT refresh token")
+    @Schema(description = "Deprecated: refresh token body field, now delivered via HttpOnly cookie")
     private String refreshToken;
 
     public static TokenResponse fromMap(Map<String, Object> data) {

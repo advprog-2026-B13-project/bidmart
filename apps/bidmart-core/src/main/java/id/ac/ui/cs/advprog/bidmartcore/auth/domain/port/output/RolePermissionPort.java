@@ -6,5 +6,6 @@ import java.util.Set;
 
 public interface RolePermissionPort {
     Set<PermissionValue> findPermissionsByRoleId(int roleId);
+    void replacePermissionsForRole(int roleId, Set<PermissionValue> permissions);
+    void deleteAllByRoleId(int roleId);
 }
-

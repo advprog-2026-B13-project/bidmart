@@ -1,5 +1,4 @@
-import { clearSessionTokens, getAccessToken, getRefreshToken, setSessionTokens } from "./token-storage";
-import type { ApiResponse, TokenPair } from "./types";
+import type { ApiResponse } from "./types";
 
 function resolveAuthBaseUrl() {
   const configuredBaseUrl =
@@ -59,37 +58,31 @@ async function parseJsonSafe<T>(response: Response): Promise<T | null> {
   }
 }
 
-async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-
-  if (!refreshToken) {
-    clearSessionTokens();
-    return false;
-  }
-
+export async function refreshSession(fallbackRefreshToken?: string): Promise<boolean> {
+  const hasFallbackToken = Boolean(fallbackRefreshToken);
   const response = await fetch(joinUrl("/api/auth/refresh"), {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ refreshToken }),
+    body: hasFallbackToken ? JSON.stringify({ refreshToken: fallbackRefreshToken }) : undefined,
   });
 
   if (!response.ok) {
-    clearSessionTokens();
     return false;
   }
 
-  const payload = await parseJsonSafe<ApiResponse<TokenPair>>(response);
-  const tokens = payload?.data;
-
-  if (!tokens?.accessToken || !tokens?.refreshToken) {
-    clearSessionTokens();
+  const payload = await parseJsonSafe<ApiResponse<unknown>>(response);
+  if (payload?.success === false) {
     return false;
   }
 
-  setSessionTokens({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
   return true;
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  return refreshSession();
 }
 
 async function ensureFreshToken() {
@@ -105,6 +98,7 @@ async function ensureFreshToken() {
 type ApiFetchOptions = {
   auth?: boolean;
   retryOnUnauthorized?: boolean;
+  onUnauthorized?: () => void;
 };
 
 export async function apiFetch<T>(
@@ -116,17 +110,14 @@ export async function apiFetch<T>(
   const shouldRetry = options.retryOnUnauthorized ?? true;
 
   const headers = new Headers(init.headers || {});
-  headers.set("Content-Type", "application/json");
-
-  if (shouldAttachAuth) {
-    const accessToken = getAccessToken();
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
-    }
+  const hasBody = init.body !== undefined && init.body !== null;
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(joinUrl(path), {
     ...init,
+    credentials: "include",
     headers,
   });
 
@@ -145,6 +136,17 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const message = payload?.message || "Request failed";
+
+    if (response.status === 401 && shouldAttachAuth) {
+      if (options.onUnauthorized) {
+        options.onUnauthorized();
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      }
+    }
+
     throw new ApiError(message, response.status);
   }
 

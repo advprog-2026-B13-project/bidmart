@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.auth.application.service;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.EmailOtp;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.SessionClientInfo;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.TotpCredential;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.User;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.MFAType;
@@ -30,6 +31,7 @@ public class MfaServiceImpl implements MfaUseCase {
     private final PreAuthSessionPort preAuthSessionPort;
     private final SessionUseCase sessionUseCase;
     private final PasswordEncoder passwordEncoder;
+    private final EmailOtpSenderPort emailOtpSenderPort;
 
     private final GoogleAuthenticator googleAuthenticator = new GoogleAuthenticator();
     private final SecureRandom secureRandom = new SecureRandom();
@@ -146,14 +148,12 @@ public class MfaServiceImpl implements MfaUseCase {
         emailOtp.setCreatedAt(Instant.now());
         emailOtpRepository.save(emailOtp);
 
-        // TODO: Integrate with notification module to actually send the email
-        // For now the OTP is generated and stored; in production,
-        // delegate to an EmailSenderPort / NotificationService
+        emailOtpSenderPort.sendOtpEmail(user.getEmail(), otp, preAuthTtlSeconds);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> verifyMfa(String preAuthToken, String code) {
+    public Map<String, Object> verifyMfa(String preAuthToken, String code, SessionClientInfo clientInfo) {
         PreAuthSessionData data = preAuthSessionPort.get(preAuthToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired pre-auth token"));
 
@@ -170,7 +170,7 @@ public class MfaServiceImpl implements MfaUseCase {
 
         // MFA verified - delete pre-auth session and create real session
         preAuthSessionPort.delete(preAuthToken);
-        return sessionUseCase.createSession(userId);
+        return sessionUseCase.createSession(userId, clientInfo);
     }
 
     private void verifyTotp(UUID userId, String code) {

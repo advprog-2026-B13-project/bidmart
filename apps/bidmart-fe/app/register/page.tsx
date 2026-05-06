@@ -48,11 +48,26 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register({
+      const registrationResult = await register({
         email: formData.email,
         password: formData.password,
         displayName: formData.name || undefined,
       });
+
+      if (registrationResult.requiresEmailVerification) {
+        const params = new URLSearchParams({
+          email: registrationResult.email,
+        });
+
+        if (registrationResult.verificationToken) {
+          params.set("verificationToken", registrationResult.verificationToken);
+        }
+
+        params.set("registered", "true");
+        router.push(`/verify-email?${params.toString()}`);
+        return;
+      }
+
       router.push("/login?registered=true");
     } catch (submitError) {
       setError(getErrorMessage(submitError));

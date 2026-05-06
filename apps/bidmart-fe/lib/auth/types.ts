@@ -9,18 +9,35 @@ export type TokenPair = {
   refreshToken: string;
 };
 
+export type SessionSummaryResponse = {
+  sessionId: string;
+  isActive?: boolean;
+  createdAt?: string;
+  lastLoginAt?: string;
+  expiresAt?: string;
+  deviceInfo?: string;
+  ipAddress?: string;
+  locationLabel?: string;
+  isCurrent?: boolean;
+};
+
 export type LoginResponse = {
   requiresMfa?: boolean;
   accessToken?: string;
   refreshToken?: string;
   preAuthToken?: string;
   mfaType?: string;
+  requiresSessionReplacement?: boolean;
+  sessionReplacementToken?: string;
+  activeSessions?: SessionSummaryResponse[];
 };
 
 export type RegisterResponse = {
   userId: string;
   email: string;
   displayName?: string;
+  requiresEmailVerification?: boolean;
+  verificationToken?: string;
 };
 
 export type ProfileResponse = {
@@ -35,9 +52,44 @@ export type ProfileResponse = {
   role?: string;
 };
 
-export type SessionTokens = {
-  accessToken: string;
-  refreshToken: string;
+export type BidResponse = {
+  bidId: string;
+  listingId: string;
+  bidderId?: string;
+  amount: number;
+  status?: string;
+  createdAt?: string;
+};
+
+export type OtherUserBidResponse = {
+  bidId: string;
+  listingId: string;
+  amount: number;
+  status?: string;
+  createdAt?: string;
+};
+
+export type OtherUserProfileResponse = {
+  userId: string;
+  email: string;
+  displayName?: string;
+  photoUrl?: string;
+  shippingAddress?: string;
+  status?: string;
+  biddingHistoryVisible?: boolean;
+  previousBids?: OtherUserBidResponse[];
+  ongoingBids?: OtherUserBidResponse[];
+};
+
+export type ProfileUpdateInput = {
+  displayName?: string | null;
+  photoUrl?: string | null;
+  shippingAddress?: string | null;
+};
+
+export type TotpSetupResponse = {
+  secret: string;
+  otpAuthUrl: string;
 };
 
 export type LoginInput = {
@@ -51,6 +103,16 @@ export type RegisterInput = {
   displayName?: string;
 };
 
+export type VerifyEmailInput = {
+  email: string;
+  code: string;
+};
+
+export type ResendVerificationOtpInput = {
+  email: string;
+  verificationToken: string;
+};
+
 export type MfaVerifyInput = {
   preAuthToken: string;
   code: string;
@@ -59,10 +121,60 @@ export type MfaVerifyInput = {
 export type LoginResult =
   | {
       requiresMfa: false;
-      tokens: SessionTokens;
+      requiresSessionReplacement?: false;
     }
   | {
       requiresMfa: true;
       preAuthToken: string;
       mfaType?: string;
+      requiresSessionReplacement?: false;
+    }
+  | {
+      requiresMfa?: false;
+      requiresSessionReplacement: true;
+      sessionReplacementToken: string;
+      activeSessions: SessionSummaryResponse[];
     };
+
+export type SessionReplacementConfirmationInput = {
+  sessionReplacementToken: string;
+  replaceOldestSession: boolean;
+};
+
+export type AdminRoleResponse = {
+  roleId: number;
+  roleName: string;
+  permissions: string[];
+};
+
+export type AdminCreateRoleInput = {
+  roleName: string;
+  permissions: string[];
+};
+
+export type AdminSetRolePermissionsInput = {
+  permissions: string[];
+};
+
+export type AdminAssignUserRoleInput = {
+  roleId: number;
+};
+
+export type AdminManagedUserResponse = {
+  userId: string;
+  email: string;
+  displayName?: string;
+  status?: string;
+  createdAt?: string;
+  roleId?: number;
+  roleName?: string;
+};
+
+export type AdminManagedUsersPageResponse = {
+  users: AdminManagedUserResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+};

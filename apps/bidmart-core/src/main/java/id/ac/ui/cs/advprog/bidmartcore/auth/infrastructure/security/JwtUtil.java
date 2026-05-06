@@ -10,6 +10,8 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Locale;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -57,6 +59,43 @@ public class JwtUtil {
         token.setExpirationTime(expirationTime);
 
         return token;
+    }
+
+    public JwtToken generateEmailVerificationToken(UUID userId, String email, long ttlSeconds) {
+        Instant expirationTime = Instant.ofEpochMilli(System.currentTimeMillis() + (ttlSeconds * 1000));
+        String tokenString = Jwts.builder()
+                .subject(userId.toString())
+                .claim("type", "email-verification")
+                .claim("email", email.toLowerCase(Locale.ROOT))
+                .issuedAt(new Date())
+                .expiration(Date.from(expirationTime))
+                .signWith(getSigningKey())
+                .compact();
+
+        JwtToken token = new JwtToken();
+        token.setToken(tokenString);
+        token.setExpirationTime(expirationTime);
+        return token;
+    }
+
+    public void validateEmailVerificationToken(String token, UUID expectedUserId, String expectedEmail) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        String tokenType = claims.get("type", String.class);
+        String tokenEmail = claims.get("email", String.class);
+        String tokenUserId = claims.getSubject();
+
+        boolean valid = "email-verification".equals(tokenType)
+                && expectedUserId.toString().equals(tokenUserId)
+                && expectedEmail.equalsIgnoreCase(tokenEmail);
+
+        if (!valid) {
+            throw new IllegalArgumentException("Invalid verification request");
+        }
     }
 
     public String extractSessionId(String token) {

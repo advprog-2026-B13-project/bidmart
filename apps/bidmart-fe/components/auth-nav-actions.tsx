@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./auth-provider";
-import { apiFetch } from "@/lib/auth/api-client";
 
 export function AuthNavActions() {
   const router = useRouter();
@@ -12,6 +11,7 @@ export function AuthNavActions() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const displayName = user?.displayName || user?.email || "Account";
+  const isAdmin = (user?.role || "").toUpperCase().includes("ADMIN");
 
   const handleLogout = async () => {
     setIsSubmitting(true);
@@ -24,12 +24,6 @@ export function AuthNavActions() {
       setIsSubmitting(false);
     }
   };
-
-  // Dummy action
-  const dummyAction = async () => {
-    const data = await apiFetch("/api/bidding/my-bids");
-    console.log("Dummy action response:", data);
-  }
 
   if (isHydrating) {
     return (
@@ -59,11 +53,27 @@ export function AuthNavActions() {
       </span>
       <button
         type="button"
-        onClick={dummyAction}
+        onClick={() => router.push("/profile")}
         className="btn btn-ghost btn-sm"
       >
-        My Bids (Dummy)
+        Profile
       </button>
+      <button
+        type="button"
+        onClick={() => router.push("/settings")}
+        className="btn btn-ghost btn-sm"
+      >
+        Settings
+      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => router.push("/admin")}
+          className="btn btn-ghost btn-sm"
+        >
+          Admin
+        </button>
+      )}
       <button
         type="button"
         onClick={handleLogout}

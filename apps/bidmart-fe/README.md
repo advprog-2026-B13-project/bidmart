@@ -54,6 +54,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 API calls use `NEXT_PUBLIC_AUTH_API_URL` (or `NEXT_PUBLIC_API_BASE_URL`) when provided.
 Without either env var, localhost browsers default to [http://localhost:8080](http://localhost:8080), while non-local deployments use same-origin relative API paths.
 
+Authentication mode:
+- Frontend uses HttpOnly-cookie sessions (no token persistence in browser storage).
+- API requests always send cookies with `credentials: "include"`.
+- Backend CORS must allow the frontend origin and credentials for cookie auth to work cross-site.
+
 Deployment examples:
 - Production: `NEXT_PUBLIC_AUTH_API_URL=https://api.bidmart.store`
 - Staging: `NEXT_PUBLIC_AUTH_API_URL=https://api.staging.bidmart.store`
