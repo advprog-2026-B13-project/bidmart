@@ -10,17 +10,17 @@ export function NotificationBell() {
   const { user, isAuthenticated, isHydrating } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    setLoading(true);
+    const ignore = { current: false };
     getNotifications(user.userId)
-      .then(setNotifications)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then(n => { if (!ignore.current) setNotifications(n); })
+      .catch(() => {});
+
+    return () => { ignore.current = true; };
   }, [isAuthenticated, user?.userId]);
 
   useEffect(() => {
@@ -61,11 +61,7 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="w-6 h-6 border-2 border-black border-t-transparent animate-spin mx-auto" />
-              </div>
-            ) : notifications.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-gray-500 font-bold text-sm uppercase">No notifications yet</p>
               </div>
