@@ -14,7 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface ListingService {
-    Listing createListing(ListingCreateRequest request);
+    Listing createListing(ListingCreateRequest request, UUID sellerId);
     Listing updateListing(UUID id, UUID requesterId, ListingUpdateRequest request);
     Listing getListingById(UUID id);
     void deleteListing(UUID id, UUID requesterId);

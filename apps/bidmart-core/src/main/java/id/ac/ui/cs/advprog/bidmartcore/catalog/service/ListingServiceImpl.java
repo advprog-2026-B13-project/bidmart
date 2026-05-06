@@ -35,11 +35,17 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
-    public Listing createListing(ListingCreateRequest request) {
+    public Listing createListing(ListingCreateRequest request, UUID sellerId) {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Kategori tidak ditemukan"));
+
+        if (request.getStartTime() != null && request.getEndTime() != null
+                && !request.getEndTime().isAfter(request.getStartTime())) {
+            throw new IllegalArgumentException("Waktu selesai lelang harus setelah waktu mulai");
+        }
+
         Listing listing = new Listing();
-        listing.setSellerId(request.getSellerId());
+        listing.setSellerId(sellerId);
         listing.setCategory(category);
         listing.setTitle(request.getTitle());
         listing.setDescription(request.getDescription());

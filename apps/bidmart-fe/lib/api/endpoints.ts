@@ -193,3 +193,23 @@ export async function getCategoryById(id: number) {
     coverImage: "",
   };
 }
+
+export interface CreateListingInput {
+  title: string;
+  description: string;
+  imageUrl?: string;
+  categoryId: number;
+  startingPrice: number;
+  reservePrice: number;
+  minBidIncrement: number;
+  startTime: string; // ISO datetime string
+  endTime: string;   // ISO datetime string
+}
+
+export async function createListing(input: CreateListingInput) {
+  const raw = await apiFetch("/api/catalog/listings/create", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, { auth: true });
+  return parseListing(raw as Record<string, unknown>);
+}

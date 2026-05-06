@@ -1,5 +1,27 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
@@ -7,18 +29,6 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 
 @RestController("catalogListingController")
 @RequestMapping("/api/catalog/listings")
@@ -26,6 +36,7 @@ import java.util.UUID;
 public class ListingController {
 
     private final ListingService listingService;
+    private final AuthContext authContext;
 
     @GetMapping("/search")
     public ResponseEntity<Page<Listing>> searchListings(
@@ -48,8 +59,10 @@ public class ListingController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<Listing> createListing(@Valid @RequestBody ListingCreateRequest requestDTO) {
-        Listing savedListing = listingService.createListing(requestDTO);
+    @RequireLogin
+    public ResponseEntity<Listing> createListing(
+            @Valid @RequestBody ListingCreateRequest requestDTO) {
+        Listing savedListing = listingService.createListing(requestDTO, authContext.getUserId());
         return new ResponseEntity<>(savedListing, HttpStatus.CREATED);
     }
 
