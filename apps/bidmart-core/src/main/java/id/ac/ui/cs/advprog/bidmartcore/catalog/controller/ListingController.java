@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,10 +33,11 @@ public class ListingController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) ListingStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "endTime"));
-        Page<Listing> results = listingService.searchListings(keyword, minPrice, maxPrice, categoryId, pageable);
+        Page<Listing> results = listingService.searchListings(keyword, minPrice, maxPrice, categoryId, status, pageable);
         return ResponseEntity.ok(results);
     }
 

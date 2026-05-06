@@ -155,8 +155,14 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     public Page<Listing> searchListings(String keyword, BigDecimal minPrice, BigDecimal maxPrice, Integer categoryId, Pageable pageable) {
-        Specification<Listing> spec = Specification.where(ListingSpecification.isActive())
-                .and(ListingSpecification.isNotExpired());
+        return searchListings(keyword, minPrice, maxPrice, categoryId, null, pageable);
+    }
+
+    @Override
+    public Page<Listing> searchListings(String keyword, BigDecimal minPrice, BigDecimal maxPrice, Integer categoryId, ListingStatus status, Pageable pageable) {
+        Specification<Listing> spec = status == null
+                ? Specification.where(ListingSpecification.isActive()).and(ListingSpecification.isNotExpired())
+                : Specification.where(ListingSpecification.hasStatus(status));
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             spec = spec.and(ListingSpecification.hasTitle(keyword));

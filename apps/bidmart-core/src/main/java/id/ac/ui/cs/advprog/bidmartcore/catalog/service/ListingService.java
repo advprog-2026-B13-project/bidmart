@@ -21,6 +21,7 @@ public interface ListingService {
 
     boolean isListingValidForBid(UUID listingId);
     Page<Listing> searchListings(String keyword, BigDecimal minPrice, BigDecimal maxPrice, Integer categoryId, Pageable pageable);
+    Page<Listing> searchListings(String keyword, BigDecimal minPrice, BigDecimal maxPrice, Integer categoryId, ListingStatus status, Pageable pageable);
 
     void updateFinalResult(UUID listingId, BigDecimal finalPrice, UUID winnerId);
 

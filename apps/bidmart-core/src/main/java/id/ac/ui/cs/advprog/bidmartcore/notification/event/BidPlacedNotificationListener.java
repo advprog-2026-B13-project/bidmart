@@ -24,18 +24,7 @@ public class BidPlacedNotificationListener {
         log.debug("Bid placed event for listing {}, bidder {}: amount {}",
                 event.getListingId(), event.getBidderId(), event.getAmount());
 
-        // Notify bidder — bid confirmation
-        String bidderMessage = String.format(
-                "Your bid of Rp %s was placed successfully!",
-                formatAmount(event.getAmount())
-        );
-        notificationService.createNotification(
-                event.getBidderId(),
-                "BID_CONFIRMED",
-                bidderMessage
-        );
-
-        // Notify seller — new bid on their listing
+        // Notify seller only — bidder gets a toast confirmation on the frontend
         listingRepository.findById(event.getListingId()).ifPresent(listing -> {
             String sellerMessage = String.format(
                     "New bid of Rp %s on your listing \"%s\"!",
