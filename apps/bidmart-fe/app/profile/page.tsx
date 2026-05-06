@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { getListingById } from "@/lib/api/endpoints";
 import { getProfile, listMyBids } from "@/lib/auth/auth-api";
 import type { BidResponse, ProfileResponse } from "@/lib/auth/types";
 
@@ -37,6 +39,21 @@ function formatCurrency(value: number) {
 }
 
 function BidTable({ bids }: { bids: BidResponse[] }) {
+  const [expandedListing, setExpandedListing] = useState<string | null>(null);
+  const [listingNames, setListingNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const uniqueIds = [...new Set(bids.map(b => b.listingId))];
+    Promise.all(uniqueIds.map(id => getListingById(id).catch(() => null)))
+      .then(listings => {
+        const map: Record<string, string> = {};
+        listings.forEach((listing, i) => {
+          if (listing) map[uniqueIds[i]] = listing.title;
+        });
+        setListingNames(map);
+      });
+  }, [bids]);
+
   if (bids.length === 0) {
     return (
       <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
@@ -45,32 +62,95 @@ function BidTable({ bids }: { bids: BidResponse[] }) {
     );
   }
 
+  // Group bids by listing
+  const grouped = bids.reduce<Record<string, BidResponse[]>>((acc, bid) => {
+    if (!acc[bid.listingId]) acc[bid.listingId] = [];
+    acc[bid.listingId].push(bid);
+    return acc;
+  }, {});
+
+  const sortedListings = Object.entries(grouped).sort(
+    (a, b) => new Date(b[1][0].createdAt!).getTime() - new Date(a[1][0].createdAt!).getTime()
+  );
+
+  const getStatusStyle = (status?: string) => {
+    switch (status?.toUpperCase()) {
+      case "ACCEPTED": return "bg-electric/10 text-electric border border-electric";
+      case "OUTBID": return "bg-hot/10 text-hot border border-hot";
+      case "WON": return "bg-acid/20 text-black border border-acid";
+      default: return "bg-gray-100 text-gray-600 border border-gray-300";
+    }
+  };
+
   return (
-    <div className="overflow-x-auto border-2 border-black">
-      <table className="w-full min-w-170 text-sm bg-white">
-        <thead>
-          <tr className="border-b-2 border-black bg-gray-100">
-            <th className="py-3 px-3 text-left font-black uppercase tracking-wide text-xs">Listing</th>
-            <th className="py-3 px-3 text-left font-black uppercase tracking-wide text-xs">Amount</th>
-            <th className="py-3 px-3 text-left font-black uppercase tracking-wide text-xs">Status</th>
-            <th className="py-3 px-3 text-left font-black uppercase tracking-wide text-xs">Created At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bids.map((bid) => (
-            <tr key={bid.bidId} className="border-b border-gray-200">
-              <td className="py-3 px-3 font-semibold text-electric">
-                <Link href={`/listing/${bid.listingId}`} className="hover:underline">
-                  {bid.listingId}
-                </Link>
-              </td>
-              <td className="py-3 px-3 font-black">{formatCurrency(bid.amount)}</td>
-              <td className="py-3 px-3 font-semibold">{bid.status || "UNKNOWN"}</td>
-              <td className="py-3 px-3 text-gray-600">{formatDate(bid.createdAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {sortedListings.map(([listingId, listingBids]) => {
+        const isOpen = expandedListing === listingId;
+        const latestBid = listingBids[0];
+        const listingName = listingNames[listingId] || listingId;
+
+        return (
+          <div key={listingId} className="border-2 border-black bg-white">
+            {/* Group header — always visible */}
+            <button
+              onClick={() => setExpandedListing(isOpen ? null : listingId)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-sm text-electric truncate">
+                  {listingName}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {listingBids.length} bid{listingBids.length > 1 ? "s" : ""} ·{" "}
+                  {formatDate(latestBid.createdAt)}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 ml-4 shrink-0">
+                <div className="text-right">
+                  <p className="font-black text-sm">
+                    {formatCurrency(latestBid.amount)}
+                  </p>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 ${getStatusStyle(latestBid.status)}`}>
+                    {latestBid.status || "UNKNOWN"}
+                  </span>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+
+            {/* Expanded bid details */}
+            {isOpen && (
+              <div className="border-t-2 border-black">
+                <div className="divide-y divide-gray-200">
+                  {listingBids
+                    .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
+                    .map(bid => (
+                      <div key={bid.bidId} className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center">
+                            <span className="text-xs font-black text-gray-500">{bid.bidId.slice(0, 2).toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <p className="font-black text-sm">{formatCurrency(bid.amount)}</p>
+                            <p className="text-xs text-gray-400">{formatDate(bid.createdAt)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 ${getStatusStyle(bid.status)}`}>
+                            {bid.status || "UNKNOWN"}
+                          </span>
+                          <Link href={`/listing/${listingId}`} className="text-xs font-black text-electric hover:underline uppercase">
+                            View
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
