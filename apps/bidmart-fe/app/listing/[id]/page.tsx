@@ -263,7 +263,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
           <span className="text-5xl font-black text-black">
             {formatCurrency(listing.currentPrice)}
           </span>
-          <span className="text-gray-500 font-bold uppercase text-sm">{bids.length} bids</span>
+          <span className="text-gray-500 font-bold uppercase text-sm">{listing.bidCount} bids</span>
         </div>
         {listing.reservePrice && (
           <p className="text-sm font-bold mt-2">
@@ -452,6 +452,49 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
         setLoading(false);
       }
     });
+  }, [params]);
+
+  // SSE stream for real-time updates
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let listingId: string | null = null;
+
+    params.then(({ id }) => {
+      listingId = id;
+      es = new EventSource(`/api/auctions/${id}/stream`);
+
+      es.addEventListener("message", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === "price-change") {
+            setListing(prev => prev ? {
+              ...prev,
+              currentPrice: data.currentPrice,
+              bidCount: data.bidCount,
+            } : prev);
+          } else if (data.type === "auction-ended") {
+            setListing(prev => prev ? {
+              ...prev,
+              status: data.result === "WON" ? "sold" : "ended",
+            } : prev);
+          }
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es?.close();
+        // Reconnect after 3 seconds
+        setTimeout(() => {
+          if (listingId) {
+            es = new EventSource(`/api/auctions/${listingId}/stream`);
+          }
+        }, 3000);
+      };
+    });
+
+    return () => {
+      es?.close();
+    };
   }, [params]);
 
   if (loading) {

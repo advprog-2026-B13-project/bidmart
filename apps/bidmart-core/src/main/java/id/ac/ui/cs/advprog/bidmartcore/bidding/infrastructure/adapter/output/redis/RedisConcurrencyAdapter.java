@@ -27,6 +27,7 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     private final RedisScript<Long> rollbackScript;
 
     private static final String KEY_PREFIX = "auction:";
+    private static final String EXPIRY_SET_KEY = "auction:expiry";
 
     private String key(UUID listingId) {
         return KEY_PREFIX + listingId + ":state";
@@ -142,6 +143,9 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
                 "winner", winner,
                 "maxAmount", String.valueOf(maxAmount)
         ));
+
+        // Add to expiry sorted set
+        addToExpirySet(listingId, endTime);
     }
 
     @Override
@@ -159,6 +163,9 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
                 "winner", winner,
                 "maxAmount", String.valueOf(maxAmount)
         ));
+
+        // Update expiry sorted set (anti-snipe extends end time)
+        addToExpirySet(listingId, endTime);
     }
 
     private long resolveHighestMaxAmount(UUID listingId, long fallbackPrice) {
@@ -170,11 +177,27 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     @Override
     public void removeAuction(UUID listingId) {
         redis.delete(key(listingId));
+        removeFromExpirySet(listingId);
     }
 
     @Override
     public long getAuctionEndTime(UUID listingId) {
         Object endTime = redis.opsForHash().get(key(listingId), "endTime");
         return endTime != null ? Long.parseLong(endTime.toString()) : 0L;
+    }
+
+    @Override
+    public void addToExpirySet(UUID listingId, long endTimeEpochMillis) {
+        redis.opsForZSet().add(EXPIRY_SET_KEY, listingId.toString(), endTimeEpochMillis);
+    }
+
+    @Override
+    public void removeFromExpirySet(UUID listingId) {
+        redis.opsForZSet().remove(EXPIRY_SET_KEY, listingId.toString());
+    }
+
+    @Override
+    public java.util.Set<String> getExpiredFromExpirySet(long upToEpochMillis) {
+        return redis.opsForZSet().rangeByScore(EXPIRY_SET_KEY, 0, upToEpochMillis);
     }
 }
