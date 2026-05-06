@@ -22,4 +22,14 @@ public class NotificationServiceImpl implements NotificationService {
     public List<Notification> getUserNotifications(UUID userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
+
+    @Override
+    public void createNotification(UUID userId, String type, String message) {
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setMessage(message);
+        notification.setRead(false);
+        notificationRepository.save(notification);
+    }
 }
