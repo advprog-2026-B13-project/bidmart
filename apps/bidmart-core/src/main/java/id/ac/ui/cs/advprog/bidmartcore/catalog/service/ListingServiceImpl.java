@@ -6,21 +6,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingSpecification;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
@@ -75,8 +74,22 @@ public class ListingServiceImpl implements ListingService {
             throw new IllegalStateException("Gagal memperbarui: Listing ini sudah memiliki penawaran.");
         }
 
+        if (request.getStartTime() != null && request.getEndTime() != null
+                && !request.getEndTime().isAfter(request.getStartTime())) {
+            throw new IllegalArgumentException("Waktu selesai lelang harus setelah waktu mulai");
+        }
+
         existingListing.setDescription(request.getDescription());
         existingListing.setImageUrl(request.getImageUrl());
+        existingListing.setStartingPrice(request.getStartingPrice());
+        existingListing.setReservePrice(request.getReservePrice());
+        existingListing.setMinBidIncrement(request.getMinBidIncrement());
+        existingListing.setStartTime(request.getStartTime());
+        existingListing.setEndTime(request.getEndTime());
+
+        if (existingListing.getBidCount() == null || existingListing.getBidCount() == 0) {
+            existingListing.setCurrentPrice(request.getStartingPrice());
+        }
         return listingRepository.save(existingListing);
     }
 
@@ -84,6 +97,61 @@ public class ListingServiceImpl implements ListingService {
     public Listing getListingById(UUID id) {
         return listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+    }
+
+    @Override
+    public Listing getListingForOwner(UUID id, UUID ownerId) {
+        Listing listing = listingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+        if (!listing.getSellerId().equals(ownerId)) {
+            throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
+        }
+        return listing;
+    }
+
+    @Override
+    public List<Listing> getListingsBySeller(UUID sellerId) {
+        return listingRepository.findBySellerId(sellerId);
+    }
+
+    @Override
+    @Transactional
+    public Listing activateListing(UUID id, UUID requesterId) {
+        Listing listing = listingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+        if (!listing.getSellerId().equals(requesterId)) {
+            throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
+        }
+        if (listing.getStatus() != ListingStatus.DRAFT) {
+            throw new IllegalStateException("Hanya listing berstatus DRAFT yang dapat diaktifkan.");
+        }
+        if (listing.getBidCount() != null && listing.getBidCount() > 0) {
+            throw new IllegalStateException("Gagal mengaktifkan: Listing ini sudah memiliki penawaran.");
+        }
+
+        listing.setStatus(ListingStatus.ACTIVE);
+        return listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public Listing closeListing(UUID id, UUID requesterId) {
+        Listing listing = listingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+        if (!listing.getSellerId().equals(requesterId)) {
+            throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
+        }
+        if (listing.getStatus() != ListingStatus.ACTIVE) {
+            throw new IllegalStateException("Hanya listing berstatus ACTIVE yang dapat ditutup.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (listing.getStartTime() != null && !now.isBefore(listing.getStartTime())) {
+            throw new IllegalStateException("Listing tidak dapat ditutup karena sudah mulai.");
+        }
+
+        listing.setStatus(ListingStatus.CLOSED);
+        return listingRepository.save(listing);
     }
 
     @Override

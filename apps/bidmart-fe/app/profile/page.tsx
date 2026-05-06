@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { getListingById } from "@/lib/api/endpoints";
+import { activateListing, closeListing, deleteListing, getListingById, getMyListings, type SellerListing } from "@/lib/api/endpoints";
 import { getProfile, listMyBids } from "@/lib/auth/auth-api";
 import type { BidResponse, ProfileResponse } from "@/lib/auth/types";
 
@@ -161,8 +161,12 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [myBids, setMyBids] = useState<BidResponse[]>([]);
+  const [myListings, setMyListings] = useState<SellerListing[]>([]);
   const [targetUserId, setTargetUserId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
+  const [activateTarget, setActivateTarget] = useState<SellerListing | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -183,9 +187,10 @@ export default function ProfilePage() {
       setError("");
 
       try {
-        const [profileResponse, bidsResponse] = await Promise.all([
+        const [profileResponse, bidsResponse, listingsResponse] = await Promise.all([
           getProfile(),
           listMyBids(),
+          getMyListings(),
         ]);
 
         if (!isMounted) {
@@ -194,6 +199,7 @@ export default function ProfilePage() {
 
         setProfile(profileResponse);
         setMyBids(bidsResponse);
+        setMyListings(listingsResponse);
       } catch (loadError) {
         if (isMounted) {
           setError(getErrorMessage(loadError));
@@ -223,6 +229,75 @@ export default function ProfilePage() {
     }
 
     router.push(`/profile/${value}`);
+  };
+
+  const handleDeleteListing = async (listingId: string, title: string) => {
+    if (!listingId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete draft listing "${title}"? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(listingId);
+    setError("");
+
+    try {
+      await deleteListing(listingId);
+      setMyListings((current) => current.filter((listing) => listing.id !== listingId));
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleActivateListing = async () => {
+    if (!activateTarget) {
+      return;
+    }
+
+    setIsUpdatingStatus(activateTarget.id);
+    setError("");
+
+    try {
+      const updated = await activateListing(activateTarget.id);
+      setMyListings((current) => current.map((listing) => (
+        listing.id === activateTarget.id
+          ? { ...listing, status: updated.status }
+          : listing
+      )));
+      setActivateTarget(null);
+    } catch (activateError) {
+      setError(getErrorMessage(activateError));
+    } finally {
+      setIsUpdatingStatus(null);
+    }
+  };
+
+  const handleCloseListing = async (listing: SellerListing) => {
+    const confirmed = window.confirm(`Close listing "${listing.title}"? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsUpdatingStatus(listing.id);
+    setError("");
+
+    try {
+      const updated = await closeListing(listing.id);
+      setMyListings((current) => current.map((item) => (
+        item.id === listing.id
+          ? { ...item, status: updated.status }
+          : item
+      )));
+    } catch (closeError) {
+      setError(getErrorMessage(closeError));
+    } finally {
+      setIsUpdatingStatus(null);
+    }
   };
 
   if (isHydrating || !isAuthenticated) {
@@ -291,9 +366,133 @@ export default function ProfilePage() {
 
               <BidTable bids={myBids} />
             </section>
+
+            <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Seller</p>
+                  <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">My Listings</h2>
+                </div>
+                <Link href="/listing/new" className="btn btn-acid text-xs font-bold uppercase tracking-wide">
+                  Create Listing
+                </Link>
+              </div>
+
+              {myListings.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
+                  <p className="text-sm font-bold uppercase tracking-wide text-gray-600">No listings yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {myListings.map((listing) => {
+                    const isDraft = listing.status === "DRAFT";
+                    const isActive = listing.status === "ACTIVE";
+                    const isBeforeStart = listing.startTime.getTime() > Date.now();
+                    return (
+                      <div key={listing.id} className="border-2 border-black bg-gray-50 p-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 border-2 border-black bg-white overflow-hidden">
+                              {listing.imageUrl ? (
+                                <img src={listing.imageUrl} alt={listing.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+                                  NO IMG
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-black text-sm uppercase tracking-wide">{listing.title}</p>
+                              <p className="text-xs text-gray-500">{listing.categoryName || "Uncategorized"}</p>
+                              <p className="text-xs text-gray-500">Ends: {formatDate(listing.endTime.toISOString())}</p>
+                              {isBeforeStart && (
+                                <p className="text-xs text-gray-500">Starts: {formatDate(listing.startTime.toISOString())}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-start md:items-end gap-3">
+                            <span className="px-2 py-1 border-2 border-black text-[10px] font-black uppercase tracking-widest bg-white">
+                              {listing.status}
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              <Link href={`/listing/${listing.id}`} className="btn btn-ghost btn-sm text-xs font-bold uppercase">
+                                View
+                              </Link>
+                              {isDraft && (
+                                <>
+                                  <Link href={`/listing/${listing.id}/edit`} className="btn btn-ghost btn-sm text-xs font-bold uppercase">
+                                    Edit
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActivateTarget(listing)}
+                                    disabled={isUpdatingStatus === listing.id}
+                                    className="btn btn-ghost btn-sm text-xs font-bold uppercase text-electric"
+                                  >
+                                    {isUpdatingStatus === listing.id ? "Activating..." : "Activate"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteListing(listing.id, listing.title)}
+                                    disabled={isDeleting === listing.id}
+                                    className="btn btn-ghost btn-sm text-xs font-bold uppercase text-hot"
+                                  >
+                                    {isDeleting === listing.id ? "Deleting..." : "Delete"}
+                                  </button>
+                                </>
+                              )}
+                              {isActive && isBeforeStart && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCloseListing(listing)}
+                                  disabled={isUpdatingStatus === listing.id}
+                                  className="btn btn-ghost btn-sm text-xs font-bold uppercase text-hot"
+                                >
+                                  {isUpdatingStatus === listing.id ? "Closing..." : "Close"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </>
         )}
       </div>
+
+      {activateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="max-w-md w-full border-3 border-black bg-white p-6 shadow-[8px_8px_0_#0A0A0A]">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-500">Activate Listing</p>
+            <h3 className="text-2xl font-black uppercase tracking-tight mt-2">{activateTarget.title}</h3>
+            <p className="text-sm text-gray-600 mt-3">
+              This action is irreversible. Once activated, the listing can no longer be edited as a draft.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-6">
+              <button
+                type="button"
+                onClick={handleActivateListing}
+                disabled={isUpdatingStatus === activateTarget.id}
+                className="btn btn-acid text-xs font-bold uppercase tracking-wide"
+              >
+                {isUpdatingStatus === activateTarget.id ? "Activating..." : "Activate"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivateTarget(null)}
+                className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

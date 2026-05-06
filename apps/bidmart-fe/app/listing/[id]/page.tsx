@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink } from "lucide-react";
-import { getListingById, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
+import { getListingById, getListingByIdOwner, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 import { useToast } from "@/components/toast";
+import { useAuth } from "@/components/auth-provider";
 
 function formatEndsAt(endTime: Date): { dateLabel: string; timeStr: string } {
   const date = new Date(endTime);
@@ -20,6 +21,10 @@ function formatEndsAt(endTime: Date): { dateLabel: string; timeStr: string } {
   if (isToday) return { dateLabel: "Today", timeStr };
   if (isTomorrow) return { dateLabel: "Tomorrow", timeStr };
   return { dateLabel: date.toLocaleDateString([], { month: "short", day: "numeric" }), timeStr };
+}
+
+function formatStartsAt(startTime: Date): { dateLabel: string; timeStr: string } {
+  return formatEndsAt(startTime);
 }
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
@@ -41,6 +46,27 @@ function CountdownTimer({ endTime }: { endTime: Date }) {
     <span className={`text-3xl md:text-4xl font-black uppercase tracking-tight ${
       urgency === "critical" ? "text-hot" : urgency === "soon" ? "text-electric" : "text-black"
     }`}>
+      {timeLeft}
+    </span>
+  );
+}
+
+function StartCountdown({ startTime }: { startTime: Date }) {
+  const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(startTime));
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    (() => setMounted(true))();
+    const update = () => setTimeLeft(formatTimeRemaining(startTime));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  if (!mounted) return <span className="text-gray-400 font-bold">...</span>;
+
+  return (
+    <span className="text-3xl md:text-4xl font-black uppercase tracking-tight text-electric">
       {timeLeft}
     </span>
   );
@@ -224,6 +250,9 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
   const [error, setError] = useState("");
   const { showToast } = useToast();
 
+  const now = new Date();
+  const hasStarted = now.getTime() >= listing.startTime.getTime();
+
   const minBid = listing.currentPrice + 1;
   const suggestedBids = [
     Math.ceil(listing.currentPrice / 100) * 100 + 50,
@@ -280,13 +309,25 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       <div className="bg-gray-100 border-2 border-black p-5 mb-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Time Remaining</p>
-            <CountdownTimer endTime={listing.endTime} />
+            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
+              {hasStarted ? "Time Remaining" : "Starting In"}
+            </p>
+            {hasStarted ? (
+              <CountdownTimer endTime={listing.endTime} />
+            ) : (
+              <StartCountdown startTime={listing.startTime} />
+            )}
           </div>
           <div className="text-right">
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Ends At</p>
-            <p className="font-black text-black">{formatEndsAt(listing.endTime).timeStr}</p>
-            <p className="text-xs font-black text-gray-500">{formatEndsAt(listing.endTime).dateLabel}</p>
+            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">
+              {hasStarted ? "Ends At" : "Starts At"}
+            </p>
+            <p className="font-black text-black">
+              {hasStarted ? formatEndsAt(listing.endTime).timeStr : formatStartsAt(listing.startTime).timeStr}
+            </p>
+            <p className="text-xs font-black text-gray-500">
+              {hasStarted ? formatEndsAt(listing.endTime).dateLabel : formatStartsAt(listing.startTime).dateLabel}
+            </p>
           </div>
         </div>
       </div>
@@ -436,23 +477,59 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [listing, setListing] = useState<ParsedListing | null>(null);
   const [bids, setBids] = useState<BidResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated, isHydrating } = useAuth();
 
   useEffect(() => {
+    let isMounted = true;
+
     params.then(async ({ id }) => {
+      if (isHydrating) {
+        return;
+      }
+
+      setLoading(true);
+
       try {
         const [listingData, bidsData] = await Promise.all([
           getListingById(id),
           getBidsForListing(id),
         ]);
+        if (!isMounted) {
+          return;
+        }
         setListing(listingData);
         setBids(bidsData);
       } catch {
-        setListing(null);
+        if (isAuthenticated) {
+          try {
+            const [listingData, bidsData] = await Promise.all([
+              getListingByIdOwner(id),
+              getBidsForListing(id),
+            ]);
+            if (!isMounted) {
+              return;
+            }
+            setListing(listingData);
+            setBids(bidsData);
+          } catch {
+            if (isMounted) {
+              setListing(null);
+            }
+          }
+        } else if (isMounted) {
+          setListing(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
-  }, [params]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params, isAuthenticated, isHydrating]);
 
   // SSE stream for real-time updates
   useEffect(() => {
@@ -460,6 +537,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     let listingId: string | null = null;
 
     params.then(({ id }) => {
+      if (isHydrating) {
+        return;
+      }
       listingId = id;
       es = new EventSource(`/api/auctions/${id}/stream`);
 
@@ -495,7 +575,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     return () => {
       es?.close();
     };
-  }, [params]);
+  }, [params, isHydrating]);
 
   if (loading) {
     return (

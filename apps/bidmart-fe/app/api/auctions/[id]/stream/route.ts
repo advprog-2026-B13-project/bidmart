@@ -1,20 +1,29 @@
 import { NextRequest } from "next/server";
+import { Agent } from "undici";
 
 const BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8080";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const url = `${BASE_URL}/api/bidding/auctions/${id}/stream`;
 
+  const dispatcher = new Agent({
+    headersTimeout: 0,
+    bodyTimeout: 0,
+  });
+
   const response = await fetch(url, {
     method: "GET",
     headers: {
       Accept: "text/event-stream",
+      Cookie: req.headers.get("cookie") ?? "",
+      Authorization: req.headers.get("authorization") ?? "",
     },
-    credentials: "include",
+    cache: "no-store",
+    dispatcher,
   });
 
   if (!response.ok) {

@@ -43,10 +43,39 @@ export interface ParsedListing {
   currentPrice: number;
   reservePrice: number | null;
   bidCount: number;
+  startTime: Date;
   endTime: Date;
   status: "active" | "ending-soon" | "ended" | "sold";
   seller: { id: string; name: string; avatar: string; rating: number };
   topBidder: { id: string; name: string } | null;
+}
+
+export interface SellerListing {
+  id: string;
+  title: string;
+  imageUrl: string;
+  status: string;
+  startingPrice: number;
+  reservePrice: number | null;
+  currentPrice: number;
+  bidCount: number;
+  startTime: Date;
+  endTime: Date;
+  categoryName: string;
+}
+
+export interface ListingDetail {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  status: string;
+  startingPrice: number;
+  reservePrice: number | null;
+  minBidIncrement: number;
+  startTime: string;
+  endTime: string;
+  categoryName: string;
 }
 
 function toSlug(name: string) {
@@ -83,6 +112,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     currentPrice: Number(listing.currentPrice),
     reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,
     bidCount: (listing.bidCount as number) ?? 0,
+    startTime: new Date(listing.startTime as string),
     endTime: new Date(listing.endTime as string),
     status: mapStatus(listing.status as string),
     seller: {
@@ -92,6 +122,40 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
       rating: 4.5,
     },
     topBidder: listing.winnerId ? { id: listing.winnerId as string, name: "Bidder" } : null,
+  };
+}
+
+function parseSellerListing(listing: Record<string, unknown>): SellerListing {
+  const cat = listing.category as Record<string, unknown> | undefined;
+  return {
+    id: listing.id as string,
+    title: listing.title as string,
+    imageUrl: (listing.imageUrl as string) || "",
+    status: (listing.status as string) || "UNKNOWN",
+    startingPrice: Number(listing.startingPrice),
+    reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,
+    currentPrice: Number(listing.currentPrice),
+    bidCount: (listing.bidCount as number) ?? 0,
+    startTime: new Date(listing.startTime as string),
+    endTime: new Date(listing.endTime as string),
+    categoryName: (cat?.name as string) || "",
+  };
+}
+
+function parseListingDetail(listing: Record<string, unknown>): ListingDetail {
+  const cat = listing.category as Record<string, unknown> | undefined;
+  return {
+    id: listing.id as string,
+    title: listing.title as string,
+    description: listing.description as string,
+    imageUrl: (listing.imageUrl as string) || "",
+    status: (listing.status as string) || "UNKNOWN",
+    startingPrice: Number(listing.startingPrice),
+    reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,
+    minBidIncrement: Number(listing.minBidIncrement),
+    startTime: listing.startTime as string,
+    endTime: listing.endTime as string,
+    categoryName: (cat?.name as string) || "",
   };
 }
 
@@ -127,6 +191,16 @@ export async function getListings(params?: {
 export async function getListingById(id: string) {
   const raw = await apiFetch(`/api/catalog/listings/detail/${id}`, { method: "GET" }, { auth: false }) as Record<string, unknown>;
   return parseListing(raw);
+}
+
+export async function getListingByIdOwner(id: string) {
+  const raw = await apiFetch(`/api/catalog/listings/detail/${id}/owner`, { method: "GET" }, { auth: true }) as Record<string, unknown>;
+  return parseListing(raw);
+}
+
+export async function getListingDetail(id: string) {
+  const raw = await apiFetch(`/api/catalog/listings/detail/${id}/owner`, { method: "GET" }, { auth: true }) as Record<string, unknown>;
+  return parseListingDetail(raw);
 }
 
 export async function getAuctionStatus(listingId: string) {
@@ -206,10 +280,48 @@ export interface CreateListingInput {
   endTime: string;   // ISO datetime string
 }
 
+export interface UpdateListingInput {
+  description: string;
+  imageUrl?: string;
+  startingPrice: number;
+  reservePrice: number;
+  minBidIncrement: number;
+  startTime: string;
+  endTime: string;
+}
+
 export async function createListing(input: CreateListingInput) {
   const raw = await apiFetch("/api/catalog/listings/create", {
     method: "POST",
     body: JSON.stringify(input),
   }, { auth: true });
   return parseListing(raw as Record<string, unknown>);
+}
+
+export async function updateListing(id: string, input: UpdateListingInput) {
+  const raw = await apiFetch(`/api/catalog/listings/update/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  }, { auth: true });
+  return parseListingDetail(raw as Record<string, unknown>);
+}
+
+export async function activateListing(id: string) {
+  const raw = await apiFetch(`/api/catalog/listings/${id}/activate`, { method: "PUT" }, { auth: true });
+  return parseListingDetail(raw as Record<string, unknown>);
+}
+
+export async function closeListing(id: string) {
+  const raw = await apiFetch(`/api/catalog/listings/${id}/close`, { method: "PUT" }, { auth: true });
+  return parseListingDetail(raw as Record<string, unknown>);
+}
+
+export async function deleteListing(id: string) {
+  await apiFetch(`/api/catalog/listings/delete/${id}`, { method: "DELETE" }, { auth: true });
+}
+
+export async function getMyListings() {
+  const raw = await apiFetch("/api/catalog/listings/mine", { method: "GET" }, { auth: true }) as Record<string, unknown>[];
+  const listings = Array.isArray(raw) ? raw : [];
+  return listings.map(parseSellerListing);
 }
