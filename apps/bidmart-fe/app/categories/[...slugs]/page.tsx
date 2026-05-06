@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getListings, getCategories, getSubCategories, type ParsedListing } from "@/lib/api/endpoints";
-import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 
 function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
   const urgency = getTimeUrgency(listing.endTime);

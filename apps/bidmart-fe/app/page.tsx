@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getListings, getCategories, type ParsedListing } from "@/lib/api/endpoints";
-import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));

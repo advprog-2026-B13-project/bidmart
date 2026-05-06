@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getListingById, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
-import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/mock-data";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
@@ -211,17 +211,17 @@ function BidHistory({ bids }: { bids: BidResult[] }) {
 }
 
 function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[] }) {
-  const [bidAmount, setBidAmount] = useState(listing.currentPrice + 50);
+  const [bidAmount, setBidAmount] = useState(Math.ceil(listing.currentPrice / 100) * 100 + 50);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const minBid = listing.currentPrice + 1;
   const suggestedBids = [
-    listing.currentPrice + 50,
-    listing.currentPrice + 100,
-    listing.currentPrice + 250,
-    listing.currentPrice + 500,
+    Math.ceil(listing.currentPrice / 100) * 100 + 50,
+    Math.ceil(listing.currentPrice / 100) * 100 + 100,
+    Math.ceil(listing.currentPrice / 100) * 100 + 250,
+    Math.ceil(listing.currentPrice / 100) * 100 + 500,
   ];
 
   const handleBid = async () => {
@@ -300,15 +300,17 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
           Your Bid (min. {formatCurrency(minBid)})
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">$</span>
+          <div className="flex gap-2 justify-center items-center">
+            <span className="text-xl font-black text-black">Rp</span>
           <input
             type="number"
             value={bidAmount}
             onChange={(e) => setBidAmount(Number(e.target.value))}
-            className="input pl-12 text-2xl font-black"
+            className="input pl-48 pr-12 text-2xl font-black"
             min={minBid}
             step="1"
           />
+          </div>
         </div>
         {error && <p className="text-hot text-sm font-bold mt-2">{error}</p>}
       </div>
