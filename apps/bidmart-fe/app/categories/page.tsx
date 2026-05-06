@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { getCategories, getSubCategories } from "@/lib/api/endpoints";
 
 export default function CategoriesPage() {
@@ -82,9 +83,7 @@ export default function CategoriesPage() {
                     <span className="bg-white text-black text-xs font-black px-3 py-1">
                       EXPLORE
                     </span>
-                    <svg className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <ArrowRight className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" />
                   </div>
                 </div>
               </div>

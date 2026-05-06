@@ -4,15 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getListings, getCategories, type ParsedListing } from "@/lib/api/endpoints";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
+import { Clock, MoveUpRight } from "lucide-react";
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
   const urgency = getTimeUrgency(endTime);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft(formatTimeRemaining(endTime));
-    }, 60000);
+    const update = () => setTimeLeft(formatTimeRemaining(endTime));
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [endTime]);
 
@@ -52,9 +53,7 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
         {/* Timer */}
         <div className="absolute top-3 right-3">
           <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5 shadow-[2px_2px_0_#0A0A0A]">
-            <svg className={`w-4 h-4 ${urgency === "critical" ? "text-hot" : "text-gray-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Clock className={`w-4 h-4 ${urgency === "critical" ? "text-hot" : "text-gray-600"}`} />
             <CountdownTimer endTime={listing.endTime} />
           </div>
         </div>
@@ -89,9 +88,7 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
             <span className="text-xs font-bold text-gray-500 uppercase">{listing.seller.name.split(' ')[0]}</span>
           </div>
           <div className="flex items-center gap-1">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
-            </svg>
+            <MoveUpRight className="w-4 h-4 text-gray-400" />
             <span className="text-xs font-black text-gray-600">{listing.bidCount}</span>
           </div>
         </div>
@@ -136,9 +133,7 @@ function FeaturedAuction({ listing }: { listing: ParsedListing | null }) {
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-1">Time Left</p>
               <div className="flex items-center gap-2">
-                <svg className="w-6 h-6 text-acid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <Clock className="w-6 h-6 text-acid" />
                 <CountdownTimer endTime={listing.endTime} />
               </div>
             </div>
@@ -201,6 +196,7 @@ export default function HomePage() {
   const [listings, setListings] = useState<ParsedListing[]>([]);
   const [categories, setCategories] = useState<{ slug: string; name: string; coverImage: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [auctionFilter, setAuctionFilter] = useState<"active" | "ended">("active");
 
   useEffect(() => {
     Promise.all([
@@ -215,6 +211,12 @@ export default function HomePage() {
 
   const featured = listings[0] || null;
   const endingSoonListings = listings.filter(l => l.status === "active" || l.status === "ending-soon").slice(0, 4);
+
+  const filteredListings = listings.filter(l =>
+    auctionFilter === "active"
+      ? l.status === "active" || l.status === "ending-soon"
+      : l.status === "ended" || l.status === "sold"
+  );
 
   if (loading) {
     return (
@@ -327,9 +329,17 @@ export default function HomePage() {
               <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">
                 All Auctions
               </h2>
-              <p className="text-gray-500 font-bold mt-2 uppercase text-sm tracking-wide">{listings.length} items waiting</p>
+              <p className="text-gray-500 font-bold mt-2 uppercase text-sm tracking-wide">{filteredListings.length} items waiting</p>
             </div>
             <div className="flex items-center gap-3">
+              <select
+                value={auctionFilter}
+                onChange={(e) => setAuctionFilter(e.target.value as "active" | "ended")}
+                className="input py-2 px-3 text-sm font-bold w-auto bg-white"
+              >
+                <option value="active">ACTIVE</option>
+                <option value="ended">ENDED</option>
+              </select>
               <select className="input py-2 px-3 text-sm font-bold w-auto bg-white">
                 <option>ENDING SOON</option>
                 <option>PRICE: LOW → HIGH</option>
@@ -340,7 +350,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {listings.map((listing, i) => (
+            {filteredListings.map((listing, i) => (
               <ListingCard key={listing.id} listing={listing} index={i} />
             ))}
           </div>

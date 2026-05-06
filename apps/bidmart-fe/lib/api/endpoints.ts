@@ -55,7 +55,7 @@ function toSlug(name: string) {
 
 function mapStatus(status: string): "active" | "ending-soon" | "ended" | "sold" {
   if (status === "ACTIVE" || status === "EXTENDED") return "active";
-  if (status === "CLOSED") return "ended";
+  if (status === "CLOSED" || status === "UNSOLD") return "ended";
   if (status === "WON") return "sold";
   return "active";
 }
@@ -100,6 +100,7 @@ export async function getListings(params?: {
   minPrice?: number;
   maxPrice?: number;
   categoryId?: number;
+  status?: string;
   page?: number;
   size?: number;
 }) {
@@ -108,6 +109,7 @@ export async function getListings(params?: {
   if (params?.minPrice) searchParams.set("minPrice", String(params.minPrice));
   if (params?.maxPrice) searchParams.set("maxPrice", String(params.maxPrice));
   if (params?.categoryId) searchParams.set("categoryId", String(params.categoryId));
+  if (params?.status) searchParams.set("status", params.status);
   if (params?.page !== undefined) searchParams.set("page", String(params.page));
   if (params?.size !== undefined) searchParams.set("size", String(params.size));
 

@@ -2,8 +2,25 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink } from "lucide-react";
 import { getListingById, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
+import { useToast } from "@/components/toast";
+
+function formatEndsAt(endTime: Date): { dateLabel: string; timeStr: string } {
+  const date = new Date(endTime);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) return { dateLabel: "Today", timeStr };
+  if (isTomorrow) return { dateLabel: "Tomorrow", timeStr };
+  return { dateLabel: date.toLocaleDateString([], { month: "short", day: "numeric" }), timeStr };
+}
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
@@ -50,16 +67,12 @@ function ShareButton() {
       >
         {copied ? (
           <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="w-4 h-4" />
             COPIED!
           </>
         ) : (
           <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
+            <Share2 className="w-4 h-4" />
             SHARE
           </>
         )}
@@ -68,9 +81,7 @@ function ShareButton() {
         onClick={handleTwitter}
         className="btn btn-sm btn-ghost font-bold uppercase"
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-        </svg>
+        <ExternalLink className="w-4 h-4" />
       </button>
     </div>
   );
@@ -116,18 +127,14 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-black shadow-[3px_3px_0_#0A0A0A] flex items-center justify-center hover:bg-acid transition-colors disabled:opacity-30"
               disabled={active === 0}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={() => setActive(prev => prev < images.length - 1 ? prev + 1 : prev)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-black shadow-[3px_3px_0_#0A0A0A] flex items-center justify-center hover:bg-acid transition-colors disabled:opacity-30"
               disabled={active === images.length - 1}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
+              <ChevronRight className="w-6 h-6" />
             </button>
           </>
         )}
@@ -215,6 +222,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
+  const { showToast } = useToast();
 
   const minBid = listing.currentPrice + 1;
   const suggestedBids = [
@@ -237,10 +245,12 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       await placeBid({ listingId: listing.id, amount: bidAmount, bidType: "MANUAL" });
       setIsSubmitting(false);
       setShowSuccess(true);
+      showToast(`Bid of ${formatCurrency(bidAmount)} placed successfully!`, "success");
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       setIsSubmitting(false);
       setError(err instanceof Error ? err.message : "Bid failed");
+      showToast(err instanceof Error ? err.message : "Bid failed", "error");
     }
   };
 
@@ -275,9 +285,8 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
           </div>
           <div className="text-right">
             <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Ends At</p>
-            <p className="font-black text-black">
-              {new Date(listing.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
+            <p className="font-black text-black">{formatEndsAt(listing.endTime).timeStr}</p>
+            <p className="text-xs font-black text-gray-500">{formatEndsAt(listing.endTime).dateLabel}</p>
           </div>
         </div>
       </div>
@@ -285,9 +294,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       {/* Anti-snipe */}
       <div className="bg-electric/10 border-2 border-electric p-4 mb-5">
         <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-electric shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Info className="w-5 h-5 text-electric shrink-0 mt-0.5" />
           <p className="text-xs font-bold text-black leading-relaxed">
             <strong>ANTI-SNIPE:</strong> Bid in the last 2 min? Auction extends 2 more minutes.
           </p>
@@ -342,24 +349,17 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       >
         {isSubmitting ? (
           <>
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
+            <Loader2 className="w-5 h-5 animate-spin" />
             Processing...
           </>
         ) : showSuccess ? (
           <>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="w-5 h-5" />
             BID PLACED!
           </>
         ) : (
           <>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            <Send className="w-5 h-5" />
             Place Bid — {formatCurrency(bidAmount)}
           </>
         )}
@@ -573,9 +573,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="font-black text-lg text-black uppercase">{listing.seller.name}</p>
                 <div className="flex items-center gap-1">
-                  <svg className="w-4 h-4 text-electric" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                  </svg>
+                  <Star className="w-4 h-4 text-electric" />
                   <span className="font-black text-sm">{listing.seller.rating}</span>
                 </div>
               </div>

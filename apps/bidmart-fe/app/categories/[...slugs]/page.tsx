@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Clock, Share2, ChevronLeft, ChevronRight, ArrowRight, SlidersHorizontal } from "lucide-react";
 import { getListings, getCategories, getSubCategories, type ParsedListing } from "@/lib/api/endpoints";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 
@@ -29,9 +30,7 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
         </div>
         <div className="absolute top-3 right-3">
           <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5 shadow-[2px_2px_0_#0A0A0A]">
-            <svg className={`w-4 h-4 ${urgency === "critical" ? "text-hot" : "text-gray-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Clock className={`w-4 h-4 ${urgency === "critical" ? "text-hot" : "text-gray-600"}`} />
             <span className={`font-black text-sm ${urgency === "critical" ? "text-hot" : urgency === "soon" ? "text-electric" : "text-gray-600"}`}>
               {formatTimeRemaining(listing.endTime)}
             </span>
@@ -65,9 +64,7 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
             <span className="text-xs font-bold text-gray-500 uppercase">{listing.seller.name.split(' ')[0]}</span>
           </div>
           <div className="flex items-center gap-1">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
-            </svg>
+            <Share2 className="w-4 h-4 text-gray-400" />
             <span className="text-xs font-black text-gray-600">{listing.bidCount}</span>
           </div>
         </div>
@@ -243,9 +240,7 @@ export default function NestedCategoryPage({ params }: { params: Promise<{ slugs
                 onClick={() => setShowFilters(!showFilters)}
                 className="lg:hidden btn btn-sm font-bold uppercase gap-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
+                <SlidersHorizontal className="w-4 h-4" />
                 Filters
               </button>
 
@@ -374,9 +369,7 @@ function RootCategoriesPage() {
                     {cat.name}
                   </h2>
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <ArrowRight className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" />
                   </div>
                 </div>
               </div>
