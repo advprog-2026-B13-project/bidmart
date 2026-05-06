@@ -10,6 +10,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,4 +23,7 @@ public class BidRequest {
     @NotNull(message = "Harga penawaran wajib diisi")
     @Positive(message = "Harga penawaran harus lebih dari nol")
     private BigDecimal amount;
+
+    @NotNull(message = "Tipe penawaran wajib diisi")
+    private BidType bidType;
 }

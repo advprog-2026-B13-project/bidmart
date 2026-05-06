@@ -23,9 +23,10 @@ public class BiddingRedisConfig {
         return template;
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Bean
-    public RedisScript<List> placeBidScript() {
-        return RedisScript.of(RedisLuaScripts.PLACE_BID_LUA, List.class);
+    public RedisScript<List<Object>> placeBidScript() {
+        return (RedisScript) RedisScript.of(RedisLuaScripts.PLACE_BID_LUA, List.class);
     }
 
     @Bean

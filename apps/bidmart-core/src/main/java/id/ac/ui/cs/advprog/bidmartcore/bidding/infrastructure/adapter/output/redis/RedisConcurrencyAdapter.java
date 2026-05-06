@@ -10,7 +10,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BidRepositoryPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ConcurrencyPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +22,8 @@ import lombok.RequiredArgsConstructor;
 public class RedisConcurrencyAdapter implements ConcurrencyPort {
 
     private final StringRedisTemplate redis;
-    private final RedisScript<List> placeBidScript;
+    private final BidRepositoryPort bidRepository;
+    private final RedisScript<List<Object>> placeBidScript;
     private final RedisScript<Long> rollbackScript;
 
     private static final String KEY_PREFIX = "auction:";
@@ -37,25 +40,44 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
 
     @Override
     public ConcurrencyResult placeBid(UUID listingId, long bidAmount, long minIncrement,
-                                     UUID bidderId, long currentTimeMillis,
+            UUID bidderId, BidType bidType, long currentTimeMillis,
                                      long antiSnipeThresholdMillis, long antiSnipeExtensionMillis) {
         List<Object> result = redis.execute(placeBidScript,
                 Collections.singletonList(key(listingId)),
                 String.valueOf(bidAmount),
                 String.valueOf(minIncrement),
                 bidderId.toString(),
+                bidType.name(),
                 String.valueOf(currentTimeMillis),
                 String.valueOf(antiSnipeThresholdMillis),
                 String.valueOf(antiSnipeExtensionMillis));
 
+        if (result == null || result.isEmpty()) {
+            return ConcurrencyResult.cacheMiss();
+        }
+
         long status = ((Number) result.get(0)).longValue();
-        long oldPrice = ((Number) result.get(1)).longValue();
-        String oldWinner = result.get(2) != null ? String.valueOf(result.get(2)) : "";
-        long oldEndTime = ((Number) result.get(3)).longValue();
+        long visiblePrice = parseLong(result, 1);
+        String winnerId = parseString(result, 2);
+        long endTime = parseLong(result, 3);
+        long bidderCommittedMax = parseLong(result, 4);
+        long proxyVisiblePrice = parseLong(result, 5);
+        String proxyWinnerId = parseString(result, 6);
 
         return switch ((int) status) {
-            case 1  -> ConcurrencyResult.accepted(oldPrice, oldWinner, oldEndTime);
-            case 0  -> ConcurrencyResult.rejected(oldPrice, oldWinner, oldEndTime);
+            case 1 -> ConcurrencyResult.leading(
+                visiblePrice,
+                winnerId,
+                endTime,
+                bidderCommittedMax);
+            case -4 -> ConcurrencyResult.outbid(
+                visiblePrice,
+                winnerId,
+                endTime,
+                bidderCommittedMax,
+                proxyVisiblePrice,
+                proxyWinnerId);
+            case 0  -> ConcurrencyResult.rejected();
             case -1 -> ConcurrencyResult.cacheMiss();
             case -2 -> ConcurrencyResult.notActive();
             case -3 -> ConcurrencyResult.ended();
@@ -63,13 +85,38 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         };
     }
 
+    private long parseLong(List<Object> result, int index) {
+        if (result.size() <= index || result.get(index) == null) {
+            return 0L;
+        }
+        Object value = result.get(index);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(String.valueOf(value));
+    }
+
+    private String parseString(List<Object> result, int index) {
+        if (result.size() <= index || result.get(index) == null) {
+            return "";
+        }
+        return String.valueOf(result.get(index));
+    }
+
     @Override
-    public void rollback(UUID listingId, long priceToRestore, String winnerToRestore, long endTimeToRestore) {
+    public void rollback(UUID listingId,
+                         long priceToRestore,
+                         String winnerToRestore,
+                         long endTimeToRestore,
+                         long expectedCurrentPrice,
+                         String expectedCurrentWinner) {
         redis.execute(rollbackScript,
                 Collections.singletonList(key(listingId)),
                 String.valueOf(priceToRestore),
                 winnerToRestore == null ? "" : winnerToRestore,
-                String.valueOf(endTimeToRestore));
+                String.valueOf(endTimeToRestore),
+                String.valueOf(expectedCurrentPrice),
+                expectedCurrentWinner == null ? "" : expectedCurrentWinner);
     }
 
     @Override
@@ -85,12 +132,15 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
                 ? info.currentPrice().longValue()
                 : info.startingPrice().longValue();
         long endTime = toEpochMillis(info.endTime());
+        String winner = info.winnerId() != null ? info.winnerId().toString() : "";
+        long maxAmount = winner.isBlank() ? price : resolveHighestMaxAmount(listingId, price);
 
         redis.opsForHash().putAll(redisKey, Map.of(
                 "price", String.valueOf(price),
                 "endTime", String.valueOf(endTime),
                 "status", info.status().name(),
-                "winner", ""
+                "winner", winner,
+                "maxAmount", String.valueOf(maxAmount)
         ));
     }
 
@@ -100,12 +150,21 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         long price = info.currentPrice() != null
                 ? info.currentPrice().longValue()
                 : info.startingPrice().longValue();
+        String winner = info.winnerId() != null ? info.winnerId().toString() : "";
+        long maxAmount = winner.isBlank() ? price : resolveHighestMaxAmount(listingId, price);
         redis.opsForHash().putAll(key(listingId), Map.of(
                 "price", String.valueOf(price),
                 "endTime", String.valueOf(endTime),
                 "status", info.status().name(),
-                "winner", info.winnerId() != null ? info.winnerId().toString() : ""
+                "winner", winner,
+                "maxAmount", String.valueOf(maxAmount)
         ));
+    }
+
+    private long resolveHighestMaxAmount(UUID listingId, long fallbackPrice) {
+        return bidRepository.findTopBid(listingId)
+                .map(bid -> bid.getMaxAmount() != null ? bid.getMaxAmount().longValue() : bid.getAmount().longValue())
+                .orElse(fallbackPrice);
     }
 
     @Override

@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class EnglishAuctionValidator {
+public class AuctionValidator {
 
     public void validateStatic(UUID sellerId, BigDecimal bidAmount, UUID bidderId) {
         if (sellerId.equals(bidderId)) {
