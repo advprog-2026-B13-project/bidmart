@@ -6,4 +6,5 @@ import java.util.UUID;
 
 public interface NotificationService {
     List<Notification> getUserNotifications(UUID userId);
+    void createNotification(UUID userId, String type, String message);
 }

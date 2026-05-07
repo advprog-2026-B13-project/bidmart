@@ -23,8 +23,8 @@ public class NotificationPreference {
     private UUID userId;
 
     @Column(name = "email_enabled", nullable = false)
-    private boolean emailEnabled = true; // Default true sesuai skema
+    private boolean emailEnabled = true;
 
     @Column(name = "push_enabled", nullable = false)
-    private boolean pushEnabled = true; // Default true sesuai skema
+    private boolean pushEnabled = true;
 }
