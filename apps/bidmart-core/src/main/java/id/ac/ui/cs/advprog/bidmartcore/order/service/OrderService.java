@@ -9,4 +9,5 @@ public interface OrderService {
     List<Order> getOrdersByBuyerId(UUID buyerId);
     Order updateShipmentStatus(UUID orderId, UUID sellerId, OrderStatus newStatus, String trackingNumber);
     Order confirmDelivery(UUID orderId, UUID buyerId);
+    Order disputeOrder(UUID orderId, UUID buyerId);
 }

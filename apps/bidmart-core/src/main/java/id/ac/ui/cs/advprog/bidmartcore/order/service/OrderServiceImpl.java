@@ -61,4 +61,23 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.COMPLETED);
         return orderRepository.save(order);
     }
+
+    @Override
+    public Order disputeOrder(UUID orderId, UUID buyerId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Pesanan tidak ditemukan"));
+
+        if (!order.getBuyerId().equals(buyerId)) {
+            throw new SecurityException("Akses ditolak: Anda bukan pembeli dari pesanan ini");
+        }
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalStateException("Pesanan sudah selesai, sengketa tidak dapat diajukan");
+        }
+        if (order.getStatus() == OrderStatus.DISPUTED) {
+            throw new IllegalStateException("Pesanan ini sudah dalam status sengketa");
+        }
+
+        order.setStatus(OrderStatus.DISPUTED);
+        return orderRepository.save(order);
+    }
 }
