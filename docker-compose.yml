@@ -68,6 +68,17 @@ services:
     networks:
       - bidmart-network
 
+  watchtower:
+    image: containrrr/watchtower
+    container_name: bidmart-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/kevincornelius1905/.docker/config.json:/config.json:ro
+    command: --interval 60 core
+    networks:
+      - bidmart-network
+
 volumes:
   postgres_data:
   redis_data:
