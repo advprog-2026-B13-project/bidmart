@@ -79,9 +79,27 @@ services:
     networks:
       - bidmart-network
 
+  caddy:
+    image: caddy:alpine
+    container_name: bidmart-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - core
+    networks:
+      - bidmart-network
+
 volumes:
   postgres_data:
   redis_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   bidmart-network:
