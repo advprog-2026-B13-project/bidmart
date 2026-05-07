@@ -48,4 +48,13 @@ public class OrderController {
         Order confirmedOrder = orderService.confirmDelivery(orderId, currentBuyerId);
         return ResponseEntity.ok(confirmedOrder);
     }
+
+    @RequireLogin
+    @PutMapping("/{orderId}/dispute")
+    public ResponseEntity<Order> disputeOrder(@PathVariable UUID orderId, AuthContext authContext) {
+        UUID buyerId = authContext.getUserId();
+
+        Order updatedOrder = orderService.disputeOrder(orderId, buyerId);
+        return ResponseEntity.ok(updatedOrder);
+    }
 }
