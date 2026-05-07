@@ -1,7 +1,10 @@
 name: CD
 
 on:
-  workflow_call:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 concurrency:
   group: cd-deploy-${{ github.ref }}
@@ -10,7 +13,6 @@ concurrency:
 jobs:
   deploy-core-staging:
     name: Build Core and Deploy to Railway (Staging)
-    # if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,10 +46,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Trigger Railway staging deploy
-        run: |
-          curl -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}"
 
   deploy-core-main:
     name: Deploy Core API to Cloud Run (Production)
