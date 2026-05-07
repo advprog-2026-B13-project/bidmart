@@ -54,10 +54,11 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             cd ~/bidmart
-            docker compose pull core
-            docker compose up -d core
+            docker compose -f infra/docker-compose.yml pull core
+            docker compose -f infra/docker-compose.yml up -d core
             docker image prune -f
