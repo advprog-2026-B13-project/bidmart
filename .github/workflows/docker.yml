@@ -30,7 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/bidmart-core
+          images: ghcr.io/advprog-2026-b13-project/bidmart-core
           tags: |
             type=ref,event=branch
             type=sha
