@@ -48,7 +48,7 @@ jobs:
   deploy:
     needs: core
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging'
+    # if: github.ref == 'refs/heads/staging'
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
