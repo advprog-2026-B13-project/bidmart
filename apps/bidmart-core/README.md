@@ -1,7 +1,7 @@
 # Bidmart Core Service
 
 Core backend service built with Java and Spring Boot.
- 
+
 ## Overview
 
 Main backend service for the Bidmart platform.

@@ -59,6 +59,6 @@ jobs:
           script: |
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             cd ~/bidmart
-            docker compose -f infra/docker-compose.yml pull core
-            docker compose -f infra/docker-compose.yml up -d core
+            docker compose -f infra/docker-compose.yml --env-file .env pull core
+            docker compose -f infra/docker-compose.yml --env-file .env up -d core
             docker image prune -f
