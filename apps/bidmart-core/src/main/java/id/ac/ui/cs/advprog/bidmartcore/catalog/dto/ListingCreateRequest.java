@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.dto;
 
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -10,14 +9,10 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Getter
 @Setter
 public class ListingCreateRequest {
-    @NotNull(message = "Seller ID wajib diisi")
-    private UUID sellerId;
-
     @NotNull(message = "Kategori ID wajib diisi")
     private Integer categoryId;
 
@@ -45,6 +40,5 @@ public class ListingCreateRequest {
     private LocalDateTime startTime;
 
     @NotNull(message = "Waktu berakhir wajib diisi")
-    @Future(message = "Waktu berakhir harus di masa depan")
     private LocalDateTime endTime;
 }

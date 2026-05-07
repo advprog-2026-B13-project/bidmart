@@ -1,7 +1,6 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -71,7 +70,6 @@ public class Listing {
     private LocalDateTime startTime;
 
     @NotNull(message = "Waktu selesai tidak boleh kosong")
-    @Future(message = "Waktu selesai harus di masa depan")
     @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 

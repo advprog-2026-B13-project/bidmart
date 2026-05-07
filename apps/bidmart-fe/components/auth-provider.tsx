@@ -101,24 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    const onUnauthorized = () => {
+    window.addEventListener("auth:unauthorized", () => {
       if (isMounted) {
         setUser(null);
       }
-
-      const publicPaths = ["/login", "/register", "/verify-email"];
-      const isPublicPath = publicPaths.some((publicPath) => pathname?.startsWith(publicPath));
-
-      if (!isPublicPath) {
-        router.replace("/login");
-      }
-    };
-
-    window.addEventListener("auth:unauthorized", onUnauthorized);
+    });
 
     return () => {
       isMounted = false;
-      window.removeEventListener("auth:unauthorized", onUnauthorized);
+      window.removeEventListener("auth:unauthorized", () => {});
     };
   }, [pathname, router]);
 
