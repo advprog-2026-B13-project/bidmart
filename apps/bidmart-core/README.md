@@ -5,7 +5,7 @@ Core backend service built with Java and Spring Boot.
 ## Overview
 
 Main backend service for the Bidmart platform.
-
+ 
 **Technology Stack:**
 - Language: Java 21
 - Framework: Spring Boot 4.0.3
