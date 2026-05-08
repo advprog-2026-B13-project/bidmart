@@ -221,10 +221,11 @@ public class ListingServiceImpl implements ListingService {
             return false;
         }
         LocalDateTime now = LocalDateTime.now();
-        return listing.getStatus() == ListingStatus.ACTIVE ||
-                listing.getStatus() == ListingStatus.EXTENDED &&
-                !now.isBefore(listing.getStartTime()) &&
+        boolean isStatusValid = (listing.getStatus() == ListingStatus.ACTIVE ||
+                listing.getStatus() == ListingStatus.EXTENDED);
+        boolean isTimeValid = !now.isBefore(listing.getStartTime()) &&
                 now.isBefore(listing.getEndTime());
+        return isStatusValid && isTimeValid;
     }
 
     @Override
