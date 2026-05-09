@@ -18,4 +18,5 @@ public interface WalletService {
     WalletModel releaseBalance(UUID userId, BigDecimal amount);
     WalletModel convertHoldToPayment(UUID userId, BigDecimal amount);
     List<WalletTransactionModel> getTransactions(UUID userId);
+    void transferHeldBalance(UUID buyerId, UUID sellerId, BigDecimal amount);
 }
