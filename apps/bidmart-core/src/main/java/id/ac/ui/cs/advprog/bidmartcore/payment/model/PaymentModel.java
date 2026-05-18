@@ -30,7 +30,8 @@ public class PaymentModel {
     private BigDecimal amount;
 
     @Column(nullable = false)
-    private String status; // PENDING, SUCCESS, FAILED
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus status; // PENDING, SUCCESS, FAILED
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -38,3 +39,4 @@ public class PaymentModel {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+

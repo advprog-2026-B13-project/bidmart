@@ -1,27 +1,33 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.output.wallet;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.WalletPort;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-// TODO: Replace with actual WalletService adapter once wallet module implements hold/release
 @Component
+@RequiredArgsConstructor
 public class WalletStubAdapter implements WalletPort {
+
+    private final WalletService walletService;
 
     @Override
     public BigDecimal getAvailableBalance(UUID userId) {
-        return BigDecimal.valueOf(Long.MAX_VALUE); // Stub: unlimited balance
+        WalletModel wallet = walletService.getWalletByUserId(userId);
+        return wallet.getAvailableBalance();
     }
 
     @Override
     public void holdFunds(UUID userId, BigDecimal amount) {
-        // Stub: no-op
+        walletService.holdBalance(userId, amount);
     }
 
     @Override
     public void releaseFunds(UUID userId, BigDecimal amount) {
-        // Stub: no-op
+        walletService.releaseBalance(userId, amount);
     }
 }

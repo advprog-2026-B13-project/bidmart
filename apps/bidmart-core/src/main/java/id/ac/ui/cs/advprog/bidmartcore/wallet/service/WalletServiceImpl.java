@@ -21,6 +21,12 @@
         private final WalletRepository walletRepository;
         private final WalletTransactionRepository transactionRepository;
 
+                private void requirePositiveAmount(BigDecimal amount, String label) {
+                        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                                throw new IllegalArgumentException(label + " amount must be greater than zero");
+                        }
+                }
+
         private WalletModel getOrCreateWallet(UUID userId) {
             try {
                 return walletRepository.findByUserId(userId);
@@ -40,17 +46,12 @@
 
         @Override
         public WalletModel getWalletByUserId(UUID userId) {
-            return walletRepository.findByUserId(userId);
+                        return getOrCreateWallet(userId);
         }
 
         @Override
         public WalletModel topUp(UUID userId, BigDecimal amount) {
-            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Top up amount must be greater than zero");
-            }
-            WalletModel wallet = walletRepository.findByUserId(userId);
-            wallet.setAvailableBalance(wallet.getAvailableBalance().add(amount));
-            return walletRepository.save(wallet);
+                        return deposit(userId, amount);
         }
 
         @Override
@@ -61,10 +62,11 @@
         @Override
         @Transactional
         public WalletModel withdraw(UUID userId, BigDecimal amount) {
-            WalletModel wallet = walletRepository.findByUserId(userId);
+                        requirePositiveAmount(amount, "Withdraw");
+                        WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getAvailableBalance().compareTo(amount) < 0) {
-                throw new RuntimeException("Insufficient balance");
+                                throw new IllegalArgumentException("Insufficient balance");
             }
 
             wallet.setAvailableBalance(
@@ -89,17 +91,18 @@
 
         @Override
         public List<WalletTransactionModel> getTransactions(UUID userId) {
-            WalletModel wallet = walletRepository.findByUserId(userId);
+                        WalletModel wallet = getOrCreateWallet(userId);
             return transactionRepository.findByWalletId(wallet.getId());
         }
 
         @Override
         @Transactional
         public WalletModel convertHoldToPayment(UUID userId, BigDecimal amount) {
-            WalletModel wallet = walletRepository.findByUserId(userId);
+                        requirePositiveAmount(amount, "Payment");
+                        WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getHeldBalance().compareTo(amount) < 0) {
-                throw new RuntimeException("Insufficient held balance");
+                                throw new IllegalArgumentException("Insufficient held balance");
             }
 
             wallet.setHeldBalance(
@@ -125,10 +128,11 @@
         @Override
         @Transactional
         public WalletModel releaseBalance(UUID userId, BigDecimal amount) {
-            WalletModel wallet = walletRepository.findByUserId(userId);
+                        requirePositiveAmount(amount, "Release");
+                        WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getHeldBalance().compareTo(amount) < 0) {
-                throw new RuntimeException("Insufficient held balance");
+                                throw new IllegalArgumentException("Insufficient held balance");
             }
 
             wallet.setHeldBalance(
@@ -158,10 +162,11 @@
         @Override
         @Transactional
         public WalletModel holdBalance(UUID userId, BigDecimal amount) {
-            WalletModel wallet = walletRepository.findByUserId(userId);
+                        requirePositiveAmount(amount, "Hold");
+                        WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getAvailableBalance().compareTo(amount) < 0) {
-                throw new RuntimeException("Insufficient available balance");
+                                throw new IllegalArgumentException("Insufficient available balance");
             }
 
             wallet.setAvailableBalance(
@@ -191,8 +196,8 @@
         @Override
         @Transactional
         public WalletModel deposit(UUID userId, BigDecimal amount) {
-
-            WalletModel wallet = getOrCreateWallet(userId);
+                        requirePositiveAmount(amount, "Deposit");
+                        WalletModel wallet = getOrCreateWallet(userId);
 
             wallet.setAvailableBalance(
                     wallet.getAvailableBalance().add(amount)

@@ -1,56 +1,34 @@
 package id.ac.ui.cs.advprog.bidmartcore.payment.controller;
 
-import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
-import id.ac.ui.cs.advprog.bidmartcore.payment.repository.PaymentSpringRepository;
-import id.ac.ui.cs.advprog.bidmartcore.payment.model.PaymentModel;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.adapter.input.rest.ApiResponse;
+import id.ac.ui.cs.advprog.bidmartcore.payment.controller.dto.PaymentNotificationRequest;
+import id.ac.ui.cs.advprog.bidmartcore.payment.controller.dto.PaymentNotificationResponse;
+import id.ac.ui.cs.advprog.bidmartcore.payment.service.PaymentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.math.BigDecimal;
-import java.util.Map;
-import java.util.UUID;
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/payment")
+@RequiredArgsConstructor
+@Tag(name = "Payment", description = "Top up and payment processing")
 public class PaymentCallbackController {
 
-    @Autowired
-    private PaymentSpringRepository paymentRepository;
+    private final PaymentService paymentService;
 
-    @Autowired
-    private WalletService walletService;
-
-    public PaymentCallbackController(WalletService walletService) {
-        this.walletService = walletService;
-    }
-
-    @PostMapping("/callback")
-    public Map<String, String> handleCallback(@RequestBody Map<String, Object> payload) {
-
-        String orderId = (String) payload.get("order_id");
-        String status = (String) payload.get("transaction_status");
-
-        if (!"settlement".equals(status)) {
-            return Map.of("message", "ignored");
-        }
-
-        PaymentModel payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow();
-
-        if ("SUCCESS".equals(payment.getStatus())) {
-            return Map.of("message", "already processed");
-        }
-
-        payment.setStatus("SUCCESS");
-        payment.setUpdatedAt(LocalDateTime.now());
-        paymentRepository.save(payment);
-
-        walletService.deposit(
-                payment.getUserId(),
-                payment.getAmount()
-        );
-
-        return Map.of("message", "wallet updated");
+        @PostMapping({
+            "/callback",
+            "/notification",
+            "/notifications",
+            "/midtrans/callback",
+            "/midtrans/notification"
+        })
+    @Operation(summary = "Handle Midtrans payment notifications")
+    public ResponseEntity<ApiResponse<PaymentNotificationResponse>> handleCallback(
+            @RequestBody PaymentNotificationRequest payload) {
+        PaymentNotificationResponse response = paymentService.handleNotification(payload);
+        return ResponseEntity.ok(ApiResponse.success("Notification processed", response));
     }
 }
