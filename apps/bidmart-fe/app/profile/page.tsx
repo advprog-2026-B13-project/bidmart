@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { SubmitEventHandler, useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { activateListing, closeListing, deleteListing, getListingById, getMyListings, type SellerListing } from "@/lib/api/endpoints";
+import {
+  createTopUpTransaction,
+  getMyWallet,
+  getMyWalletTransactions,
+  type TopUpResponse,
+  type WalletSummary,
+  type WalletTransaction,
+} from "@/lib/api/wallet";
 import { getProfile, listMyBids } from "@/lib/auth/auth-api";
 import type { BidResponse, ProfileResponse } from "@/lib/auth/types";
 
@@ -36,6 +44,23 @@ function formatCurrency(value: number) {
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatTransactionType(type?: string) {
+  switch ((type || "").toUpperCase()) {
+    case "TOP_UP":
+      return "Top Up";
+    case "WITHDRAW":
+      return "Withdraw";
+    case "HOLD":
+      return "Hold";
+    case "RELEASE":
+      return "Release";
+    case "PAYMENT":
+      return "Payment";
+    default:
+      return type || "Unknown";
+  }
 }
 
 function BidTable({ bids }: { bids: BidResponse[] }) {
@@ -162,12 +187,20 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [myBids, setMyBids] = useState<BidResponse[]>([]);
   const [myListings, setMyListings] = useState<SellerListing[]>([]);
-  const [targetUserId, setTargetUserId] = useState("");
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWalletLoading, setIsWalletLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
+  const [isTopUpSubmitting, setIsTopUpSubmitting] = useState(false);
   const [activateTarget, setActivateTarget] = useState<SellerListing | null>(null);
   const [error, setError] = useState("");
+  const [walletError, setWalletError] = useState("");
+  const [topUpMethod, setTopUpMethod] = useState("bank_transfer");
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpBank, setTopUpBank] = useState("bca");
+  const [topUpResult, setTopUpResult] = useState<TopUpResponse | null>(null);
 
   useEffect(() => {
     if (!isHydrating && !isAuthenticated) {
@@ -200,6 +233,7 @@ export default function ProfilePage() {
         setProfile(profileResponse);
         setMyBids(bidsResponse);
         setMyListings(listingsResponse);
+        await loadWallet(() => isMounted);
       } catch (loadError) {
         if (isMounted) {
           setError(getErrorMessage(loadError));
@@ -222,13 +256,71 @@ export default function ProfilePage() {
     return profile?.displayName || profile?.email || user?.email || "Account";
   }, [profile?.displayName, profile?.email, user?.email]);
 
-  const openOtherProfile = () => {
-    const value = targetUserId.trim();
-    if (!value) {
+  const loadWallet = async (isActive?: () => boolean) => {
+    setIsWalletLoading(true);
+    setWalletError("");
+
+    try {
+      const [walletResponse, transactionsResponse] = await Promise.all([
+        getMyWallet(),
+        getMyWalletTransactions(),
+      ]);
+
+      if (isActive && !isActive()) {
+        return;
+      }
+
+      setWallet(walletResponse);
+      setWalletTransactions(transactionsResponse);
+    } catch (loadError) {
+      if (!isActive || isActive()) {
+        setWalletError(getErrorMessage(loadError));
+      }
+    } finally {
+      if (!isActive || isActive()) {
+        setIsWalletLoading(false);
+      }
+    }
+  };
+
+  const handleTopUp: SubmitEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault();
+
+    if (!profile?.userId) {
+      setWalletError("Unable to resolve user ID for top up.");
       return;
     }
 
-    router.push(`/profile/${value}`);
+    const amountNumber = Number(topUpAmount);
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      setWalletError("Top up amount must be greater than zero.");
+      return;
+    }
+
+    if (!Number.isInteger(amountNumber)) {
+      setWalletError("Top up amount must be a whole number.");
+      return;
+    }
+
+    setWalletError("");
+    setIsTopUpSubmitting(true);
+    setTopUpResult(null);
+
+    try {
+      const shouldSendBank = topUpMethod === "bank_transfer" || topUpMethod === "qris";
+      const response = await createTopUpTransaction({
+        userId: profile.userId,
+        amount: amountNumber,
+        paymentType: topUpMethod,
+        bank: shouldSendBank ? (topUpBank || undefined) : undefined,
+      });
+
+      setTopUpResult(response);
+    } catch (topUpError) {
+      setWalletError(getErrorMessage(topUpError));
+    } finally {
+      setIsTopUpSubmitting(false);
+    }
   };
 
   const handleDeleteListing = async (listingId: string, title: string) => {
@@ -300,6 +392,18 @@ export default function ProfilePage() {
     }
   };
 
+  const totalBalance = wallet
+    ? wallet.availableBalance + wallet.heldBalance
+    : 0;
+
+  const recentTransactions = [...walletTransactions]
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 8);
+
   if (isHydrating || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
@@ -350,6 +454,155 @@ export default function ProfilePage() {
                     <p><span className="font-black uppercase tracking-wide text-xs text-gray-500">Shipping Address</span><br />{profile.shippingAddress}</p>
                   )}
                 </div>
+              </div>
+            </section>
+
+            <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Wallet</p>
+                  <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Balance & Payments</h2>
+                  <p className="text-sm text-gray-600 mt-2 max-w-2xl">
+                    Available balance can be used for new bids. Held balance is reserved for active bids and will be
+                    released automatically if you get outbid.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadWallet()}
+                  disabled={isWalletLoading}
+                  className="btn btn-ghost btn-sm text-xs font-bold uppercase"
+                >
+                  {isWalletLoading ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+
+              {walletError && (
+                <div className="mb-4 p-3 bg-hot/10 border-2 border-hot text-hot text-sm font-bold">
+                  {walletError}
+                </div>
+              )}
+
+              {isWalletLoading ? (
+                <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
+                  <p className="text-sm font-bold uppercase tracking-wide text-gray-600">Loading wallet...</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="border-2 border-black bg-gray-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Available</p>
+                    <p className="text-2xl font-black text-black mt-2">
+                      {formatCurrency(wallet?.availableBalance ?? 0)}
+                    </p>
+                  </div>
+                  <div className="border-2 border-black bg-gray-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Held</p>
+                    <p className="text-2xl font-black text-black mt-2">
+                      {formatCurrency(wallet?.heldBalance ?? 0)}
+                    </p>
+                  </div>
+                  <div className="border-2 border-black bg-gray-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Total</p>
+                    <p className="text-2xl font-black text-black mt-2">
+                      {formatCurrency(totalBalance)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2 mt-6">
+                <div className="border-2 border-black bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Top Up</p>
+                  <form onSubmit={handleTopUp} className="grid gap-3 mt-3">
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Amount (IDR)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={topUpAmount}
+                        onChange={(event) => setTopUpAmount(event.target.value)}
+                        className="input mt-2"
+                        placeholder="10000"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Bank</label>
+                      <select
+                        value={topUpBank}
+                        onChange={(event) => setTopUpBank(event.target.value)}
+                        className="input mt-2"
+                      >
+                        <option value="bca">BCA</option>
+                        <option value="bni">BNI</option>
+                        <option value="bri">BRI</option>
+                        <option value="permata">Permata</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isTopUpSubmitting}
+                      className="btn btn-electric text-xs font-bold uppercase tracking-wide"
+                    >
+                      {isTopUpSubmitting ? "Creating..." : "Create Top Up"}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="border-2 border-black bg-gray-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Latest Top Up</p>
+                  {topUpResult ? (
+                    <div className="mt-3 text-sm">
+                      <p className="font-black uppercase tracking-wide">Order ID</p>
+                      <p className="font-mono text-xs break-all mb-3">{topUpResult.orderId}</p>
+                      <p className="font-black uppercase tracking-wide">Bank Transfer</p>
+                      <p className="font-bold">{topUpResult.bank.toUpperCase()}</p>
+                      <p className="font-black uppercase tracking-wide mt-3">VA Number</p>
+                      <p className="font-mono text-lg font-black">
+                        {topUpResult.vaNumber || "Pending"}
+                      </p>
+                      <p className="font-black uppercase tracking-wide mt-3">Status</p>
+                      <p className="font-bold">{topUpResult.transactionStatus}</p>
+                      <p className="text-xs text-gray-600 mt-3">
+                        Complete the transfer, then refresh your wallet balance.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600 mt-3">
+                      Create a top up to receive a virtual account number for bank transfer.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Recent Transactions</p>
+                  <span className="text-xs font-bold uppercase text-gray-400">
+                    {walletTransactions.length} total
+                  </span>
+                </div>
+
+                {recentTransactions.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
+                    <p className="text-sm font-bold uppercase tracking-wide text-gray-600">No wallet activity yet.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200 border-2 border-black">
+                    {recentTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-4 bg-white">
+                        <div>
+                          <p className="font-black text-sm uppercase tracking-wide">{formatTransactionType(tx.type)}</p>
+                          <p className="text-xs text-gray-500">{formatDate(tx.createdAt ?? "")}</p>
+                        </div>
+                        <p className="font-black text-sm">
+                          {formatCurrency(Number(tx.amount))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 
