@@ -1,27 +1,101 @@
-name: CD
-
 on:
   workflow_call:
 
-jobs:
-  deploy-staging:
-    name: Deploy to Staging
-    if: github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Staging Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to STAGING server..."
-          echo "✅ Staging is up to date!"
+concurrency:
+  group: cd-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
-  deploy-main:
-    name: Deploy to Production
+jobs:
+  deploy-core-main:
+    name: Deploy Core API to Cloud Run (Production)
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GAR_REPOSITORY: ${{ secrets.GAR_REPOSITORY }}
+      CLOUD_RUN_SERVICE: ${{ secrets.CLOUD_RUN_SERVICE_PROD }}
+      CLOUD_SQL_INSTANCE: ${{ secrets.CLOUD_SQL_INSTANCE_PROD }}
+      VPC_CONNECTOR: ${{ secrets.VPC_CONNECTOR_PROD }}
+      CLOUD_RUN_RUNTIME_SA: ${{ secrets.CLOUD_RUN_RUNTIME_SA_PROD }}
+      INTERNAL_IP_SQL: ${{ secrets.INTERNAL_IP_SQL }}
+      DATABASE_USER: ${{ secrets.DATABASE_USER_PROD }}
+      REDIS_HOST: ${{ secrets.REDIS_HOST_PROD }}
+      REDIS_PORT: ${{ secrets.REDIS_PORT_PROD }}
+      DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD_SECRET_PROD }}
+      AUTH_JWT_SECRET: ${{ secrets.JWT_SECRET_PROD }}
     steps:
-      - name: Production Deployment
+      - uses: actions/checkout@v4
+
+      - name: Validate required GCP configuration
+        env:
+          GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+          GCP_DEPLOYER_SERVICE_ACCOUNT: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
         run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to PRODUCTION server..."
-          echo "🚀 Production is live!"
+          [ -n "$GCP_WIF_PROVIDER" ] || { echo "Missing secret: GCP_WIF_PROVIDER"; exit 1; }
+          [ -n "$GCP_DEPLOYER_SERVICE_ACCOUNT" ] || { echo "Missing secret: GCP_DEPLOYER_SERVICE_ACCOUNT"; exit 1; }
+          [ -n "$GCP_PROJECT_ID" ] || { echo "Missing secret: GCP_PROJECT_ID"; exit 1; }
+          [ -n "$GCP_REGION" ] || { echo "Missing secret: GCP_REGION"; exit 1; }
+          [ -n "$GAR_REPOSITORY" ] || { echo "Missing secret: GAR_REPOSITORY"; exit 1; }
+          [ -n "$CLOUD_RUN_SERVICE" ] || { echo "Missing secret: CLOUD_RUN_SERVICE_PROD"; exit 1; }
+          [ -n "$CLOUD_SQL_INSTANCE" ] || { echo "Missing secret: CLOUD_SQL_INSTANCE_PROD"; exit 1; }
+          [ -n "$VPC_CONNECTOR" ] || { echo "Missing secret: VPC_CONNECTOR_PROD"; exit 1; }
+          [ -n "$CLOUD_RUN_RUNTIME_SA" ] || { echo "Missing secret: CLOUD_RUN_RUNTIME_SA_PROD"; exit 1; }
+          [ -n "$INTERNAL_IP_SQL" ] || { echo "Missing secret: INTERNAL_IP_SQL"; exit 1; }
+          [ -n "$DATABASE_USER" ] || { echo "Missing secret: DATABASE_USER_PROD"; exit 1; }
+          [ -n "$REDIS_HOST" ] || { echo "Missing secret: REDIS_HOST_PROD"; exit 1; }
+          [ -n "$REDIS_PORT" ] || { echo "Missing secret: REDIS_PORT_PROD"; exit 1; }
+          [ -n "$DATABASE_PASSWORD" ] || { echo "Missing secret: DB_PASSWORD_SECRET_PROD"; exit 1; }
+          [ -n "$AUTH_JWT_SECRET" ] || { echo "Missing secret: JWT_SECRET_PROD"; exit 1; }
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Build and push API image to Artifact Registry
+        id: image
+        run: |
+          IMAGE_HOST="${GCP_REGION}-docker.pkg.dev"
+          IMAGE_NAME="${IMAGE_HOST}/${GCP_PROJECT_ID}/${GAR_REPOSITORY}/${CLOUD_RUN_SERVICE}:${GITHUB_SHA}"
+          gcloud auth configure-docker "$IMAGE_HOST" --quiet
+          docker build -t "$IMAGE_NAME" apps/bidmart-core
+          docker push "$IMAGE_NAME"
+          echo "image=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy API to Cloud Run (production)
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.image }}
+        run: |
+          gcloud run deploy "$CLOUD_RUN_SERVICE" \
+            --image "$IMAGE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --port 8080 \
+            --allow-unauthenticated \
+            --service-account "$CLOUD_RUN_RUNTIME_SA" \
+            --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
+            --vpc-connector "$VPC_CONNECTOR" \
+            --vpc-egress private-ranges-only \
+            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,SPRING_DATA_REDIS_DATABASE=0,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
+
+      - name: Publish API production summary
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.image }}
+        run: |
+          API_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --region "$GCP_REGION" --format='value(status.url)')"
+          echo "### Core API production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "Service: $CLOUD_RUN_SERVICE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: $IMAGE_NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: $API_URL" >> "$GITHUB_STEP_SUMMARY"

@@ -1,11 +1,11 @@
 # Bidmart Core Service
 
 Core backend service built with Java and Spring Boot.
-
+ 
 ## Overview
 
 Main backend service for the Bidmart platform.
-
+ 
 **Technology Stack:**
 - Language: Java 21
 - Framework: Spring Boot 4.0.3
@@ -34,6 +34,11 @@ cd apps/bidmart-core
 ### Development server
 ```bash
 ./gradlew bootRun
+```
+
+Use `dev` profile (recommended while frontend runs on localhost):
+```bash
+SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
 ```
 
 The server runs on `http://localhost:8080` (default Spring Boot port)
@@ -69,3 +74,38 @@ src/
     └── resources/      # Test configs
 ```
 
+## CORS Configuration
+
+CORS is configured globally via `app.cors.*` properties and can be set per environment.
+
+Default properties are in `src/main/resources/application.properties`, with profile overrides in:
+- `src/main/resources/application-dev.properties`
+- `src/main/resources/application-prod.properties`
+
+### Dev example (frontend on localhost:3000)
+```bash
+SPRING_PROFILES_ACTIVE=dev APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 ./gradlew bootRun
+```
+
+### Prod example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://bidmart.store ./gradlew bootRun
+``` 
+
+### Prod with staging subdomains example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://bidmart.store APP_CORS_ALLOWED_ORIGIN_PATTERNS=https://*.bidmart.store ./gradlew bootRun
+```
+
+### Staging with temporary GCP frontend URL example
+```bash
+SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://staging.bidmart.store APP_CORS_ALLOWED_ORIGIN_PATTERNS=https://*.run.app ./gradlew bootRun
+```
+
+You can also override additional settings:
+- `APP_CORS_ALLOWED_METHODS` (comma separated)
+- `APP_CORS_ALLOWED_HEADERS` (comma separated)
+- `APP_CORS_EXPOSED_HEADERS` (comma separated)
+- `APP_CORS_ALLOWED_ORIGIN_PATTERNS` (comma separated, supports wildcard subdomains)
+- `APP_CORS_ALLOW_CREDENTIALS` (`true` or `false`)
+- `APP_CORS_MAX_AGE` (seconds)
