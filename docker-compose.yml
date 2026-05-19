@@ -75,9 +75,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/kevincornelius1905/.docker/config.json:/config.json:ro
-    command: --interval 60 core
-    networks:
-      - bidmart-network
+    command: --interval 300 --cleanup core
 
   caddy:
     image: caddy:alpine
