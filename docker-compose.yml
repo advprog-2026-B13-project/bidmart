@@ -33,7 +33,7 @@ services:
       - bidmart-network
 
   core:
-    image: ghcr.io/advprog-2026-b13-project/bidmart-core:latest
+    image: ghcr.io/advprog-2026-b13-project/bidmart-core:staging
     container_name: bidmart-core
     restart: unless-stopped
     environment:
