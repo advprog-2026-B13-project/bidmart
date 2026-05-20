@@ -12,9 +12,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent.AuctionResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionTimeExtendedEvent;
@@ -27,13 +24,15 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult.BidAcceptance;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.input.BiddingUseCase;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.AuctionNotificationPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BidRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BiddingMetricsPort;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BiddingMetricsPort.Sample;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ConcurrencyPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.EventPublisherPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.WalletPort;
-import id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.output.redis.RedisAuctionEventPublisher;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.config.BiddingProperties;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import lombok.RequiredArgsConstructor;
@@ -49,8 +48,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
     private final WalletPort walletPort;
     private final AuctionValidator validator;
     private final BiddingProperties properties;
-    private final RedisAuctionEventPublisher auctionEventPublisher;
-    private final MeterRegistry meterRegistry;
+    private final AuctionNotificationPort auctionNotifier;
+    private final BiddingMetricsPort metrics;
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Jakarta");
     private static final int MAX_CACHE_RETRIES = 3;
@@ -61,52 +60,50 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     @Transactional
     public BidResult placeBid(UUID listingId, BigDecimal bidAmount, UUID bidderId, BidType bidType) {
-        Timer.Sample totalSample = Timer.start(meterRegistry);
+        Sample totalSample = metrics.start();
 
-        Timer.Sample listingReadSample = Timer.start(meterRegistry);
+        Sample listingReadSample = metrics.start();
         ListingInfo listing = listingPort.getListingInfo(listingId);
-        listingReadSample.stop(meterRegistry.timer("bidding.listing_read"));
+        metrics.record(listingReadSample, "bidding.listing_read");
 
-        Timer.Sample walletSample = Timer.start(meterRegistry);
+        Sample walletSample = metrics.start();
         validateAndHoldFunds(listing, bidAmount, bidderId);
-        walletSample.stop(meterRegistry.timer("bidding.wallet_hold"));
+        metrics.record(walletSample, "bidding.wallet_hold");
 
         long bidRupiah = bidAmount.longValue();
         long minIncrementRupiah = listing.minBidIncrement().longValue();
 
-        Timer.Sample redisSample = Timer.start(meterRegistry);
+        Sample redisSample = metrics.start();
         ConcurrencyResult result = runRedisWithRetry(listingId, listing, bidRupiah, minIncrementRupiah, bidderId,
                 bidType);
-        redisSample.stop(meterRegistry.timer("bidding.redis_decision"));
+        metrics.record(redisSample, "bidding.redis_decision");
 
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
             walletPort.releaseFunds(bidderId, bidAmount);
-            totalSample.stop(meterRegistry.timer("bidding.place_bid", "outcome", "cache_miss"));
+            metrics.record(totalSample, "bidding.place_bid", "outcome", "cache_miss");
             throw new IllegalStateException("System unavailable, please try again.");
         }
 
         boolean stateMutated = result.status() == BidAcceptance.LEADING || result.status() == BidAcceptance.OUTBID;
 
         try {
-            Timer.Sample dbWriteSample = Timer.start(meterRegistry);
+            Sample dbWriteSample = metrics.start();
             BidProcessingOutcome outcome = switch (result.status()) {
                 case LEADING -> handleLeading(listingId, listing, bidderId, bidAmount, result, bidType);
                 case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
                 default -> handleReject(bidderId, bidAmount, result.status());
             };
-            dbWriteSample.stop(meterRegistry.timer("bidding.db_write",
-                    "outcome", result.status().name().toLowerCase()));
+            metrics.record(dbWriteSample, "bidding.db_write", "outcome", result.status().name().toLowerCase());
 
             outcome.publishActions().forEach(Runnable::run);
 
-            totalSample.stop(meterRegistry.timer("bidding.place_bid",
-                    "outcome", result.status().name().toLowerCase()));
+            metrics.record(totalSample, "bidding.place_bid", "outcome", result.status().name().toLowerCase());
             return outcome.bidResult();
         } catch (Exception e) {
             if (stateMutated) {
                 compensate(listingId, listing, bidderId, bidAmount, result);
             }
-            totalSample.stop(meterRegistry.timer("bidding.place_bid", "outcome", "error"));
+            metrics.record(totalSample, "bidding.place_bid", "outcome", "error");
             throw e;
         }
     }
@@ -189,7 +186,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
         publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
 
         int bidCount = bidRepository.countByListing(listingId);
-        publishActions.add(() -> auctionEventPublisher.publishPriceChange(listingId, visiblePrice, bidCount));
+        publishActions.add(() -> auctionNotifier.publishPriceChange(listingId, visiblePrice, bidCount));
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
                 listingId, listing.endTime(), result.endTime());
@@ -318,7 +315,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
 
             // SSE: proxy counter changed the visible price.
             int bidCount = bidRepository.countByListing(listingId);
-            publishActions.add(() -> auctionEventPublisher.publishPriceChange(
+            publishActions.add(() -> auctionNotifier.publishPriceChange(
                     listingId, proxyVisiblePrice, bidCount));
         }
 
@@ -494,7 +491,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
                     listingId, listing.sellerId(), winnerBid.getBidderId(),
                     winnerBid.getAmount(), AuctionResult.WON, now));
 
-            auctionEventPublisher.publishAuctionEnded(listingId, winnerBid.getBidderId(),
+            auctionNotifier.publishAuctionEnded(listingId, winnerBid.getBidderId(),
                     winnerBid.getAmount(), "WON");
         } else {
             topBid.ifPresent(bid -> {
@@ -506,7 +503,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
                     listingId, listing.sellerId(), null,
                     null, AuctionResult.UNSOLD, now));
 
-            auctionEventPublisher.publishAuctionEnded(listingId, null, null, "UNSOLD");
+            auctionNotifier.publishAuctionEnded(listingId, null, null, "UNSOLD");
         }
     }
 }
