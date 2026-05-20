@@ -33,7 +33,7 @@ services:
       - bidmart-network
 
   core:
-    image: ghcr.io/advprog-2026-b13-project/bidmart-core:latest
+    image: ghcr.io/advprog-2026-b13-project/bidmart-core:staging
     container_name: bidmart-core
     restart: unless-stopped
     environment:
@@ -75,9 +75,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/kevincornelius1905/.docker/config.json:/config.json:ro
-    command: --interval 60 core
-    networks:
-      - bidmart-network
+    command: --interval 300 --cleanup core
 
   caddy:
     image: caddy:alpine
