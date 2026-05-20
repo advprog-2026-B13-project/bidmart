@@ -223,6 +223,12 @@ export default function HomePage() {
       setCategories(cats);
       setLoading(false);
     }).catch(() => setLoading(false));
+
+    const poll = setInterval(() => {
+      getListings({ size: 100 }).then(r => setListings(r.listings)).catch(() => {});
+    }, 10000);
+
+    return () => clearInterval(poll);
   }, []);
 
   const featured = listings[0] || null;

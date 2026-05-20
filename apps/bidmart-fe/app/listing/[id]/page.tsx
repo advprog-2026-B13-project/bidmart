@@ -658,51 +658,49 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [params, isAuthenticated, isHydrating]);
 
-  // SSE stream for real-time updates
+  // SSE stream for real-time updates — driven off listingId (already resolved string)
   useEffect(() => {
+    if (!listingId || isHydrating) return;
+
     let es: EventSource | null = null;
     let cancelled = false;
 
-    params.then(({ id }) => {
-      if (isHydrating || cancelled) return;
+    const connect = () => {
+      if (cancelled) return;
+      es = new EventSource(`/api/auctions/${listingId}/stream`);
 
-      const connect = () => {
-        if (cancelled) return;
-        es = new EventSource(`/api/auctions/${id}/stream`);
+      es.addEventListener("message", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === "price-change") {
+            setListing(prev => prev ? {
+              ...prev,
+              currentPrice: data.currentPrice,
+              bidCount: data.bidCount,
+            } : prev);
+            getBidsForListing(listingId).then(setBids).catch(() => {});
+          } else if (data.type === "auction-ended") {
+            setListing(prev => prev ? {
+              ...prev,
+              status: data.result === "WON" ? "sold" : "ended",
+            } : prev);
+          }
+        } catch {}
+      });
 
-        es.addEventListener("message", (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            if (data.type === "price-change") {
-              setListing(prev => prev ? {
-                ...prev,
-                currentPrice: data.currentPrice,
-                bidCount: data.bidCount,
-              } : prev);
-              getBidsForListing(id).then(setBids).catch(() => {});
-            } else if (data.type === "auction-ended") {
-              setListing(prev => prev ? {
-                ...prev,
-                status: data.result === "WON" ? "sold" : "ended",
-              } : prev);
-            }
-          } catch {}
-        });
-
-        es.onerror = () => {
-          es?.close();
-          setTimeout(connect, 3000);
-        };
+      es.onerror = () => {
+        es?.close();
+        if (!cancelled) setTimeout(connect, 3000);
       };
+    };
 
-      connect();
-    });
+    connect();
 
     return () => {
       cancelled = true;
       es?.close();
     };
-  }, [params, isHydrating]);
+  }, [listingId, isHydrating]);
 
   if (loading) {
     return (
