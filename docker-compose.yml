@@ -52,6 +52,8 @@ services:
       AUTH_MFA_EMAIL_SUBJECT: Your BidMart OTP code
       AUTH_MFA_EMAIL_APP_NAME: BidMart
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-change-me}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-change-me}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health/status"]
       interval: 30s
