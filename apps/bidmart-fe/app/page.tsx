@@ -28,6 +28,9 @@ function CountdownTimer({ endTime }: { endTime: Date }) {
 
 function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
   const urgency = getTimeUrgency(listing.endTime);
+  const imageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+    ? listing.imageUrl
+    : null;
 
   return (
     <Link
@@ -37,11 +40,17 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
     >
       {/* Image */}
       <div className="relative aspect-card overflow-hidden bg-gray-100">
-        <img
-          src={listing.imageUrl}
-          alt={listing.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+            NO IMG
+          </div>
+        )}
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
           {listing.status === "ending-soon" ? (
@@ -99,15 +108,22 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
 
 function FeaturedAuction({ listing }: { listing: ParsedListing | null }) {
   if (!listing) return null;
+  const imageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+    ? listing.imageUrl
+    : null;
 
   return (
     <div className="relative overflow-hidden border-3 border-black bg-black">
       <div className="absolute inset-0">
-        <img
-          src={listing.imageUrl}
-          alt={listing.title}
-          className="w-full h-full object-cover opacity-30"
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover opacity-30"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-900" />
+        )}
         <div className="absolute inset-0 bg-linear-to-r from-black via-black/90 to-transparent" />
       </div>
 
