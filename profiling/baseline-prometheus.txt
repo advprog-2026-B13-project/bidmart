@@ -1,0 +1,23 @@
+﻿
+bidding_db_write_seconds_count{application="bidmart-core",outcome="leading"} 300
+bidding_db_write_seconds_sum{application="bidmart-core",outcome="leading"} 3.924085281
+bidding_db_write_seconds_max{application="bidmart-core",outcome="leading"} 0.0590263
+bidding_listing_read_seconds_count{application="bidmart-core"} 380
+bidding_listing_read_seconds_sum{application="bidmart-core"} 1.515919627
+bidding_listing_read_seconds_max{application="bidmart-core"} 0.026579
+bidding_place_bid_seconds_count{application="bidmart-core",outcome="error"} 80
+bidding_place_bid_seconds_sum{application="bidmart-core",outcome="error"} 1.866527898
+bidding_place_bid_seconds_count{application="bidmart-core",outcome="leading"} 300
+bidding_place_bid_seconds_sum{application="bidmart-core",outcome="leading"} 
+7.243674592
+bidding_place_bid_seconds_max{application="bidmart-core",outcome="error"} 0.0
+bidding_place_bid_seconds_max{application="bidmart-core",outcome="leading"} 
+0.129776799
+bidding_redis_decision_seconds_count{application="bidmart-core"} 380
+bidding_redis_decision_seconds_sum{application="bidmart-core"} 1.062664711
+bidding_redis_decision_seconds_max{application="bidmart-core"} 0.0238056
+bidding_wallet_hold_seconds_count{application="bidmart-core"} 380
+bidding_wallet_hold_seconds_sum{application="bidmart-core"} 1.079748694
+bidding_wallet_hold_seconds_max{application="bidmart-core"} 0.0164163
+
+
