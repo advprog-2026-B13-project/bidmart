@@ -187,6 +187,16 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     }
 
     @Override
+    public LiveAuctionState getAuctionLiveState(UUID listingId) {
+        List<Object> values = redis.opsForHash().multiGet(key(listingId),
+                java.util.List.of("price", "winner"));
+        Object price = values.get(0);
+        if (price == null) return null;
+        String winner = values.get(1) != null ? values.get(1).toString() : "";
+        return new LiveAuctionState(Long.parseLong(price.toString()), winner);
+    }
+
+    @Override
     public void addToExpirySet(UUID listingId, long endTimeEpochMillis) {
         redis.opsForZSet().add(EXPIRY_SET_KEY, listingId.toString(), endTimeEpochMillis);
     }
