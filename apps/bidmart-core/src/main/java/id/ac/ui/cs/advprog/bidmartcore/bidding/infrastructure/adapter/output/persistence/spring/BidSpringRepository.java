@@ -6,9 +6,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.Bid;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidStatus;
@@ -36,6 +39,7 @@ public interface BidSpringRepository extends JpaRepository<Bid, UUID> {
                         """)
         List<BidderMaxProjection> findTopBidderMax(@Param("listingId") UUID listingId);
 
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
         Optional<Bid> findFirstByListingIdAndStatusOrderByMaxAmountDescCreatedAtAsc(
                         UUID listingId,
                         BidStatus status);

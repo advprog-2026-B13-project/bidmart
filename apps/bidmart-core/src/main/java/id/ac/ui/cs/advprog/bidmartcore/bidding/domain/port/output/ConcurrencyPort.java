@@ -27,6 +27,9 @@ public interface ConcurrencyPort {
 
     long getAuctionEndTime(UUID listingId);
 
+    record LiveAuctionState(long priceRupiah, String winnerId) {}
+    LiveAuctionState getAuctionLiveState(UUID listingId);
+
     void addToExpirySet(UUID listingId, long endTimeEpochMillis);
     void removeFromExpirySet(UUID listingId);
     java.util.Set<String> getExpiredFromExpirySet(long upToEpochMillis);
