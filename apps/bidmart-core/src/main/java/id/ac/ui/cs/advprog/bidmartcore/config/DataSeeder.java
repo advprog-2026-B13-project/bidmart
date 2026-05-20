@@ -15,6 +15,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -40,6 +41,7 @@ public class DataSeeder {
     private final ListingRepository listingRepository;
     private final BidSpringRepository bidRepository;
     private final PasswordEncoder passwordEncoder;
+        private final WalletService walletService;
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
@@ -248,7 +250,13 @@ public class DataSeeder {
         user.setDefault2FAMethod(MFAType.DISABLED);
         user.setStatus(UserStatus.ACTIVE);
         user.setCreatedAt(java.time.Instant.now());
-        return userRepository.save(user);
+                User saved = userRepository.save(user);
+
+                if (walletBalance > 0) {
+                        walletService.deposit(saved.getId(), BigDecimal.valueOf(walletBalance));
+                }
+
+                return saved;
     }
 
     private Category saveCategory(String name, Category parent) {

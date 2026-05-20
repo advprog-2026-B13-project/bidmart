@@ -33,7 +33,7 @@ services:
       - bidmart-network
 
   core:
-    image: ghcr.io/advprog-2026-b13-project/bidmart-core:latest
+    image: ghcr.io/advprog-2026-b13-project/bidmart-core:staging
     container_name: bidmart-core
     restart: unless-stopped
     environment:
@@ -52,6 +52,8 @@ services:
       AUTH_MFA_EMAIL_SUBJECT: Your BidMart OTP code
       AUTH_MFA_EMAIL_APP_NAME: BidMart
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-change-me}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-change-me}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health/status"]
       interval: 30s
@@ -75,9 +77,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/kevincornelius1905/.docker/config.json:/config.json:ro
-    command: --interval 60 core
-    networks:
-      - bidmart-network
+    command: --interval 300 --cleanup core
 
   caddy:
     image: caddy:alpine

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink } from "lucide-react";
 import { getListingById, getListingByIdOwner, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
+import { getMyWallet, type WalletSummary } from "@/lib/api/wallet";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
@@ -250,9 +251,14 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
   const { showToast } = useToast();
+  const { isAuthenticated, isHydrating } = useAuth();
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [walletError, setWalletError] = useState("");
+  const [isWalletLoading, setIsWalletLoading] = useState(false);
 
   const now = new Date();
   const hasStarted = now.getTime() >= listing.startTime.getTime();
+  const canBid = hasStarted && isAuthenticated;
 
   const minBid = listing.currentPrice + listing.minBidIncrement;
   const suggestedBids = [
@@ -262,9 +268,75 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
     minBid + listing.minBidIncrement * 5,
   ];
 
+  const remainingAfterBid = wallet
+    ? wallet.availableBalance - bidAmount
+    : null;
+
+  const loadWallet = async () => {
+    setIsWalletLoading(true);
+    setWalletError("");
+
+    try {
+      const walletResponse = await getMyWallet();
+      setWallet(walletResponse);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
+      setWalletError(message);
+    } finally {
+      setIsWalletLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (isHydrating || !isAuthenticated) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsWalletLoading(true);
+    setWalletError("");
+
+    getMyWallet()
+      .then((walletResponse) => {
+        if (isMounted) {
+          setWallet(walletResponse);
+        }
+      })
+      .catch((loadError) => {
+        if (isMounted) {
+          const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
+          setWalletError(message);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsWalletLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isHydrating]);
+
   const handleBid = async () => {
+    if (!isAuthenticated) {
+      setError("Please sign in to place a bid.");
+      showToast("Please sign in to place a bid.", "error");
+      return;
+    }
+
     if (bidAmount < minBid) {
       setError(`Minimum bid is ${formatCurrency(minBid)}`);
+      return;
+    }
+
+    if (wallet && bidAmount > wallet.availableBalance) {
+      setError("Saldo tidak mencukupi. Top up terlebih dahulu.");
+      showToast("Saldo tidak mencukupi. Top up terlebih dahulu.", "error");
       return;
     }
 
@@ -276,6 +348,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       setIsSubmitting(false);
       setShowSuccess(true);
       showToast(`Bid of ${formatCurrency(bidAmount)} placed successfully!`, "success");
+      await loadWallet();
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       setIsSubmitting(false);
@@ -333,6 +406,57 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
         </div>
       </div>
 
+      {/* Wallet */}
+      <div className="bg-white border-2 border-black p-4 mb-5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Wallet</p>
+          {isAuthenticated && !isWalletLoading && (
+            <button
+              type="button"
+              onClick={loadWallet}
+              className="text-[10px] font-black uppercase text-electric"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+
+        {!isAuthenticated ? (
+          <p className="text-sm font-bold text-gray-600 mt-3">
+            Sign in to view your balance and place bids.
+          </p>
+        ) : isWalletLoading ? (
+          <p className="text-sm font-bold text-gray-600 mt-3">Loading wallet...</p>
+        ) : walletError ? (
+          <p className="text-sm font-bold text-hot mt-3">{walletError}</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">Available</span>
+              <span>{formatCurrency(wallet?.availableBalance ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">Held</span>
+              <span>{formatCurrency(wallet?.heldBalance ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">After Bid</span>
+              <span className={remainingAfterBid !== null && remainingAfterBid < 0 ? "text-hot" : "text-black"}>
+                {remainingAfterBid === null
+                  ? formatCurrency(0)
+                  : formatCurrency(Math.max(remainingAfterBid, 0))}
+              </span>
+            </div>
+            {remainingAfterBid !== null && remainingAfterBid < 0 && (
+              <p className="text-xs font-bold text-hot">Insufficient available balance. Top up first.</p>
+            )}
+            <Link href="/profile" className="text-xs font-black uppercase text-electric">
+              Top up in profile
+            </Link>
+          </div>
+        )}
+      </div>
+
       {/* Anti-snipe */}
       <div className="bg-electric/10 border-2 border-electric p-4 mb-5">
         <div className="flex items-start gap-3">
@@ -384,7 +508,7 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
       {/* Submit */}
       <button
         onClick={handleBid}
-        disabled={isSubmitting}
+        disabled={isSubmitting || !canBid}
         className={`btn w-full text-base py-5 font-black uppercase tracking-wide ${
           showSuccess ? "bg-electric text-white border-electric" : "btn-black"
         }`}
@@ -406,6 +530,12 @@ function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[]
           </>
         )}
       </button>
+
+      {!canBid && (
+        <p className="text-xs text-center text-gray-500 mt-3 font-bold uppercase tracking-wide">
+          {hasStarted ? "Sign in to place a bid" : "Auction has not started yet"}
+        </p>
+      )}
 
       <p className="text-xs text-center text-gray-400 mt-4 font-medium">
         By bidding, you agree to our <Link href="/terms" className="underline font-bold hover:text-black">Terms</Link>

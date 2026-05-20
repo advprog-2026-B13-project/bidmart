@@ -5,15 +5,27 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
-// TODO: rename atau modif file template ini
 @Component
 @RequiredArgsConstructor
-public class WalletRepositoryImpl implements WalletRepository{
-    private final WalletSpringRepository springRepository;
+public class WalletRepositoryImpl implements WalletRepository {
+
+    private final WalletSpringRepository walletSpringRepository;
+
+    @Override
+    public WalletModel save(WalletModel wallet) {
+        return walletSpringRepository.save(wallet);
+    }
+
+    @Override
+    public WalletModel findByUserId(UUID userId) {
+        return walletSpringRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Wallet not found for userId: " + userId));
+    }
 
     @Override
     public List<WalletModel> findAll() {
-        return springRepository.findAll();
+        return walletSpringRepository.findAll();
     }
 }
