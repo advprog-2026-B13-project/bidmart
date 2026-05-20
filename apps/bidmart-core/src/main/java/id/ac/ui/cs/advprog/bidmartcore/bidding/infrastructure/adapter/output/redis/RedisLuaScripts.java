@@ -92,13 +92,17 @@ public final class RedisLuaScripts {
                         return {1, currentPrice, bidderId, newEndTime, bidAmount, 0, ''}
                     end
 
-                    -- MANUAL by current winner means visible=max=submitted amount.
+                    -- MANUAL by current winner: raise visible price, preserve proxy max if higher.
+                    local keepMax = bidAmount
+                    if oldMaxAmount and oldMaxAmount > keepMax then
+                        keepMax = oldMaxAmount
+                    end
                     redis.call('HMSET', KEYS[1],
                         'price', bidAmount,
                         'winner', bidderId,
-                        'maxAmount', bidAmount,
+                        'maxAmount', keepMax,
                         'endTime', newEndTime)
-                    return {1, bidAmount, bidderId, newEndTime, bidAmount, 0, ''}
+                    return {1, bidAmount, bidderId, newEndTime, keepMax, 0, ''}
                 end
 
                 -- Challenger takes lead.

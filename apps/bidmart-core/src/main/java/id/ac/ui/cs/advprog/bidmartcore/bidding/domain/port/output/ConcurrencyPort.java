@@ -23,6 +23,8 @@ public interface ConcurrencyPort {
 
     void refreshAuction(UUID listingId, ListingInfo info);
 
+    ListingPort.ListingInfo getListingInfoFromCache(UUID listingId);
+
     void removeAuction(UUID listingId);
 
     long getAuctionEndTime(UUID listingId);

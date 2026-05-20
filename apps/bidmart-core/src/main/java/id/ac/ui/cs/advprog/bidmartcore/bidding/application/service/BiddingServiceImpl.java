@@ -90,7 +90,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
         try {
             Timer.Sample dbWriteSample = Timer.start(meterRegistry);
             BidProcessingOutcome outcome = switch (result.status()) {
-                case LEADING -> handleLeading(listingId, listing, bidderId, bidAmount, result);
+                case LEADING -> handleLeading(listingId, listing, bidderId, bidAmount, result, bidType);
                 case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
                 default -> handleReject(bidderId, bidAmount, result.status());
             };
@@ -165,47 +165,103 @@ public class BiddingServiceImpl implements BiddingUseCase {
             ListingInfo listing,
             UUID bidderId,
             BigDecimal submittedAmount,
-            ConcurrencyResult result) {
+            ConcurrencyResult result,
+            BidType bidType) {
         LocalDateTime now = LocalDateTime.now();
         BigDecimal visiblePrice = BigDecimal.valueOf(result.visiblePrice());
         List<Runnable> publishActions = new ArrayList<>();
 
-        Bid previousWinningBid = markPreviousWinningBidAsOutbid(listingId);
+        Bid currentWinningBid = bidRepository.findTopBid(listingId).orElse(null);
 
-        Bid savedBid = saveBid(listingId, bidderId, visiblePrice, submittedAmount, BidSource.MANUAL,
-                BidStatus.ACCEPTED);
+        final Bid activeBid;
+        final Bid outbidVictim;
+
+        if (currentWinningBid != null && currentWinningBid.getBidderId().equals(bidderId)) {
+            activeBid = applySameBidderLeading(listingId, bidderId, submittedAmount, visiblePrice, bidType, currentWinningBid);
+            outbidVictim = null;
+        } else {
+            outbidVictim = currentWinningBid;
+            activeBid = applyChallengerLeading(listingId, bidderId, submittedAmount, visiblePrice, bidType, currentWinningBid);
+        }
+
         BidPlacedEvent bidPlacedEvent = new BidPlacedEvent(
-                listingId,
-                savedBid.getId(),
-                bidderId,
-                visiblePrice,
-                now);
+                listingId, activeBid.getId(), bidderId, visiblePrice, now);
         publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
 
-        // Publish SSE event for real-time frontend updates
-        int bidCount = bidRepository.findByListing(listingId).size();
-        publishActions.add(() -> auctionEventPublisher.publishPriceChange(
-                listingId, visiblePrice, bidCount));
+        int bidCount = bidRepository.countByListing(listingId);
+        publishActions.add(() -> auctionEventPublisher.publishPriceChange(listingId, visiblePrice, bidCount));
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
-                listingId,
-                listing.endTime(),
-                result.endTime());
+                listingId, listing.endTime(), result.endTime());
         if (extensionEvent != null) {
             publishActions.add(() -> eventPublisher.publishAuctionTimeExtended(extensionEvent));
         }
 
-        if (previousWinningBid != null && !previousWinningBid.getBidderId().equals(bidderId)) {
+        if (outbidVictim != null) {
             OutbidEvent outbidEvent = new OutbidEvent(
-                    listingId,
-                    previousWinningBid.getBidderId(),
-                    previousWinningBid.getAmount(),
-                    visiblePrice,
-                    now);
+                    listingId, outbidVictim.getBidderId(), outbidVictim.getAmount(),
+                    visiblePrice, now);
             publishActions.add(() -> eventPublisher.publishOutbid(outbidEvent));
         }
 
-        return new BidProcessingOutcome(toBidResult(savedBid), publishActions);
+        return new BidProcessingOutcome(toBidResult(activeBid), publishActions);
+    }
+
+    private Bid applySameBidderLeading(UUID listingId, UUID bidderId,
+            BigDecimal submittedAmount, BigDecimal visiblePrice,
+            BidType bidType, Bid winner) {
+        if (bidType == BidType.PROXY) {
+            return raiseSameBidderProxyMax(bidderId, submittedAmount, winner);
+        }
+        if (BidSource.PROXY.equals(winner.getSource())
+                && winner.getMaxAmount() != null
+                && submittedAmount.compareTo(winner.getMaxAmount()) < 0) {
+            return manualUnderProxyMax(listingId, bidderId, submittedAmount, visiblePrice, winner);
+        }
+        return manualAboveOrEqualProxyMax(listingId, bidderId, submittedAmount, visiblePrice, bidType, winner);
+    }
+
+    private Bid raiseSameBidderProxyMax(UUID bidderId, BigDecimal submittedAmount, Bid winner) {
+        BigDecimal oldMax = winner.getMaxAmount() != null ? winner.getMaxAmount() : winner.getAmount();
+        walletPort.releaseFunds(bidderId, oldMax);
+        winner.setStatus(BidStatus.ACCEPTED);
+        winner.setSource(BidSource.PROXY);
+        winner.setMaxAmount(submittedAmount);
+        return bidRepository.save(winner);
+    }
+
+    private Bid manualUnderProxyMax(UUID listingId, UUID bidderId,
+            BigDecimal submittedAmount, BigDecimal visiblePrice, Bid winner) {
+        BigDecimal originalProxyMax = winner.getMaxAmount();
+        walletPort.releaseFunds(bidderId, submittedAmount);
+        winner.setStatus(BidStatus.OUTBID);
+        bidRepository.save(winner);
+        return saveBid(listingId, bidderId, visiblePrice, originalProxyMax, BidSource.PROXY, BidStatus.ACCEPTED);
+    }
+
+    private Bid manualAboveOrEqualProxyMax(UUID listingId, UUID bidderId,
+            BigDecimal submittedAmount, BigDecimal visiblePrice,
+            BidType bidType, Bid winner) {
+        BigDecimal prevHeld = winner.getMaxAmount() != null ? winner.getMaxAmount() : winner.getAmount();
+        winner.setStatus(BidStatus.OUTBID);
+        bidRepository.save(winner);
+        walletPort.releaseFunds(bidderId, prevHeld);
+        BidSource bidSource = bidType == BidType.PROXY ? BidSource.PROXY : BidSource.MANUAL;
+        return saveBid(listingId, bidderId, visiblePrice, submittedAmount, bidSource, BidStatus.ACCEPTED);
+    }
+
+    private Bid applyChallengerLeading(UUID listingId, UUID bidderId,
+            BigDecimal submittedAmount, BigDecimal visiblePrice,
+            BidType bidType, Bid previousWinner) {
+        if (previousWinner != null) {
+            BigDecimal prevHeld = previousWinner.getMaxAmount() != null
+                    ? previousWinner.getMaxAmount() : previousWinner.getAmount();
+            previousWinner.setStatus(BidStatus.OUTBID);
+            bidRepository.save(previousWinner);
+            walletPort.releaseFunds(previousWinner.getBidderId(), prevHeld);
+        }
+        BidSource bidSource = bidType == BidType.PROXY ? BidSource.PROXY : BidSource.MANUAL;
+        return saveBid(listingId, bidderId, visiblePrice, submittedAmount, bidSource, BidStatus.ACCEPTED);
     }
 
     private BidProcessingOutcome handleOutbid(UUID listingId,
@@ -215,7 +271,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
             ConcurrencyResult result) {
         walletPort.releaseFunds(bidderId, submittedAmount);
 
-        markPreviousWinningBidAsOutbid(listingId);
+        Bid previousWinningBid = markPreviousWinningBidAsOutbid(listingId);
 
         LocalDateTime now = LocalDateTime.now();
         BigDecimal visiblePrice = BigDecimal.valueOf(result.visiblePrice());
@@ -239,11 +295,16 @@ public class BiddingServiceImpl implements BiddingUseCase {
         if (result.proxyVisiblePrice() != null && result.proxyWinnerId() != null && !result.proxyWinnerId().isBlank()) {
             UUID proxyWinnerId = UUID.fromString(result.proxyWinnerId());
             BigDecimal proxyVisiblePrice = BigDecimal.valueOf(result.proxyVisiblePrice());
+            // Preserve the original proxy max so future outbid releases the correct held amount.
+            BigDecimal originalProxyMax = previousWinningBid != null
+                    && previousWinningBid.getMaxAmount() != null
+                    ? previousWinningBid.getMaxAmount()
+                    : proxyVisiblePrice;
             Bid proxyBid = saveBid(
                     listingId,
                     proxyWinnerId,
                     proxyVisiblePrice,
-                    proxyVisiblePrice,
+                    originalProxyMax,
                     BidSource.PROXY,
                     BidStatus.ACCEPTED);
 
@@ -254,6 +315,11 @@ public class BiddingServiceImpl implements BiddingUseCase {
                     proxyVisiblePrice,
                     now);
             publishActions.add(() -> eventPublisher.publishBidPlaced(proxyBidPlacedEvent));
+
+            // SSE: proxy counter changed the visible price.
+            int bidCount = bidRepository.countByListing(listingId);
+            publishActions.add(() -> auctionEventPublisher.publishPriceChange(
+                    listingId, proxyVisiblePrice, bidCount));
         }
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
@@ -363,6 +429,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 bid.getListingId(),
                 bid.getBidderId(),
                 bid.getAmount(),
+                bid.getMaxAmount(),
+                bid.getSource() != null ? bid.getSource().name() : null,
                 bid.getStatus().name(),
                 bid.getCreatedAt());
     }
@@ -370,18 +438,14 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     public List<BidResult> getBidsForListing(UUID listingId) {
         return bidRepository.findByListing(listingId).stream()
-                .map(bid -> new BidResult(
-                        bid.getId(), bid.getListingId(), bid.getBidderId(),
-                        bid.getAmount(), bid.getStatus().name(), bid.getCreatedAt()))
+                .map(this::toBidResult)
                 .toList();
     }
 
     @Override
     public List<BidResult> getMyBids(UUID bidderId) {
         return bidRepository.findByBidder(bidderId).stream()
-                .map(bid -> new BidResult(
-                        bid.getId(), bid.getListingId(), bid.getBidderId(),
-                        bid.getAmount(), bid.getStatus().name(), bid.getCreatedAt()))
+                .map(this::toBidResult)
                 .toList();
     }
 

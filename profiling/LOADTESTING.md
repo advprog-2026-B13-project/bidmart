@@ -157,20 +157,62 @@ The bottleneck is I/O to PostgreSQL, not the Java application layer or the monol
 
 ---
 
-## After-Refactor Run
+## After-Refactor Run (2026-05-20)
 
-> To be filled in after Redis Streams async write implementation.
+**Optimizations applied:**
+- Cache-first listing read: `ListingCatalogAdapter` reads from Redis hash before hitting PostgreSQL. Redis hash now stores all 10 static fields (added `sellerId`, `startingPrice`, `reservePrice`, `minBidIncrement`, `startTime`).
+- COUNT query: replaced `findByListing().size()` full table scan with `countByListingId` (`SELECT COUNT(*)`).
 
-```
-k6 run --summary-export=profiling/after-summary.json profiling/k6-bid-load.js
-```
+### k6 HTTP Latency — `place_bid_latency` (300 iterations, 0 errors)
 
-Then scrape Prometheus again and fill in the after table here.
-
-| Stage | baseline avg | after avg | delta |
+| Metric | Baseline | After | Delta |
 |---|---|---|---|
-| `bidding.db_write` | 11.91 ms | — | — |
-| `bidding.listing_read` | 3.65 ms | — | — |
-| `bidding.wallet_hold` | 2.06 ms | — | — |
-| `bidding.redis_decision` | 1.97 ms | — | — |
-| **`bidding.place_bid`** | **22.16 ms** | — | — |
+| avg | 48.67 ms | **35.85 ms** | -26% |
+| median | 44.31 ms | **31.69 ms** | -28% |
+| p(90) | 70.55 ms | **46.79 ms** | -34% |
+| **p(95)** | **86.92 ms** | **66.08 ms** | **-24%** |
+| max | 214.09 ms | **148.97 ms** | -30% |
+| errors | 0 / 300 | **0 / 300** | — |
+
+Raw k6 export: `profiling/after-summary.json`
+
+---
+
+### Micrometer Per-Stage Breakdown
+
+| Stage | Baseline avg | After avg | Delta | Baseline % | After % |
+|---|---|---|---|---|---|
+| `bidding.db_write` | 11.91 ms | **9.65 ms** | -19% | 53.7% | **57.9%** |
+| `bidding.listing_read` | 3.65 ms | **1.31 ms** | **-64%** | 16.5% | **7.9%** |
+| `bidding.wallet_hold` | 2.06 ms | 1.77 ms | -14% | 9.3% | 10.6% |
+| `bidding.redis_decision` | 1.97 ms | 1.37 ms | -31% | 8.9% | 8.2% |
+| **`bidding.place_bid`** | **22.16 ms** | **16.67 ms** | **-25%** | 100% | 100% |
+
+Raw Prometheus values:
+
+```
+bidding_db_write_seconds_count{outcome="leading"}    300
+bidding_db_write_seconds_sum{outcome="leading"}      2.8955289   → avg 9.65ms
+
+bidding_listing_read_seconds_count                   300
+bidding_listing_read_seconds_sum                     0.3940437   → avg 1.31ms
+
+bidding_wallet_hold_seconds_count                    300
+bidding_wallet_hold_seconds_sum                      0.5302746   → avg 1.77ms
+
+bidding_redis_decision_seconds_count                 300
+bidding_redis_decision_seconds_sum                   0.4104915   → avg 1.37ms
+
+bidding_place_bid_seconds_count{outcome="leading"}   300
+bidding_place_bid_seconds_sum{outcome="leading"}     5.0019886   → avg 16.67ms
+```
+
+---
+
+## Updated Conclusion
+
+`listing_read` dropped **64%** (3.65 ms → 1.31 ms) — cache-first eliminated the PSQL round-trip for warm auctions. End-to-end `place_bid` improved **25%** (22.16 ms → 16.67 ms).
+
+`db_write` is now the sole dominant stage at **58% of total latency**, confirming it as the next optimization target. The result validates the hypothesis: PSQL I/O is the bottleneck, not the Java layer or monolith topology.
+
+**Next optimization**: move `db_write` off the request path via Redis Streams (XADD + sequential consumer). Expected improvement: ≥50% reduction in `place_bid` avg latency (from 16.67 ms to ~8 ms).
