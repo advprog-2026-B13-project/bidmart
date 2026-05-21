@@ -291,6 +291,7 @@ function BidPanel({ listing, bids, onBidPlaced }: { listing: ParsedListing; bids
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
+  const isDirty = useRef(false);
   const { showToast } = useToast();
   const { isAuthenticated, isHydrating, user } = useAuth();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
@@ -322,12 +323,10 @@ function BidPanel({ listing, bids, onBidPlaced }: { listing: ParsedListing; bids
     loadWallet();
   }, [isAuthenticated, isHydrating]);
 
-  // Keep minBid in sync when listing.currentPrice changes via SSE
+  // Keep minBid in sync when listing.currentPrice changes via SSE — only if user hasn't typed
   useEffect(() => {
-    setBidAmount(prev => {
-      const newMin = listing.currentPrice + listing.minBidIncrement;
-      return prev < newMin ? newMin : prev;
-    });
+    if (isDirty.current) return;
+    setBidAmount(listing.currentPrice + listing.minBidIncrement);
   }, [listing.currentPrice, listing.minBidIncrement]);
 
   const validate = (): string | null => {
@@ -349,6 +348,7 @@ function BidPanel({ listing, bids, onBidPlaced }: { listing: ParsedListing; bids
     try {
       const result = await placeBid({ listingId: listing.id, amount: bidAmount, bidType });
       setIsSubmitting(false);
+      isDirty.current = false;
       await loadWallet();
       onBidPlaced(result);
 
@@ -466,7 +466,7 @@ function BidPanel({ listing, bids, onBidPlaced }: { listing: ParsedListing; bids
             <input
               type="number"
               value={bidAmount}
-              onChange={(e) => { setBidAmount(Number(e.target.value)); setError(""); }}
+              onChange={(e) => { isDirty.current = true; setBidAmount(Number(e.target.value)); setError(""); }}
               className="flex-1 px-3 py-3 text-xl font-black outline-none bg-transparent"
               min={minBid}
               step={listing.minBidIncrement}
@@ -667,7 +667,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
     const connect = () => {
       if (cancelled) return;
-      es = new EventSource(`/api/auctions/${listingId}/stream`);
+      const apiBase = process.env.NEXT_PUBLIC_AUTH_API_URL || "";
+      es = new EventSource(`${apiBase}/api/bidding/auctions/${listingId}/stream`);
 
       es.addEventListener("message", (e) => {
         try {

@@ -70,6 +70,42 @@ services:
     networks:
       - bidmart-network
 
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: bidmart-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    depends_on:
+      - core
+    networks:
+      - bidmart-network
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: bidmart-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://grafana.staging.bidmart.store"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - bidmart-network
+
   watchtower:
     image: containrrr/watchtower:1.7.1
     container_name: bidmart-watchtower
@@ -79,7 +115,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/kevincornelius1905/.docker/config.json:/config.json:ro
-    command: --interval 300 --cleanup core
+    command: --interval 300 --cleanup bidmart-core
 
   caddy:
     image: caddy:alpine
@@ -102,6 +138,8 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
+  prometheus_data:
+  grafana_data:
 
 networks:
   bidmart-network:

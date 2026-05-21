@@ -185,8 +185,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 listingId, activeBid.getId(), bidderId, visiblePrice, now);
         publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
 
-        int bidCount = bidRepository.countByListing(listingId);
-        publishActions.add(() -> auctionNotifier.publishPriceChange(listingId, visiblePrice, bidCount));
+        long bidCount = concurrencyPort.incrementAndGetBidCount(listingId);
+        publishActions.add(() -> auctionNotifier.publishPriceChange(listingId, visiblePrice, (int) bidCount));
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
                 listingId, listing.endTime(), result.endTime());
@@ -195,9 +195,11 @@ public class BiddingServiceImpl implements BiddingUseCase {
         }
 
         if (outbidVictim != null) {
+            BigDecimal heldAmount = outbidVictim.getMaxAmount() != null
+                    ? outbidVictim.getMaxAmount() : outbidVictim.getAmount();
             OutbidEvent outbidEvent = new OutbidEvent(
                     listingId, outbidVictim.getBidderId(), outbidVictim.getAmount(),
-                    visiblePrice, now);
+                    visiblePrice, now, heldAmount);
             publishActions.add(() -> eventPublisher.publishOutbid(outbidEvent));
         }
 
@@ -251,10 +253,10 @@ public class BiddingServiceImpl implements BiddingUseCase {
             BigDecimal submittedAmount, BigDecimal visiblePrice,
             BidType bidType, Bid previousWinner) {
         if (previousWinner != null) {
-            BigDecimal prevHeld = previousWinner.getMaxAmount() != null
-                    ? previousWinner.getMaxAmount() : previousWinner.getAmount();
             previousWinner.setStatus(BidStatus.OUTBID);
             bidRepository.save(previousWinner);
+            BigDecimal prevHeld = previousWinner.getMaxAmount() != null
+                    ? previousWinner.getMaxAmount() : previousWinner.getAmount();
             walletPort.releaseFunds(previousWinner.getBidderId(), prevHeld);
         }
         BidSource bidSource = bidType == BidType.PROXY ? BidSource.PROXY : BidSource.MANUAL;
@@ -314,9 +316,9 @@ public class BiddingServiceImpl implements BiddingUseCase {
             publishActions.add(() -> eventPublisher.publishBidPlaced(proxyBidPlacedEvent));
 
             // SSE: proxy counter changed the visible price.
-            int bidCount = bidRepository.countByListing(listingId);
+            long bidCount = concurrencyPort.incrementAndGetBidCount(listingId);
             publishActions.add(() -> auctionNotifier.publishPriceChange(
-                    listingId, proxyVisiblePrice, bidCount));
+                    listingId, proxyVisiblePrice, (int) bidCount));
         }
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
