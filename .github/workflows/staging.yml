@@ -74,7 +74,7 @@ jobs:
       - name: Wait for staging health check
         run: |
           for i in {1..12}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.staging.bidmart.store/actuator/health/readiness || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.staging.bidmart.store/api/health/status || echo "000")
             echo "Attempt $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "Staging is healthy"
