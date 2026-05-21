@@ -39,6 +39,8 @@ public class BidController {
                 result.listingId(),
                 result.bidderId(),
                 result.amount(),
+                result.maxAmount(),
+                result.source(),
                 result.status(),
                 result.createdAt()
         );
@@ -55,6 +57,8 @@ public class BidController {
                 bid.listingId(),
                 bid.bidderId(),
                 bid.amount(),
+                bid.maxAmount(),
+                bid.source(),
                 bid.status(),
                 bid.createdAt()
         )).toList();
@@ -72,6 +76,8 @@ public class BidController {
                 bid.listingId(),
                 bid.bidderId(),
                 bid.amount(),
+                bid.maxAmount(),
+                bid.source(),
                 bid.status(),
                 bid.createdAt()
         )).toList();

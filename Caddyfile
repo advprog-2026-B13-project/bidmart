@@ -1,3 +1,5 @@
 api.staging.bidmart.store {
-    reverse_proxy core:8080
+    reverse_proxy core:8080 {
+        flush_interval -1
+    }
 }

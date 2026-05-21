@@ -25,6 +25,8 @@ public interface BidSpringRepository extends JpaRepository<Bid, UUID> {
                 BigDecimal getMaxAmount();
         }
 
+        int countByListingId(UUID listingId);
+
         List<Bid> findByListingIdOrderByMaxAmountDescCreatedAtAsc(UUID listingId);
 
         List<Bid> findByBidderIdOrderByCreatedAtDesc(UUID bidderId);

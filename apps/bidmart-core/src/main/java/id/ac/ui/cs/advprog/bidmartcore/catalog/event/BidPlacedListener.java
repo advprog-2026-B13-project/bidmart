@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -14,6 +15,7 @@ public class BidPlacedListener {
 
     private final ListingService listingService;
 
+    @Async
     @EventListener
     public void onBidPlaced(BidPlacedEvent event) {
         log.debug("Bid placed on auction {}: {} bid {}",

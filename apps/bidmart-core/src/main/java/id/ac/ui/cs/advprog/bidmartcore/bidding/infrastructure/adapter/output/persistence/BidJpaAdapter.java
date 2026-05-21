@@ -39,6 +39,11 @@ public class BidJpaAdapter implements BidRepositoryPort {
     }
 
     @Override
+    public int countByListing(UUID listingId) {
+        return bidRepository.countByListingId(listingId);
+    }
+
+    @Override
     public List<Bid> findByListingAndBidder(UUID listingId, UUID bidderId) {
         return bidRepository.findByListingIdAndBidderIdOrderByMaxAmountDescCreatedAtAsc(listingId, bidderId);
     }
