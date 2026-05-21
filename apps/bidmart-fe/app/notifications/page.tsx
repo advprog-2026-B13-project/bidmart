@@ -34,7 +34,7 @@ export default function NotificationsPage() {
       brokerURL: wsUrl,
       reconnectDelay: 5000,
       onConnect: () => {
-        console.log("WebSocket connected for notifications!");
+        console.log("Terkoneksi ke WebSocket Notifikasi!");
         client.subscribe(`/topic/notifications/${user.userId}`, (message) => {
           const newNotif = JSON.parse(message.body);
           
@@ -51,7 +51,7 @@ export default function NotificationsPage() {
         });
       },
       onWebSocketError: (error) => {
-        console.error("WebSocket error:", error);
+        console.error("Kesalahan WebSocket:", error);
       },
     });
 
@@ -73,9 +73,9 @@ export default function NotificationsPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white p-4">
-        <h1 className="text-3xl font-black uppercase mb-4">Access Denied</h1>
-        <p className="text-gray-500 font-bold mb-6">Please sign in to view your notifications.</p>
-        <Link href="/login" className="btn btn-black">Sign In</Link>
+        <h1 className="text-3xl font-black uppercase mb-4">Akses Ditolak</h1>
+        <p className="text-gray-500 font-bold mb-6">Silakan masuk log terlebih dahulu untuk melihat notifikasi.</p>
+        <Link href="/login" className="btn btn-black">Masuk Log</Link>
       </div>
     );
   }
@@ -90,15 +90,15 @@ export default function NotificationsPage() {
           </Link>
           <h1 className="text-4xl font-black uppercase tracking-tight flex items-center gap-3">
             <Bell className="w-8 h-8" />
-            Your Notifications
+            Notifikasi Anda
           </h1>
         </div>
 
-        {/* Notifications List */}
+        {/* List */}
         <div className="border-3 border-black bg-white shadow-[8px_8px_0_#0A0A0A] divide-y-2 divide-black">
           {notifications.length === 0 ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500 font-black uppercase tracking-wide">No notifications yet.</p>
+              <p className="text-gray-500 font-black uppercase tracking-wide">Belum ada notifikasi baru.</p>
             </div>
           ) : (
             notifications.map((notification) => (
