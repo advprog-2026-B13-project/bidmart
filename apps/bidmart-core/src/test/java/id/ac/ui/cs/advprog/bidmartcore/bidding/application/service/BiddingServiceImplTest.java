@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -258,7 +259,6 @@ class BiddingServiceImplTest {
     void placeBid_sameBidderManualUnderProxyMax_releaseManualHoldKeepsProxyMax() {
         BigDecimal proxyMax = BigDecimal.valueOf(10000);
         BigDecimal manualAttempt = BigDecimal.valueOf(5500);
-        BigDecimal visibleAfter = BigDecimal.valueOf(5501);
 
         Bid existingProxy = acceptedBid(bidderId, BigDecimal.valueOf(5000), proxyMax, BidSource.PROXY);
 
@@ -442,7 +442,7 @@ class BiddingServiceImplTest {
         BigDecimal finalPrice = BigDecimal.valueOf(2000);
         Bid winnerBid = acceptedBid(bidderId, finalPrice, finalPrice, BidSource.MANUAL);
 
-        when(listingPort.getListingInfo(listingId)).thenReturn(activeListing);
+        // activeListing from setUp: reservePrice=500, so 2000 > reserve → WON
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(winnerBid));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -460,7 +460,6 @@ class BiddingServiceImplTest {
         BigDecimal lowPrice = BigDecimal.valueOf(100); // below reservePrice=500
         Bid lowBid = acceptedBid(bidderId, lowPrice, lowPrice, BidSource.MANUAL);
 
-        when(listingPort.getListingInfo(listingId)).thenReturn(activeListing);
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(lowBid));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -474,7 +473,6 @@ class BiddingServiceImplTest {
 
     @Test
     void closeAuction_noBids_publishesUnsoldWithoutSavingBid() {
-        when(listingPort.getListingInfo(listingId)).thenReturn(activeListing);
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
 
         service.closeAuction(listingId);
@@ -485,11 +483,11 @@ class BiddingServiceImplTest {
 
     @Test
     void closeAuction_listingNotActive_returnsEarlyWithoutPublishing() {
-        ListingPort.ListingInfo soldListing = new ListingPort.ListingInfo(
+        ListingPort.ListingInfo closedListing = new ListingPort.ListingInfo(
                 sellerId, ListingStatus.CLOSED,
                 BigDecimal.valueOf(1000), BigDecimal.valueOf(2000), BigDecimal.valueOf(500),
                 BigDecimal.ONE, null, LocalDateTime.now().minusHours(1), bidderId);
-        when(listingPort.getListingInfo(listingId)).thenReturn(soldListing);
+        when(listingPort.getListingInfo(listingId)).thenReturn(closedListing);
 
         service.closeAuction(listingId);
 
@@ -519,5 +517,266 @@ class BiddingServiceImplTest {
 
         assertEquals(1, results.size());
         assertEquals(bidderId, results.get(0).bidderId());
+    }
+
+    // ─── Auction not started yet ───────────────────────────────────────────────
+
+    @Test
+    void placeBid_auctionNotStartedYet_throwsBeforeHoldingFunds() {
+        // Listing with a future startTime
+        ListingPort.ListingInfo futureListing = new ListingPort.ListingInfo(
+                sellerId, ListingStatus.ACTIVE,
+                BigDecimal.valueOf(1000), null, BigDecimal.valueOf(500), BigDecimal.ONE,
+                LocalDateTime.now().plusHours(1), // startTime in future
+                LocalDateTime.now().plusHours(2),
+                null);
+        when(listingPort.getListingInfo(listingId)).thenReturn(futureListing);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL));
+
+        verify(walletPort, never()).holdFunds(any(), any());
+    }
+
+    // ─── OUTBID without proxy counter ─────────────────────────────────────────
+
+    @Test
+    void placeBid_outbid_noProxyCounter_onlyChallengerSavedAsOutbid() {
+        // No existing top bid; challenger loses immediately (e.g. stale Redis) but no proxy fires
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                // Use constructor directly: proxyVisiblePrice=null means no proxy fired
+                .thenReturn(new ConcurrencyResult(
+                        ConcurrencyResult.BidAcceptance.OUTBID,
+                        3000L, bidderId.toString(), endTimeMillis, 3000L,
+                        null, null));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        BiddingUseCase.BidResult result = service.placeBid(
+                listingId, BigDecimal.valueOf(3000), bidderId, BidType.MANUAL);
+
+        assertEquals("OUTBID", result.status());
+        // challenger's hold released
+        verify(walletPort).releaseFunds(bidderId, BigDecimal.valueOf(3000));
+        // no proxy bid SSE since there's no proxy counter
+        verify(auctionNotifier, never()).publishPriceChange(any(), any(), anyInt());
+    }
+
+    // ─── Event publishing correctness ─────────────────────────────────────────
+
+    @Test
+    void placeBid_leading_publishesBidPlacedEvent() {
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bidRepository.countByListing(listingId)).thenReturn(1);
+
+        service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
+
+        verify(eventPublisher).publishBidPlaced(any());
+        verify(auctionNotifier).publishPriceChange(eq(listingId), any(), eq(1));
+    }
+
+    @Test
+    void placeBid_leadingChallengerBeatsOldLeader_publishesOutbidEvent() {
+        UUID oldLeaderId = UUID.randomUUID();
+        Bid oldWinner = acceptedBid(oldLeaderId, BigDecimal.valueOf(1000), BigDecimal.valueOf(1000), BidSource.MANUAL);
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(oldWinner));
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bidRepository.countByListing(listingId)).thenReturn(2);
+
+        service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
+
+        verify(eventPublisher).publishOutbid(any());
+    }
+
+    // ─── Wallet maxAmount null fallback ───────────────────────────────────────
+
+    @Test
+    void placeBid_challengerBeatsOldLeaderWithNullMaxAmount_usesAmountAsHeld() {
+        UUID oldLeaderId = UUID.randomUUID();
+        // Old bid has null maxAmount — held funds equal to amount
+        Bid oldWinner = acceptedBid(oldLeaderId, BigDecimal.valueOf(1000), null, BidSource.MANUAL);
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(oldWinner));
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bidRepository.countByListing(listingId)).thenReturn(2);
+
+        service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
+
+        // When maxAmount is null, should release amount instead
+        verify(walletPort).releaseFunds(oldLeaderId, BigDecimal.valueOf(1000));
+    }
+
+    @Test
+    void placeBid_sameBidderRaisesProxyMax_nullExistingMax_usesAmountAsOldHeld() {
+        // Proxy bid with null maxAmount (created before maxAmount field existed)
+        Bid existingProxy = acceptedBid(bidderId, BigDecimal.valueOf(3000), null, BidSource.PROXY);
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(8000L, bidderId.toString(), endTimeMillis, 8000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bidRepository.countByListing(listingId)).thenReturn(1);
+
+        service.placeBid(listingId, BigDecimal.valueOf(8000), bidderId, BidType.PROXY);
+
+        // null maxAmount → falls back to amount (3000)
+        verify(walletPort).releaseFunds(bidderId, BigDecimal.valueOf(3000));
+    }
+
+    // ─── Compensation / rollback on DB failure ────────────────────────────────
+
+    @Test
+    void placeBid_leading_dbSaveThrows_compensatesWithReleaseAndRollback() {
+        BigDecimal amount = BigDecimal.valueOf(2000);
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+        // DB write throws after Redis was updated
+        when(bidRepository.save(any())).thenThrow(new RuntimeException("DB timeout"));
+
+        assertThrows(RuntimeException.class,
+                () -> service.placeBid(listingId, amount, bidderId, BidType.MANUAL));
+
+        // Wallet hold must be released (compensate runs for LEADING)
+        verify(walletPort).releaseFunds(bidderId, amount);
+        // Redis state must be rolled back
+        verify(concurrencyPort).rollback(eq(listingId), anyLong(), any(), anyLong(), anyLong(), any());
+    }
+
+    // ─── getAuctionStatus ─────────────────────────────────────────────────────
+
+    @Test
+    void getAuctionStatus_redisLiveState_returnsLivePrice() {
+        UUID winnerId = UUID.randomUUID();
+        when(concurrencyPort.getAuctionLiveState(listingId))
+                .thenReturn(new ConcurrencyPort.LiveAuctionState(5000L, winnerId.toString()));
+
+        BiddingUseCase.AuctionStatusResult result = service.getAuctionStatus(listingId);
+
+        assertEquals(BigDecimal.valueOf(5000L), result.currentPrice());
+        assertEquals(winnerId, result.currentWinnerId());
+    }
+
+    @Test
+    void getAuctionStatus_noRedisState_fallsBackToTopBid() {
+        UUID winnerId = UUID.randomUUID();
+        Bid topBid = acceptedBid(winnerId, BigDecimal.valueOf(3000), null, BidSource.MANUAL);
+
+        when(concurrencyPort.getAuctionLiveState(listingId)).thenReturn(null);
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(topBid));
+
+        BiddingUseCase.AuctionStatusResult result = service.getAuctionStatus(listingId);
+
+        // Price falls back to listing.currentPrice() (1000 from activeListing)
+        assertEquals(BigDecimal.valueOf(1000), result.currentPrice());
+        assertEquals(winnerId, result.currentWinnerId());
+    }
+
+    @Test
+    void getAuctionStatus_noRedisAndNoTopBid_returnsNullWinner() {
+        when(concurrencyPort.getAuctionLiveState(listingId)).thenReturn(null);
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+
+        BiddingUseCase.AuctionStatusResult result = service.getAuctionStatus(listingId);
+
+        assertNull(result.currentWinnerId());
+    }
+
+    @Test
+    void getAuctionStatus_redisStateWithBlankWinnerId_returnsNullWinner() {
+        when(concurrencyPort.getAuctionLiveState(listingId))
+                .thenReturn(new ConcurrencyPort.LiveAuctionState(5000L, ""));
+
+        BiddingUseCase.AuctionStatusResult result = service.getAuctionStatus(listingId);
+
+        assertNull(result.currentWinnerId());
+        assertEquals(BigDecimal.valueOf(5000L), result.currentPrice());
+    }
+
+    // ─── Anti-snipe in OUTBID path ────────────────────────────────────────────
+
+    @Test
+    void placeBid_outbid_antiSnipeTriggered_publishesTimeExtendedEvent() {
+        UUID proxyOwnerId = UUID.randomUUID();
+        long extendedEndTime = endTimeMillis + 120_000L;
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.outbid(
+                        3000L, proxyOwnerId.toString(), extendedEndTime, 3000L,
+                        3001L, proxyOwnerId.toString()));
+        when(bidRepository.findTopBid(listingId))
+                .thenReturn(Optional.of(acceptedBid(proxyOwnerId, BigDecimal.valueOf(2000),
+                        BigDecimal.valueOf(5000), BidSource.PROXY)));
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bidRepository.countByListing(listingId)).thenReturn(2);
+
+        service.placeBid(listingId, BigDecimal.valueOf(3000), bidderId, BidType.MANUAL);
+
+        verify(eventPublisher).publishAuctionTimeExtended(any());
+    }
+
+    // ─── compensate with OUTBID result — resolveExpectedCurrentPrice proxy branch
+
+    @Test
+    void placeBid_outbid_dbSaveThrows_compensateUsesProxyVisiblePrice() {
+        UUID proxyOwnerId = UUID.randomUUID();
+        long proxyVisible = 3001L;
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.outbid(
+                        3000L, proxyOwnerId.toString(), endTimeMillis, 3000L,
+                        proxyVisible, proxyOwnerId.toString()));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+        // First save (challenger OUTBID bid) throws → compensate triggered
+        when(bidRepository.save(any())).thenThrow(new RuntimeException("DB timeout"));
+
+        assertThrows(RuntimeException.class,
+                () -> service.placeBid(listingId, BigDecimal.valueOf(3000), bidderId, BidType.MANUAL));
+
+        // resolveExpectedCurrentPrice: OUTBID + proxyVisiblePrice != null → uses proxyVisible
+        verify(concurrencyPort).rollback(eq(listingId), anyLong(), any(), anyLong(),
+                eq(proxyVisible), any());
+    }
+
+    // ─── compensate with null currentPrice — resolveListingPrice startingPrice branch
+
+    @Test
+    void placeBid_leading_dbSaveThrows_listingNullCurrentPrice_compensateUsesStartingPrice() {
+        BigDecimal startingPrice = BigDecimal.valueOf(1000);
+        ListingPort.ListingInfo listingNoCurrentPrice = new ListingPort.ListingInfo(
+                sellerId, ListingStatus.ACTIVE,
+                startingPrice, null, BigDecimal.valueOf(500), BigDecimal.ONE,
+                null, activeListing.endTime(), null);
+        when(listingPort.getListingInfo(listingId)).thenReturn(listingNoCurrentPrice);
+
+        when(concurrencyPort.placeBid(any(), anyLong(), anyLong(), any(), any(),
+                anyLong(), anyLong(), anyLong()))
+                .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
+        when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
+        when(bidRepository.save(any())).thenThrow(new RuntimeException("DB timeout"));
+
+        assertThrows(RuntimeException.class,
+                () -> service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL));
+
+        // resolveListingPrice: currentPrice == null → falls back to startingPrice
+        verify(concurrencyPort).rollback(eq(listingId), eq(startingPrice.longValue()),
+                any(), anyLong(), anyLong(), any());
     }
 }

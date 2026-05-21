@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
-public class WalletStubAdapter implements WalletPort {
+public class WalletServiceAdapter implements WalletPort {
 
     private final WalletService walletService;
 

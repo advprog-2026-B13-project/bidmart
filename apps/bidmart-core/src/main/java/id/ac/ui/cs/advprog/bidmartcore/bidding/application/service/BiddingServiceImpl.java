@@ -346,7 +346,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
             case REJECTED -> throw new IllegalArgumentException("Penawaran terlalu rendah");
             case NOT_ACTIVE -> throw new IllegalArgumentException("Lelang tidak aktif");
             case ENDED -> throw new IllegalArgumentException("Lelang sudah berakhir");
-            default -> throw new IllegalArgumentException("Penawaran ditolak");
+            default -> throw new IllegalStateException("Unexpected rejection status: " + status);
         }
     }
 
