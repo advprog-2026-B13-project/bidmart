@@ -8,6 +8,9 @@ import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils
 
 function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
   const urgency = getTimeUrgency(listing.endTime);
+  const imageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+    ? listing.imageUrl
+    : null;
 
   return (
     <Link
@@ -16,11 +19,17 @@ function ListingCard({ listing, index }: { listing: ParsedListing; index: number
       style={{ animationDelay: `${index * 0.06}s`, animationFillMode: "both" }}
     >
       <div className="relative aspect-4/3 overflow-hidden bg-gray-100">
-        <img
-          src={listing.imageUrl}
-          alt={listing.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+            NO IMG
+          </div>
+        )}
         <div className="absolute top-3 left-3">
           {listing.status === "ending-soon" ? (
             <span className="badge badge-hot">ENDING SOON</span>

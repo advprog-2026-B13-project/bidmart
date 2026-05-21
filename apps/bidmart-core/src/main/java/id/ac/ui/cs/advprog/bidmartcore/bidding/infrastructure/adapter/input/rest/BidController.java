@@ -39,6 +39,7 @@ public class BidController {
                 result.listingId(),
                 result.bidderId(),
                 result.amount(),
+                result.source(),
                 result.status(),
                 result.createdAt()
         );
@@ -48,9 +49,9 @@ public class BidController {
 
     @GetMapping("/listings/{listingId}/bids")
     @Operation(summary = "Get all bids for a listing")
-    public ResponseEntity<ApiResponse<List<BidResponse>>> getBidsForListing(@PathVariable UUID listingId) {
+    public ResponseEntity<ApiResponse<List<PublicBidResponse>>> getBidsForListing(@PathVariable UUID listingId) {
         List<BidResult> bids = biddingUseCase.getBidsForListing(listingId);
-        List<BidResponse> responses = bids.stream().map(bid -> new BidResponse(
+        List<PublicBidResponse> responses = bids.stream().map(bid -> new PublicBidResponse(
                 bid.bidId(),
                 bid.listingId(),
                 bid.bidderId(),
@@ -72,6 +73,7 @@ public class BidController {
                 bid.listingId(),
                 bid.bidderId(),
                 bid.amount(),
+                bid.source(),
                 bid.status(),
                 bid.createdAt()
         )).toList();

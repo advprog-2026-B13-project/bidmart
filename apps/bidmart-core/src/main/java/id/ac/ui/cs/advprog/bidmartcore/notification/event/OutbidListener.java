@@ -4,8 +4,11 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.OutbidEvent;
 import id.ac.ui.cs.advprog.bidmartcore.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 
@@ -16,7 +19,8 @@ public class OutbidListener {
 
     private final NotificationService notificationService;
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onOutbid(OutbidEvent event) {
         log.debug("Outbid event for bidder {} on listing {}: was {} now {}",
                 event.getOutbidBidderId(), event.getListingId(),

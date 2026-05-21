@@ -9,15 +9,20 @@ export async function GET(
   const { id } = await params;
   const url = `${BASE_URL}/api/bidding/auctions/${id}/stream`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "text/event-stream",
-      Cookie: req.headers.get("cookie") ?? "",
-      Authorization: req.headers.get("authorization") ?? "",
-    },
-    cache: "no-store",
-  });
+  let response: globalThis.Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "text/event-stream",
+        Cookie: req.headers.get("cookie") ?? "",
+        Authorization: req.headers.get("authorization") ?? "",
+      },
+      cache: "no-store",
+    });
+  } catch {
+    return new Response("stream unavailable", { status: 502 });
+  }
 
   if (!response.ok) {
     return new Response("stream unavailable", { status: 502 });
