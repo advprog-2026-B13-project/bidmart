@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.AuctionNotificationPort;
@@ -19,6 +20,7 @@ public class RedisAuctionEventPublisher implements AuctionNotificationPort {
 
     private static final String CHANNEL_PREFIX = "auction:";
 
+    @Async
     public void publishPriceChange(UUID listingId, BigDecimal newPrice, int bidCount) {
         String payload = String.format(
                 "{\"type\":\"price-change\",\"listingId\":\"%s\",\"currentPrice\":%s,\"bidCount\":%d}",
