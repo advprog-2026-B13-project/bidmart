@@ -20,6 +20,11 @@ public class ListingCatalogAdapter implements ListingPort {
 
     @Override
     public ListingInfo getListingInfo(UUID listingId) {
+        ListingInfo cached = concurrencyPort.getListingInfoFromCache(listingId);
+        if (cached != null && cached.status() == ListingStatus.ACTIVE) {
+            return cached;
+        }
+
         Listing listing = listingService.getListingById(listingId);
         ListingInfo info = new ListingInfo(
                 listing.getSellerId(),

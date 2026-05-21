@@ -13,6 +13,10 @@ import {
   updateProfile,
 } from "@/lib/auth/auth-api";
 import type { ProfileResponse, TotpSetupResponse } from "@/lib/auth/types";
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+} from "@/lib/api/endpoints";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -84,6 +88,10 @@ export default function SettingsPage() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
 
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [isSavingNotifPref, setIsSavingNotifPref] = useState(false);
+
   const [totpSetupData, setTotpSetupData] = useState<TotpSetupResponse | null>(null);
   const [totpCode, setTotpCode] = useState("");
 
@@ -135,6 +143,17 @@ export default function SettingsPage() {
         setDisplayName(latest.displayName || "");
         setPhotoUrl(latest.photoUrl || "");
         setShippingAddress(latest.shippingAddress || "");
+
+        const userId = latest.userId || user?.userId;
+        if (userId) {
+          try {
+            const notifPrefs = await getNotificationPreferences(userId);
+            setEmailEnabled(notifPrefs.emailEnabled);
+            setPushEnabled(notifPrefs.pushEnabled);
+          } catch (notifError) {
+            console.error("Failed to load notification preferences:", notifError);
+          }
+        }
       } catch (loadError) {
         if (isMounted) {
           setError(getErrorMessage(loadError));
@@ -177,6 +196,31 @@ export default function SettingsPage() {
       setError(getErrorMessage(saveError));
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleSaveNotificationPreferences = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const userId = profile?.userId || user?.userId;
+    if (!userId) {
+      setError("User ID not found. Please log in again.");
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    setIsSavingNotifPref(true);
+
+    try {
+      await updateNotificationPreferences(userId, {
+        emailEnabled,
+        pushEnabled,
+      });
+      setSuccess("Notification preferences updated successfully.");
+    } catch (saveError) {
+      setError(getErrorMessage(saveError));
+    } finally {
+      setIsSavingNotifPref(false);
     }
   };
 
@@ -482,6 +526,50 @@ export default function SettingsPage() {
                 </div>
               )}
             </section>
+
+            <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Notifications</p>
+              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight mt-2 mb-5">Notification Preferences</h2>
+
+              <form onSubmit={handleSaveNotificationPreferences} className="grid gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                      id="emailEnabled"
+                      type="checkbox"
+                      checked={emailEnabled}
+                      onChange={(event) => setEmailEnabled(event.target.checked)}
+                      className="w-5 h-5 accent-black cursor-pointer"
+                  />
+                  <label htmlFor="emailEnabled" className="font-bold text-sm text-black cursor-pointer">
+                    Enable Email Notifications
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                      id="pushEnabled"
+                      type="checkbox"
+                      checked={pushEnabled}
+                      onChange={(event) => setPushEnabled(event.target.checked)}
+                      className="w-5 h-5 accent-black cursor-pointer"
+                  />
+                  <label htmlFor="pushEnabled" className="font-bold text-sm text-black cursor-pointer">
+                    Enable Real-time Push Notifications (WebSockets)
+                  </label>
+                </div>
+
+                <div className="flex justify-end mt-2">
+                  <button
+                      type="submit"
+                      disabled={isSavingNotifPref}
+                      className="btn btn-black text-xs font-bold uppercase tracking-wide"
+                  >
+                    {isSavingNotifPref ? "Saving..." : "Save Preferences"}
+                  </button>
+                </div>
+              </form>
+            </section>
+
           </div>
         )}
       </div>

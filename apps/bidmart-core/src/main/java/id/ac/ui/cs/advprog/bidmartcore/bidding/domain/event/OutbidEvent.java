@@ -15,4 +15,5 @@ public class OutbidEvent {
     private final BigDecimal previousBidAmount;
     private final BigDecimal newAmount;
     private final LocalDateTime timestamp;
+    private final BigDecimal heldAmount;
 }

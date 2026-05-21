@@ -23,12 +23,16 @@ public interface ConcurrencyPort {
 
     void refreshAuction(UUID listingId, ListingInfo info);
 
+    ListingPort.ListingInfo getListingInfoFromCache(UUID listingId);
+
     void removeAuction(UUID listingId);
 
     long getAuctionEndTime(UUID listingId);
 
     record LiveAuctionState(long priceRupiah, String winnerId) {}
     LiveAuctionState getAuctionLiveState(UUID listingId);
+
+    long incrementAndGetBidCount(UUID listingId);
 
     void addToExpirySet(UUID listingId, long endTimeEpochMillis);
     void removeFromExpirySet(UUID listingId);
