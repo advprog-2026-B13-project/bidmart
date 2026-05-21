@@ -33,6 +33,5 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("cucumber.junit-platform.naming-strategy", "long")
-    maxHeapSize = "256m"
-    jvmArgs("-XX:MaxMetaspaceSize=128m")
+    maxHeapSize = "512m"
 }
