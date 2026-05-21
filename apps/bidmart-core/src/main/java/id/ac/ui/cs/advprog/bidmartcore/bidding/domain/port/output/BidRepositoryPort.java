@@ -12,6 +12,8 @@ public interface BidRepositoryPort {
     List<Bid> findByListing(UUID listingId);
     List<Bid> findByBidder(UUID bidderId);
 
+    int countByListing(UUID listingId);
+
     List<Bid> findByListingAndBidder(UUID listingId, UUID bidderId);
     Optional<Bid> findTopBid(UUID listingId);
     Optional<Bid> findTopByListingAndBidder(UUID listingId, UUID bidderId);

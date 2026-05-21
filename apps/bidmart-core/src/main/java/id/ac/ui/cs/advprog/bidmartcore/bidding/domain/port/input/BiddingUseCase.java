@@ -23,6 +23,8 @@ public interface BiddingUseCase {
                         UUID listingId,
                         UUID bidderId,
                         BigDecimal amount,
+                        BigDecimal maxAmount,
+                        String source,
                         String status,
                         LocalDateTime createdAt) {
         }

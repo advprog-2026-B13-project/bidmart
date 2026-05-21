@@ -117,6 +117,7 @@ function ShareButton() {
 function ImageGallery({ images, title }: { images: string[]; title: string }) {
   const [active, setActive] = useState(0);
   const touchStartX = useRef(0);
+  const validImages = images.filter((image) => typeof image === "string" && image.trim().length > 0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -125,10 +126,20 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
   const handleTouchEnd = (e: React.TouchEvent) => {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && active < images.length - 1) setActive(active + 1);
+      if (diff > 0 && active < validImages.length - 1) setActive(active + 1);
       else if (diff < 0 && active > 0) setActive(active - 1);
     }
   };
+
+  if (validImages.length === 0) {
+    return (
+      <div className="border-3 border-black bg-gray-100 shadow-[8px_8px_0_#0A0A0A]">
+        <div className="aspect-4/3 flex items-center justify-center text-xs font-black text-gray-400">
+          NO IMAGE AVAILABLE
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -140,14 +151,14 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
       >
         <div className="aspect-4/3 bg-gray-100">
           <img
-            src={images[active]}
+            src={validImages[active]}
             alt={`${title} - Image ${active + 1}`}
             className="w-full h-full object-cover"
           />
         </div>
 
         {/* Navigation Arrows */}
-        {images.length > 1 && (
+        {validImages.length > 1 && (
           <>
             <button
               onClick={() => setActive(prev => prev > 0 ? prev - 1 : prev)}
@@ -157,9 +168,9 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
               <ChevronLeft className="w-6 h-6" />
             </button>
             <button
-              onClick={() => setActive(prev => prev < images.length - 1 ? prev + 1 : prev)}
+              onClick={() => setActive(prev => prev < validImages.length - 1 ? prev + 1 : prev)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-black shadow-[3px_3px_0_#0A0A0A] flex items-center justify-center hover:bg-acid transition-colors disabled:opacity-30"
-              disabled={active === images.length - 1}
+              disabled={active === validImages.length - 1}
             >
               <ChevronRight className="w-6 h-6" />
             </button>
@@ -168,14 +179,14 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
 
         {/* Status Badge */}
         <div className="absolute top-4 left-4">
-          <span className="badge badge-electric">IMAGE {active + 1} / {images.length}</span>
+          <span className="badge badge-electric">IMAGE {active + 1} / {validImages.length}</span>
         </div>
       </div>
 
       {/* Thumbnails */}
-      {images.length > 1 && (
+      {validImages.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {images.map((img, i) => (
+          {validImages.map((img, i) => (
             <button
               key={i}
               onClick={() => setActive(i)}
@@ -192,7 +203,11 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-function BidHistory({ bids }: { bids: BidResult[] }) {
+const HISTORY_PAGE_SIZE = 5;
+
+function BidHistory({ bids, currentUserId }: { bids: BidResult[]; currentUserId?: string }) {
+  const [showAll, setShowAll] = useState(false);
+
   if (bids.length === 0) {
     return (
       <div className="text-center py-12 border-2 border-dashed border-gray-300">
@@ -201,345 +216,305 @@ function BidHistory({ bids }: { bids: BidResult[] }) {
     );
   }
 
+  const visible = showAll ? bids : bids.slice(0, HISTORY_PAGE_SIZE);
+  const hiddenCount = bids.length - HISTORY_PAGE_SIZE;
+
   return (
-    <div className="space-y-0">
-      {bids.map((bid, index) => (
-        <div
-          key={bid.bidId}
-          className={`flex items-center justify-between py-4 ${
-            index === 0 ? "bg-acid/10 border-b-3 border-black" : "border-b border-gray-200"
-          }`}
-        >
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <img
-                src="https://i.pravatar.cc/150?u=bidder"
-                alt="Bidder"
-                className="w-12 h-12 rounded-full object-cover border-2 border-black"
-              />
-              {index === 0 && (
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-electric text-white text-[10px] font-black flex items-center justify-center">
-                  1
+    <div>
+      <div className="space-y-0">
+        {visible.map((bid, index) => {
+          const isMe = currentUserId && bid.bidderId === currentUserId;
+          const isLeader = index === 0;
+          return (
+            <div
+              key={bid.bidId}
+              className={`flex items-center justify-between py-4 ${
+                isLeader ? "bg-acid/10 border-b-3 border-black" : "border-b border-gray-200"
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={`https://api.dicebear.com/9.x/open-peeps/svg?seed=${bid.bidderId}`}
+                    alt="Bidder"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-black bg-gray-100"
+                  />
+                  {isLeader && (
+                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-electric text-white text-[9px] font-black flex items-center justify-center">
+                      1
+                    </div>
+                  )}
                 </div>
-              )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className={`font-black text-sm uppercase tracking-tight ${isLeader ? "text-black" : "text-gray-600"}`}>
+                      {isMe ? "You" : `Bidder ${bid.bidderId.slice(0, 6)}`}
+                    </p>
+                    {isMe && (
+                      <span className="text-[9px] font-black bg-electric text-white px-1.5 py-0.5 uppercase tracking-wide">
+                        YOU
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 font-medium">
+                    {new Date(bid.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-black text-xl ${isLeader ? "text-electric" : "text-black"}`}>
+                  {formatCurrency(bid.amount)}
+                </p>
+                {isLeader && <span className="text-[10px] font-black text-electric uppercase">Highest</span>}
+              </div>
             </div>
-            <div>
-              <p className={`font-black text-sm uppercase tracking-tight ${index === 0 ? "text-black" : "text-gray-600"}`}>
-                Bidder {bid.bidderId.slice(0, 8)}
-              </p>
-              <p className="text-xs text-gray-400 font-medium">
-                {new Date(bid.createdAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className={`font-black text-xl ${index === 0 ? "text-electric" : "text-black"}`}>
-              {formatCurrency(bid.amount)}
-            </p>
-            {index === 0 && <span className="text-[10px] font-black text-electric uppercase">Highest</span>}
-          </div>
-        </div>
-      ))}
+          );
+        })}
+      </div>
+
+      {bids.length > HISTORY_PAGE_SIZE && (
+        <button
+          onClick={() => setShowAll(v => !v)}
+          className="mt-4 w-full py-2 text-xs font-black uppercase tracking-wide border-2 border-black hover:border-electric hover:text-electric transition-colors"
+        >
+          {showAll ? "Show less" : `Show ${hiddenCount} more bid${hiddenCount !== 1 ? "s" : ""}`}
+        </button>
+      )}
     </div>
   );
 }
 
-function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[] }) {
-  const initialBid = listing.currentPrice + listing.minBidIncrement;
-  const [bidAmount, setBidAmount] = useState(initialBid);
+function BidPanel({ listing, bids, onBidPlaced }: { listing: ParsedListing; bids: BidResult[]; onBidPlaced: (result: BidResult) => void }) {
+  const minBid = listing.currentPrice + listing.minBidIncrement;
+  const [bidAmount, setBidAmount] = useState(minBid);
+  const [bidType, setBidType] = useState<"MANUAL" | "PROXY">("MANUAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
   const { showToast } = useToast();
-  const { isAuthenticated, isHydrating } = useAuth();
+  const { isAuthenticated, isHydrating, user } = useAuth();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
-  const [walletError, setWalletError] = useState("");
   const [isWalletLoading, setIsWalletLoading] = useState(false);
 
   const now = new Date();
   const hasStarted = now.getTime() >= listing.startTime.getTime();
   const canBid = hasStarted && isAuthenticated;
 
-  const minBid = listing.currentPrice + listing.minBidIncrement;
-  const suggestedBids = [
-    minBid,
-    minBid + listing.minBidIncrement,
-    minBid + listing.minBidIncrement * 2,
-    minBid + listing.minBidIncrement * 5,
-  ];
-
-  const remainingAfterBid = wallet
-    ? wallet.availableBalance - bidAmount
+  // Find user's active proxy bid — the one that's ACCEPTED with source PROXY
+  const userProxyBid = user
+    ? bids.find((bid) => bid.bidderId === user.userId && bid.source === "PROXY" && bid.status === "ACCEPTED") ?? null
     : null;
+  const userProxyMax = userProxyBid?.maxAmount ?? null;
 
   const loadWallet = async () => {
     setIsWalletLoading(true);
-    setWalletError("");
-
     try {
-      const walletResponse = await getMyWallet();
-      setWallet(walletResponse);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
-      setWalletError(message);
+      setWallet(await getMyWallet());
+    } catch {
+      // silently fail — wallet is a convenience display
     } finally {
       setIsWalletLoading(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
-
-    if (isHydrating || !isAuthenticated) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    setIsWalletLoading(true);
-    setWalletError("");
-
-    getMyWallet()
-      .then((walletResponse) => {
-        if (isMounted) {
-          setWallet(walletResponse);
-        }
-      })
-      .catch((loadError) => {
-        if (isMounted) {
-          const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
-          setWalletError(message);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsWalletLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    if (isHydrating || !isAuthenticated) return;
+    loadWallet();
   }, [isAuthenticated, isHydrating]);
 
+  // Keep minBid in sync when listing.currentPrice changes via SSE
+  useEffect(() => {
+    setBidAmount(prev => {
+      const newMin = listing.currentPrice + listing.minBidIncrement;
+      return prev < newMin ? newMin : prev;
+    });
+  }, [listing.currentPrice, listing.minBidIncrement]);
+
+  const validate = (): string | null => {
+    if (bidAmount < minBid) return `Minimum bid is ${formatCurrency(minBid)}`;
+    if (wallet && bidAmount > wallet.availableBalance) return "Insufficient balance. Top up first.";
+    if (bidType === "PROXY" && userProxyMax !== null && bidAmount < userProxyMax)
+      return `Your proxy max is already ${formatCurrency(userProxyMax)}. Enter a higher amount to raise it, or use Manual bid.`;
+    return null;
+  };
+
   const handleBid = async () => {
-    if (!isAuthenticated) {
-      setError("Please sign in to place a bid.");
-      showToast("Please sign in to place a bid.", "error");
-      return;
-    }
-
-    if (bidAmount < minBid) {
-      setError(`Minimum bid is ${formatCurrency(minBid)}`);
-      return;
-    }
-
-    if (wallet && bidAmount > wallet.availableBalance) {
-      setError("Saldo tidak mencukupi. Top up terlebih dahulu.");
-      showToast("Saldo tidak mencukupi. Top up terlebih dahulu.", "error");
-      return;
-    }
+    if (!isAuthenticated) { showToast("Sign in to place a bid.", "error"); return; }
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
 
     setIsSubmitting(true);
     setError("");
 
     try {
-      await placeBid({ listingId: listing.id, amount: bidAmount, bidType: "MANUAL" });
+      const result = await placeBid({ listingId: listing.id, amount: bidAmount, bidType });
       setIsSubmitting(false);
-      setShowSuccess(true);
-      showToast(`Bid of ${formatCurrency(bidAmount)} placed successfully!`, "success");
       await loadWallet();
-      setTimeout(() => setShowSuccess(false), 3000);
+      onBidPlaced(result);
+
+      if (result.status === "ACCEPTED") {
+        setShowSuccess(true);
+        showToast(`You're the highest bidder at ${formatCurrency(result.amount)}!`, "success");
+        setTimeout(() => setShowSuccess(false), 3000);
+      } else if (result.status === "OUTBID") {
+        showToast("Your bid was placed, but outbid by an existing proxy bid.", "info");
+      } else {
+        setShowSuccess(true);
+        showToast(`Bid of ${formatCurrency(bidAmount)} placed!`, "success");
+        setTimeout(() => setShowSuccess(false), 3000);
+      }
     } catch (err) {
       setIsSubmitting(false);
-      setError(err instanceof Error ? err.message : "Bid failed");
-      showToast(err instanceof Error ? err.message : "Bid failed", "error");
+      const msg = err instanceof Error ? err.message : "Bid failed";
+      setError(msg);
+      showToast(msg, "error");
     }
   };
 
+  const suggestedBids = [minBid, minBid + listing.minBidIncrement, minBid + listing.minBidIncrement * 3];
+
   return (
-    <div className="border-3 border-black bg-white shadow-[8px_8px_0_#0A0A0A] p-6 sticky top-24">
-      {/* Current Bid */}
-      <div className="mb-5">
-        <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Current Bid</p>
-        <div className="flex items-baseline gap-3">
-          <span className="text-5xl font-black text-black">
-            {formatCurrency(listing.currentPrice)}
-          </span>
-          <span className="text-gray-500 font-bold uppercase text-sm">{listing.bidCount} bids</span>
-        </div>
-        {listing.reservePrice && (
-          <p className="text-sm font-bold mt-2">
-            {listing.currentPrice >= listing.reservePrice ? (
-              <span className="text-electric">✓ Reserve met</span>
-            ) : (
-              <span className="text-gray-500">Reserve not yet met</span>
-            )}
-          </p>
-        )}
-      </div>
-
-      {/* Time */}
-      <div className="bg-gray-100 border-2 border-black p-5 mb-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
-              {hasStarted ? "Time Remaining" : "Starting In"}
+    <div className="border-3 border-black bg-white shadow-[8px_8px_0_#0A0A0A]">
+      {/* Price + time strip */}
+      <div className="flex items-stretch border-b-3 border-black">
+        <div className="flex-1 p-4 border-r-2 border-black">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Current Bid</p>
+          <p className="text-3xl font-black text-black leading-none">{formatCurrency(listing.currentPrice)}</p>
+          <p className="text-xs font-bold text-gray-400 mt-1">{listing.bidCount} bids</p>
+          {listing.reservePrice && (
+            <p className="text-[10px] font-bold mt-1">
+              {listing.currentPrice >= listing.reservePrice
+                ? <span className="text-electric">✓ Reserve met</span>
+                : <span className="text-gray-400">Reserve not met</span>}
             </p>
-            {hasStarted ? (
-              <CountdownTimer endTime={listing.endTime} />
-            ) : (
-              <StartCountdown startTime={listing.startTime} />
-            )}
-          </div>
-          <div className="text-right">
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">
-              {hasStarted ? "Ends At" : "Starts At"}
-            </p>
-            <p className="font-black text-black">
-              {hasStarted ? formatEndsAt(listing.endTime).timeStr : formatStartsAt(listing.startTime).timeStr}
-            </p>
-            <p className="text-xs font-black text-gray-500">
-              {hasStarted ? formatEndsAt(listing.endTime).dateLabel : formatStartsAt(listing.startTime).dateLabel}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Wallet */}
-      <div className="bg-white border-2 border-black p-4 mb-5">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Wallet</p>
-          {isAuthenticated && !isWalletLoading && (
-            <button
-              type="button"
-              onClick={loadWallet}
-              className="text-[10px] font-black uppercase text-electric"
-            >
-              Refresh
-            </button>
           )}
         </div>
-
-        {!isAuthenticated ? (
-          <p className="text-sm font-bold text-gray-600 mt-3">
-            Sign in to view your balance and place bids.
+        <div className="flex-1 p-4 bg-gray-50">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+            {hasStarted ? "Time Left" : "Starts In"}
           </p>
-        ) : isWalletLoading ? (
-          <p className="text-sm font-bold text-gray-600 mt-3">Loading wallet...</p>
-        ) : walletError ? (
-          <p className="text-sm font-bold text-hot mt-3">{walletError}</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between text-sm font-bold">
-              <span className="text-[10px] font-black uppercase text-gray-500">Available</span>
-              <span>{formatCurrency(wallet?.availableBalance ?? 0)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm font-bold">
-              <span className="text-[10px] font-black uppercase text-gray-500">Held</span>
-              <span>{formatCurrency(wallet?.heldBalance ?? 0)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm font-bold">
-              <span className="text-[10px] font-black uppercase text-gray-500">After Bid</span>
-              <span className={remainingAfterBid !== null && remainingAfterBid < 0 ? "text-hot" : "text-black"}>
-                {remainingAfterBid === null
-                  ? formatCurrency(0)
-                  : formatCurrency(Math.max(remainingAfterBid, 0))}
-              </span>
-            </div>
-            {remainingAfterBid !== null && remainingAfterBid < 0 && (
-              <p className="text-xs font-bold text-hot">Insufficient available balance. Top up first.</p>
+          {hasStarted ? <CountdownTimer endTime={listing.endTime} /> : <StartCountdown startTime={listing.startTime} />}
+          <p className="text-[10px] font-black text-gray-400 mt-1">
+            {hasStarted ? formatEndsAt(listing.endTime).dateLabel : formatStartsAt(listing.startTime).dateLabel}
+            {" · "}
+            {hasStarted ? formatEndsAt(listing.endTime).timeStr : formatStartsAt(listing.startTime).timeStr}
+          </p>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Wallet balance (compact) */}
+        {isAuthenticated && (
+          <div className="border border-gray-200 px-3 py-2 text-xs font-bold">
+            {isWalletLoading ? (
+              <span className="text-gray-400">Loading wallet...</span>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-4">
+                  <span className="text-gray-500">
+                    Available: <span className="text-black">{formatCurrency(wallet?.availableBalance ?? 0)}</span>
+                  </span>
+                  {(wallet?.heldBalance ?? 0) > 0 && (
+                    <span className="text-gray-400">
+                      Held: {formatCurrency(wallet?.heldBalance ?? 0)}
+                    </span>
+                  )}
+                </div>
+                <Link href="/profile" className="text-electric underline uppercase tracking-wide shrink-0">
+                  Top Up
+                </Link>
+              </div>
             )}
-            <Link href="/profile" className="text-xs font-black uppercase text-electric">
-              Top up in profile
-            </Link>
           </div>
         )}
-      </div>
 
-      {/* Anti-snipe */}
-      <div className="bg-electric/10 border-2 border-electric p-4 mb-5">
-        <div className="flex items-start gap-3">
-          <Info className="w-5 h-5 text-electric shrink-0 mt-0.5" />
-          <p className="text-xs font-bold text-black leading-relaxed">
-            <strong>ANTI-SNIPE:</strong> Bid in the last 2 min? Auction extends 2 more minutes.
+        {/* Proxy max display */}
+        {isAuthenticated && userProxyMax !== null && (
+          <div className="flex items-center justify-between bg-acid/10 border-2 border-black px-3 py-2 text-xs font-black">
+            <span className="uppercase tracking-wide text-gray-600">Your Proxy Max</span>
+            <span className="text-black">{formatCurrency(userProxyMax)}</span>
+          </div>
+        )}
+
+        {/* Bid type */}
+        <div className="grid grid-cols-2 gap-2">
+          {(["MANUAL", "PROXY"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setBidType(type)}
+              className={`py-2 text-xs font-black uppercase tracking-wide border-2 transition-colors ${
+                bidType === type ? "border-electric bg-electric text-white" : "border-black hover:border-electric hover:text-electric"
+              }`}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        {bidType === "PROXY" && (
+          <p className="text-[10px] text-gray-500 font-bold -mt-1">
+            {userProxyMax !== null
+              ? `Current max: ${formatCurrency(userProxyMax)}. Enter higher to raise.`
+              : "Auto-bids up to your max. Max is irreversible."}
           </p>
-        </div>
-      </div>
-
-      {/* Bid Input */}
-      <div className="mb-4">
-        <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">
-          Your Bid (min. {formatCurrency(minBid)})
-        </label>
-        <div className="relative">
-          <div className="flex gap-2 justify-center items-center">
-            <span className="text-xl font-black text-black">Rp</span>
-          <input
-            type="number"
-            value={bidAmount}
-            onChange={(e) => setBidAmount(Number(e.target.value))}
-            className="input pl-48 pr-12 text-2xl font-black"
-            min={minBid}
-            step={listing.minBidIncrement}
-          />
-          </div>
-        </div>
-        {error && <p className="text-hot text-sm font-bold mt-2">{error}</p>}
-      </div>
-
-      {/* Quick Select */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {suggestedBids.map((amount) => (
-          <button
-            key={amount}
-            onClick={() => setBidAmount(amount)}
-            className={`px-3 py-2 text-sm font-black border-2 transition-colors ${
-              bidAmount === amount
-                ? "border-electric bg-electric text-white"
-                : "border-black hover:border-electric hover:text-electric"
-            }`}
-          >
-            {formatCurrency(amount)}
-          </button>
-        ))}
-      </div>
-
-      {/* Submit */}
-      <button
-        onClick={handleBid}
-        disabled={isSubmitting || !canBid}
-        className={`btn w-full text-base py-5 font-black uppercase tracking-wide ${
-          showSuccess ? "bg-electric text-white border-electric" : "btn-black"
-        }`}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Processing...
-          </>
-        ) : showSuccess ? (
-          <>
-            <Check className="w-5 h-5" />
-            BID PLACED!
-          </>
-        ) : (
-          <>
-            <Send className="w-5 h-5" />
-            Place Bid — {formatCurrency(bidAmount)}
-          </>
         )}
-      </button>
 
-      {!canBid && (
-        <p className="text-xs text-center text-gray-500 mt-3 font-bold uppercase tracking-wide">
-          {hasStarted ? "Sign in to place a bid" : "Auction has not started yet"}
-        </p>
-      )}
+        {/* Amount input */}
+        <div>
+          <div className="flex items-center border-2 border-black focus-within:border-electric transition-colors">
+            <span className="px-3 font-black text-gray-500 text-sm border-r-2 border-black">Rp</span>
+            <input
+              type="number"
+              value={bidAmount}
+              onChange={(e) => { setBidAmount(Number(e.target.value)); setError(""); }}
+              className="flex-1 px-3 py-3 text-xl font-black outline-none bg-transparent"
+              min={minBid}
+              step={listing.minBidIncrement}
+            />
+          </div>
+          {error && <p className="text-hot text-xs font-bold mt-1">{error}</p>}
+        </div>
 
-      <p className="text-xs text-center text-gray-400 mt-4 font-medium">
-        By bidding, you agree to our <Link href="/terms" className="underline font-bold hover:text-black">Terms</Link>
-      </p>
+        {/* Quick amounts */}
+        <div className="flex gap-2">
+          {suggestedBids.map((amount) => (
+            <button
+              key={amount}
+              onClick={() => { setBidAmount(amount); setError(""); }}
+              className={`flex-1 py-1.5 text-xs font-black border-2 transition-colors ${
+                bidAmount === amount ? "border-electric bg-electric text-white" : "border-black hover:border-electric hover:text-electric"
+              }`}
+            >
+              {formatCurrency(amount)}
+            </button>
+          ))}
+        </div>
+
+        {/* Submit */}
+        <button
+          onClick={handleBid}
+          disabled={isSubmitting || !canBid}
+          className={`btn w-full py-4 font-black uppercase tracking-wide ${
+            showSuccess ? "bg-electric text-white border-electric" : "btn-black"
+          }`}
+        >
+          {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+          : showSuccess ? <><Check className="w-4 h-4" /> Bid Placed!</>
+          : <><Send className="w-4 h-4" /> {formatCurrency(bidAmount)}</>}
+        </button>
+
+        {!canBid && (
+          <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-wide">
+            {hasStarted ? "Sign in to place a bid" : "Auction has not started yet"}
+          </p>
+        )}
+
+        {/* Anti-snipe + terms */}
+        <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold">
+          <Info className="w-3 h-3 shrink-0 text-electric" />
+          <span>Last 2 min bid extends auction 2 min · <Link href="/terms" className="underline">Terms</Link></span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -568,6 +543,9 @@ function RelatedListings({ categoryId, categoryName, currentId }: { categoryId: 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {related.map((listing, i) => {
           const urgency = getTimeUrgency(listing.endTime);
+          const imageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+            ? listing.imageUrl
+            : null;
           return (
             <Link
               key={listing.id}
@@ -576,11 +554,17 @@ function RelatedListings({ categoryId, categoryName, currentId }: { categoryId: 
               style={{ animationDelay: `${i * 0.08}s`, animationFillMode: "both" }}
             >
               <div className="relative aspect-4/3 overflow-hidden bg-gray-100">
-                <img
-                  src={listing.imageUrl}
-                  alt={listing.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={listing.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+                    NO IMG
+                  </div>
+                )}
                 <div className="absolute top-3 left-3">
                   <span className="badge badge-black">{listing.category}</span>
                 </div>
@@ -607,8 +591,18 @@ function RelatedListings({ categoryId, categoryName, currentId }: { categoryId: 
 export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [listing, setListing] = useState<ParsedListing | null>(null);
   const [bids, setBids] = useState<BidResult[]>([]);
+  const [listingId, setListingId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated, isHydrating } = useAuth();
+  const { isAuthenticated, isHydrating, user } = useAuth();
+
+  const onBidPlaced = (result: BidResult) => {
+    if (result.status === "ACCEPTED") {
+      setListing(prev => prev ? { ...prev, currentPrice: result.amount } : prev);
+    }
+    if (listingId) {
+      getBidsForListing(listingId).then(setBids).catch(() => {});
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -628,6 +622,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
         if (!isMounted) {
           return;
         }
+        setListingId(id);
         setListing(listingData);
         setBids(bidsData);
       } catch {
@@ -640,6 +635,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             if (!isMounted) {
               return;
             }
+            setListingId(id);
             setListing(listingData);
             setBids(bidsData);
           } catch {
@@ -662,17 +658,16 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [params, isAuthenticated, isHydrating]);
 
-  // SSE stream for real-time updates
+  // SSE stream for real-time updates — driven off listingId (already resolved string)
   useEffect(() => {
-    let es: EventSource | null = null;
-    let listingId: string | null = null;
+    if (!listingId || isHydrating) return;
 
-    params.then(({ id }) => {
-      if (isHydrating) {
-        return;
-      }
-      listingId = id;
-      es = new EventSource(`/api/auctions/${id}/stream`);
+    let es: EventSource | null = null;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) return;
+      es = new EventSource(`/api/auctions/${listingId}/stream`);
 
       es.addEventListener("message", (e) => {
         try {
@@ -683,6 +678,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               currentPrice: data.currentPrice,
               bidCount: data.bidCount,
             } : prev);
+            getBidsForListing(listingId).then(setBids).catch(() => {});
           } else if (data.type === "auction-ended") {
             setListing(prev => prev ? {
               ...prev,
@@ -694,19 +690,17 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
       es.onerror = () => {
         es?.close();
-        // Reconnect after 3 seconds
-        setTimeout(() => {
-          if (listingId) {
-            es = new EventSource(`/api/auctions/${listingId}/stream`);
-          }
-        }, 3000);
+        if (!cancelled) setTimeout(connect, 3000);
       };
-    });
+    };
+
+    connect();
 
     return () => {
+      cancelled = true;
       es?.close();
     };
-  }, [params, isHydrating]);
+  }, [listingId, isHydrating]);
 
   if (loading) {
     return (
@@ -726,11 +720,16 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   }
 
   // Generate mock gallery images (just repeat the same image for demo)
-  const galleryImages = [
-    listing.imageUrl,
-    listing.imageUrl.replace("w=800", "w=801"),
-    listing.imageUrl.replace("w=800", "w=802"),
-  ];
+  const baseImageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+    ? listing.imageUrl
+    : null;
+  const galleryImages = baseImageUrl
+    ? [
+        baseImageUrl,
+        baseImageUrl.replace("w=800", "w=801"),
+        baseImageUrl.replace("w=800", "w=802"),
+      ]
+    : [];
 
   return (
     <div className="bg-white">
@@ -798,7 +797,14 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <h2 className="text-2xl font-black text-black mb-6 uppercase tracking-tight">
                 Bid History
               </h2>
-              <BidHistory bids={bids} />
+              <BidHistory
+                currentUserId={user?.userId}
+                bids={[...bids].sort((a, b) => {
+                  if (a.status === "ACCEPTED" && b.status !== "ACCEPTED") return -1;
+                  if (b.status === "ACCEPTED" && a.status !== "ACCEPTED") return 1;
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                })}
+              />
             </div>
 
             {/* Related Listings */}
@@ -808,7 +814,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           {/* Right Column - Bid Panel */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-24">
-              <BidPanel listing={listing} bids={bids} />
+              <BidPanel listing={listing} bids={bids} onBidPlaced={onBidPlaced} />
             </div>
           </div>
 

@@ -71,9 +71,11 @@ services:
       - bidmart-network
 
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     container_name: bidmart-watchtower
     restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.41"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/kevincornelius1905/.docker/config.json:/config.json:ro
