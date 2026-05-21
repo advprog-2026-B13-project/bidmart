@@ -40,7 +40,7 @@ class OutbidListenerTest {
     @Test
     void onOutbid_shouldCreateNotificationForOutbidBidder() {
         OutbidEvent event = new OutbidEvent(
-                listingId, outbidBidderId, BigDecimal.valueOf(100000), BigDecimal.valueOf(110000), LocalDateTime.now()
+                listingId, outbidBidderId, BigDecimal.valueOf(100000), BigDecimal.valueOf(110000), LocalDateTime.now(), BigDecimal.valueOf(100000)
         );
 
         listener.onOutbid(event);
