@@ -6,7 +6,7 @@ export default function ContactPage() {
       <div className="mb-10">
         <div className="inline-block bg-acid border-3 border-black px-4 py-1 font-black text-xs uppercase tracking-widest mb-3">Contact</div>
         <h1 className="text-5xl font-black uppercase tracking-tight">Get in Touch</h1>
-        <p className="text-gray-500 mt-3 text-lg font-medium">Have a question, issue, or feedback? We're a small team and we actually read every message.</p>
+        <p className="text-gray-500 mt-3 text-lg font-medium">Have a question, issue, or feedback? We&apos;re a small team and we actually read every message.</p>
       </div>
 
       <div className="space-y-4 mb-10">
@@ -27,7 +27,7 @@ export default function ContactPage() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 font-medium">We respond within one business day. For urgent matters, include "URGENT" in your subject line.</p>
+      <p className="text-sm text-gray-500 font-medium">We respond within one business day. For urgent matters, include &ldquo;URGENT&rdquo; in your subject line.</p>
 
       <div className="mt-8">
         <Link href="/help" className="text-sm font-black uppercase underline hover:text-acid transition-colors">Check Help Center first →</Link>

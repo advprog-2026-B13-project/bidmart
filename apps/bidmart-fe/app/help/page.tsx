@@ -29,7 +29,7 @@ export default function HelpPage() {
 
       <div className="border-3 border-black p-6 text-center">
         <p className="font-black text-lg uppercase mb-1">Still need help?</p>
-        <p className="text-gray-500 text-sm font-medium mb-4">Reach out and we'll get back to you within one business day.</p>
+        <p className="text-gray-500 text-sm font-medium mb-4">Reach out and we&apos;ll get back to you within one business day.</p>
         <Link href="/contact" className="btn btn-black font-bold uppercase text-sm">Contact Us</Link>
       </div>
     </main>
