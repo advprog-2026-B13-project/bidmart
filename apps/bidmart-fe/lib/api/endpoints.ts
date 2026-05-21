@@ -335,3 +335,24 @@ export async function getMyListings() {
   const listings = Array.isArray(raw) ? raw : [];
   return listings.map(parseSellerListing);
 }
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+}
+
+export async function getNotificationPreferences(userId: string): Promise<NotificationPreference> {
+  return await apiFetch(`/api/notifications/preferences/${userId}`, { method: "GET" }, { auth: true });
+}
+
+export async function updateNotificationPreferences(
+    userId: string,
+    data: { emailEnabled: boolean; pushEnabled: boolean }
+): Promise<NotificationPreference> {
+  return await apiFetch(`/api/notifications/preferences/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }, { auth: true });
+}
