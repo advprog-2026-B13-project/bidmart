@@ -15,7 +15,6 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (isHydrating || !isAuthenticated || !user?.userId) return;
 
-    setLoading(true);
     getNotifications(user.userId)
       .then((data) => {
         setNotifications(data);
