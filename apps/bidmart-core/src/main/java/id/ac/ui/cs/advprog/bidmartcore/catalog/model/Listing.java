@@ -80,14 +80,9 @@ public class Listing {
     @Column(name = "winner_id")
     private UUID winnerId;
 
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "winner_id")
-    private UUID winnerId;
 
     @Column(name = "moderated_by_admin_id")
     private UUID moderatedByAdminId;

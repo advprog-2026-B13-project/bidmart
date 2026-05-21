@@ -32,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.PatchMapping;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingTakedownRequest;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 @RestController("catalogListingController")
 @RequestMapping("/api/catalog/listings")
