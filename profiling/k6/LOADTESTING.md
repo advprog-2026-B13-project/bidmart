@@ -1,5 +1,7 @@
 # BidMart Bidding — Load Testing & Profiling
 
+## For files & results, see: [Google Drive Folder](https://drive.google.com/drive/folders/1AUk5fvPy7J2pe2zIiCOx5gx2FeGdJaxF?usp=drive_link)
+
 ## Goal
 
 Prove that **PostgreSQL writes are the bottleneck** in the `placeBid` path, not the Java/Spring layer or service topology. This justifies the monolith-first architecture and motivates the async PSQL offload refactor (Redis Streams).
