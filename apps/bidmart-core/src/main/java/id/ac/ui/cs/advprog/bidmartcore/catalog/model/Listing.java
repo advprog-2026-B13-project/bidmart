@@ -86,6 +86,18 @@ public class Listing {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "winner_id")
+    private UUID winnerId;
+
+    @Column(name = "moderated_by_admin_id")
+    private UUID moderatedByAdminId;
+
+    @Column(name = "takedown_reason", columnDefinition = "TEXT")
+    private String takedownReason;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     @PrePersist
     public void prePersistSetup() {
         if (startTime != null && endTime != null && !endTime.isAfter(startTime)) {
