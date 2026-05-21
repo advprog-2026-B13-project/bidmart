@@ -189,13 +189,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public void updateCurrentPriceAndWinner(UUID listingId, BigDecimal newPrice, UUID winnerId) {
-        Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
-        listing.setCurrentPrice(newPrice);
-        listing.setWinnerId(winnerId);
-        Integer currentBids = listing.getBidCount();
-        listing.setBidCount((currentBids == null ? 0 : currentBids) + 1);
-        listingRepository.save(listing);
+        listingRepository.recordNewBid(listingId, newPrice, winnerId);
     }
 
     @Override
