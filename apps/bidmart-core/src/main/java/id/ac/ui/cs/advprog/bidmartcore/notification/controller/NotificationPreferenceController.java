@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartcore.notification.controller;
 
 import id.ac.ui.cs.advprog.bidmartcore.notification.model.NotificationPreference;
 import id.ac.ui.cs.advprog.bidmartcore.notification.service.NotificationPreferenceService;
+import id.ac.ui.cs.advprog.bidmartcore.notification.dto.NotificationPreferenceDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,10 +28,9 @@ public class NotificationPreferenceController {
     @PutMapping("/{userId}")
     public ResponseEntity<NotificationPreference> updatePreferences(
             @PathVariable UUID userId,
-            @RequestParam boolean emailEnabled,
-            @RequestParam boolean pushEnabled) {
+            @RequestBody NotificationPreferenceDTO dto) {
 
-        NotificationPreference updatedPref = service.updatePreference(userId, emailEnabled, pushEnabled);
+        NotificationPreference updatedPref = service.updatePreference(userId, dto);
         return ResponseEntity.ok(updatedPref);
     }
 }

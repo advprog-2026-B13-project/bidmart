@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { getNotifications, type NotificationItem } from "@/lib/api/endpoints";
+import { Client } from "@stomp/stompjs";
 
 export function NotificationBell() {
   const { user, isAuthenticated, isHydrating } = useAuth();
@@ -21,6 +22,40 @@ export function NotificationBell() {
       .catch(() => {});
 
     return () => { ignore.current = true; };
+  }, [isAuthenticated, user?.userId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.userId) return;
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
+
+    const client = new Client({
+      brokerURL: wsUrl,
+      reconnectDelay: 5000,
+      onConnect: () => {
+        client.subscribe(`/topic/notifications/${user.userId}`, (message) => {
+          const newNotif = JSON.parse(message.body);
+          
+          const mappedNotif: NotificationItem = {
+            id: newNotif.id,
+            userId: newNotif.userId,
+            type: newNotif.type,
+            message: newNotif.message,
+            isRead: newNotif.read !== undefined ? newNotif.read : newNotif.isRead,
+            createdAt: newNotif.createdAt,
+          };
+
+          setNotifications((prev) => [mappedNotif, ...prev]);
+        });
+      },
+    });
+
+    client.activate();
+
+    return () => {
+      client.deactivate();
+    };
   }, [isAuthenticated, user?.userId]);
 
   useEffect(() => {
@@ -87,16 +122,15 @@ export function NotificationBell() {
             )}
           </div>
 
-          {notifications.length > 5 && (
-            <div className="p-3 border-t-2 border-black">
-              <Link
-                href="/notifications"
-                className="block w-full text-center text-xs font-black uppercase text-electric hover:underline"
-              >
-                View all {notifications.length} notifications
-              </Link>
-            </div>
-          )}
+          <div className="p-3 border-t-2 border-black">
+            <Link
+              href="/notifications"
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-center text-xs font-black uppercase text-electric hover:underline"
+            >
+              View all {notifications.length} notifications
+            </Link>
+          </div>
         </div>
       )}
     </div>
