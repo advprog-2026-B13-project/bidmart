@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.PermissionValue;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -61,10 +63,13 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
-    public Listing updateListing(UUID id, UUID requesterId, ListingUpdateRequest request) {
+    public Listing updateListing(UUID id, AuthContext authContext, ListingUpdateRequest request) {
         Listing existingListing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
-        if (!existingListing.getSellerId().equals(requesterId)) {
+        boolean hasGlobalPermission = authContext != null
+                && authContext.hasPermission(PermissionValue.LISTING_UPDATE_ALL_LISTING);
+        UUID requesterId = authContext != null ? authContext.getUserId() : null;
+        if (!hasGlobalPermission && (requesterId == null || !existingListing.getSellerId().equals(requesterId))) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
         if (existingListing.getStatus() != ListingStatus.DRAFT) {
@@ -263,5 +268,26 @@ public class ListingServiceImpl implements ListingService {
         listing.setCurrentPrice(finalPrice);
         listing.setWinnerId(winnerId);
         listingRepository.save(listing);
+    }
+
+    @Override
+    public boolean canEditListing(Listing listing, AuthContext authContext) {
+        if (listing == null || authContext == null || authContext.getUserId() == null) {
+            return false;
+        }
+
+        if (authContext.hasPermission(PermissionValue.LISTING_UPDATE_ALL_LISTING)) {
+            return true;
+        }
+
+        if (listing.getStatus() != ListingStatus.DRAFT) {
+            return false;
+        }
+
+        if (listing.getBidCount() != null && listing.getBidCount() > 0) {
+            return false;
+        }
+
+        return listing.getSellerId().equals(authContext.getUserId());
     }
 }

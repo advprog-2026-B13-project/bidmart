@@ -11,6 +11,7 @@
 
     import java.math.BigDecimal;
     import java.util.List;
+    import java.util.NoSuchElementException;
     import java.util.UUID;
     import java.time.LocalDateTime;
 
@@ -30,7 +31,7 @@
         private WalletModel getOrCreateWallet(UUID userId) {
             try {
                 return walletRepository.findByUserId(userId);
-            } catch (Exception e) {
+            } catch (NoSuchElementException e) {
                 return createWallet(userId);
             }
         }

@@ -43,6 +43,11 @@ export default function Login() {
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
       setSuccessMessage("Account created. Please sign in.");
+      return;
+    }
+
+    if (searchParams.get("reset") === "true") {
+      setSuccessMessage("Password updated. Please sign in.");
     }
   }, [searchParams]);
 

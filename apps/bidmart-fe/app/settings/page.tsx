@@ -279,7 +279,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-5xl mx-auto px-4 py-10 md:py-14">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <Link href="/" className="inline-flex items-center gap-2 mb-4">
               <div className="w-9 h-9 bg-acid flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A]">
@@ -296,9 +296,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex flex-col items-start md:items-end gap-2">
-            <div className="border-2 border-black bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide">
-              {profile?.displayName || profile?.email || user?.email || "Account"}
-            </div>
+            
             <button
               type="button"
               onClick={() => router.push("/sessions")}

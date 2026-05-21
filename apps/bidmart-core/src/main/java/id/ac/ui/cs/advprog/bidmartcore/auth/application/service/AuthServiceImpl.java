@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmartcore.auth.application.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.EmailOtp;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.PasswordResetToken;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.Role;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.Session;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.SessionClientInfo;
@@ -38,6 +39,8 @@ public class AuthServiceImpl implements AuthUseCase {
     private final SessionUseCase sessionUseCase;
     private final EmailOtpRepositoryPort emailOtpRepository;
     private final EmailOtpSenderPort emailOtpSenderPort;
+    private final PasswordResetTokenRepositoryPort passwordResetTokenRepository;
+    private final PasswordResetEmailSenderPort passwordResetEmailSenderPort;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
@@ -52,8 +55,11 @@ public class AuthServiceImpl implements AuthUseCase {
     @Value("${auth.registration.verification-token-ttl-seconds:1800}")
     private long verificationTokenTtlSeconds;
 
-    @Value("${auth.registration.verification-frontend-base-url:http://localhost:3000}")
-    private String verificationFrontendBaseUrl;
+    @Value("${auth.frontend-base-url:http://localhost:3000}")
+    private String frontendBaseUrl;
+
+    @Value("${auth.password-reset.token-ttl-seconds:1800}")
+    private long passwordResetTokenTtlSeconds;
 
     @Override
     @Transactional
@@ -253,6 +259,85 @@ public class AuthServiceImpl implements AuthUseCase {
         return result;
     }
 
+    @Override
+    @Transactional
+    public void requestPasswordReset(String email) {
+        if (!StringUtils.hasText(email) || !email.contains("@")) {
+            throw new IllegalArgumentException("Invalid email address");
+        }
+
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            return;
+        }
+
+        passwordResetTokenRepository.invalidateAllByUserId(user.getId());
+
+        PasswordResetToken token = new PasswordResetToken();
+        token.setId(UUID.randomUUID());
+        token.setUser(user);
+        token.setExpiresAt(Instant.now().plusSeconds(passwordResetTokenTtlSeconds));
+        token.setUsed(false);
+        token.setCreatedAt(Instant.now());
+        passwordResetTokenRepository.save(token);
+
+        String resetUrl = buildPasswordResetUrl(token.getId().toString());
+        passwordResetEmailSenderPort.sendResetEmail(user.getEmail(), resetUrl, passwordResetTokenTtlSeconds);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean verifyPasswordResetToken(String token) {
+        if (!StringUtils.hasText(token)) {
+            return false;
+        }
+
+        UUID tokenId;
+        try {
+            tokenId = UUID.fromString(token);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findById(tokenId).orElse(null);
+        if (resetToken == null || resetToken.isUsed()) {
+            return false;
+        }
+
+        if (resetToken.getExpiresAt().isBefore(Instant.now())) {
+            return false;
+        }
+
+        User user = resetToken.getUser();
+        return user != null && user.getStatus() == UserStatus.ACTIVE;
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        if (!StringUtils.hasText(newPassword)) {
+            throw new IllegalArgumentException("New password is required");
+        }
+
+        PasswordResetToken resetToken = requireValidResetToken(token);
+        User user = resetToken.getUser();
+
+        if (user == null || user.getStatus() == UserStatus.SUSPENDED) {
+            throw new IllegalStateException("Account is suspended");
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalStateException("Email is not verified");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        passwordResetTokenRepository.invalidateAllByUserId(user.getId());
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+    }
+
     private void sendEmailVerificationOtp(User user) {
         emailOtpRepository.invalidateAllByUserId(user.getId());
 
@@ -271,16 +356,51 @@ public class AuthServiceImpl implements AuthUseCase {
     }
 
     private String buildVerificationUrl(String email, String otp) {
-        if (!StringUtils.hasText(verificationFrontendBaseUrl)) {
+        if (!StringUtils.hasText(frontendBaseUrl)) {
             return null;
         }
 
         String encodedEmail = URLEncoder.encode(email, StandardCharsets.UTF_8);
         String encodedOtp = URLEncoder.encode(otp, StandardCharsets.UTF_8);
-        String baseUrl = verificationFrontendBaseUrl.endsWith("/")
-                ? verificationFrontendBaseUrl.substring(0, verificationFrontendBaseUrl.length() - 1)
-                : verificationFrontendBaseUrl;
+        String baseUrl = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
 
         return baseUrl + "/verify-email?email=" + encodedEmail + "&otp=" + encodedOtp;
+    }
+
+    private String buildPasswordResetUrl(String token) {
+        if (!StringUtils.hasText(frontendBaseUrl)) {
+            return null;
+        }
+
+        String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
+        String baseUrl = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
+
+        return baseUrl + "/reset-password?token=" + encodedToken;
+    }
+
+    private PasswordResetToken requireValidResetToken(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+
+        UUID tokenId;
+        try {
+            tokenId = UUID.fromString(token);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findById(tokenId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reset token"));
+
+        if (resetToken.isUsed() || resetToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+
+        return resetToken;
     }
 }

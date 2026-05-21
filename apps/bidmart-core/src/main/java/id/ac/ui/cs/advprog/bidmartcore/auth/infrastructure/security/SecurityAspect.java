@@ -79,6 +79,16 @@ public class SecurityAspect {
         return joinPoint.proceed();
     }
 
+    @Around("@annotation(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.OptionalAuth) || " +
+            "@within(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.OptionalAuth)")
+    public Object populateOptionalLogin(ProceedingJoinPoint joinPoint) throws Throwable {
+        Session session = resolveSession();
+        if (session != null) {
+            populateAuthContext(session);
+        }
+        return joinPoint.proceed();
+    }
+
     private Session resolveSession() {
         String token = authCookieService.resolveAccessToken(request)
                 .orElseGet(this::extractBearerToken);

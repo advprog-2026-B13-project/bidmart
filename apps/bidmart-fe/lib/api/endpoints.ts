@@ -47,6 +47,7 @@ export interface ParsedListing {
   startTime: Date;
   endTime: Date;
   status: "active" | "ending-soon" | "ended" | "sold";
+  canEdit: boolean;
   seller: { id: string; name: string; avatar: string; rating: number };
   topBidder: { id: string; name: string } | null;
 }
@@ -117,6 +118,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     startTime: new Date(listing.startTime as string),
     endTime: new Date(listing.endTime as string),
     status: mapStatus(listing.status as string),
+    canEdit: Boolean(listing.canEdit),
     seller: {
       id: listing.sellerId as string,
       name: "Seller",

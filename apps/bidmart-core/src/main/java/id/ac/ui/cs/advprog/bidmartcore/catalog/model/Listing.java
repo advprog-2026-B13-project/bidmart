@@ -86,6 +86,9 @@ public class Listing {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Transient
+    private Boolean canEdit;
+
     @PrePersist
     public void prePersistSetup() {
         if (startTime != null && endTime != null && !endTime.isAfter(startTime)) {
