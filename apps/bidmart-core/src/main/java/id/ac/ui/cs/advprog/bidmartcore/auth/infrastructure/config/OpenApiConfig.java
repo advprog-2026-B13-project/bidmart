@@ -58,8 +58,9 @@ public class OpenApiConfig {
                         new Tag().name("Authentication").description("Register, Login, Logout, Token Refresh"),
                         new Tag().name("Session Management").description("List, revoke, and manage active sessions"),
                         new Tag().name("Profile").description("View and update user profile, account deactivation"),
-                        new Tag().name("Multi-Factor Authentication").description("Setup/manage TOTP and Email OTP 2FA")
+                        new Tag().name("Multi-Factor Authentication").description("Setup/manage TOTP and Email OTP 2FA"),
+                        new Tag().name("Payment").description("Top up and payment processing"),
+                        new Tag().name("Wallet").description("Wallet balance and transaction endpoints")
                 ));
     }
 }
-

@@ -2,7 +2,31 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { mockListings, mockBids, formatCurrency, formatTimeRemaining, getTimeUrgency, type Listing, type Bid } from "@/lib/mock-data";
+import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { getListingById, getListingByIdOwner, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
+import { getMyWallet, type WalletSummary } from "@/lib/api/wallet";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
+import { useToast } from "@/components/toast";
+import { useAuth } from "@/components/auth-provider";
+
+function formatEndsAt(endTime: Date): { dateLabel: string; timeStr: string } {
+  const date = new Date(endTime);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) return { dateLabel: "Today", timeStr };
+  if (isTomorrow) return { dateLabel: "Tomorrow", timeStr };
+  return { dateLabel: date.toLocaleDateString([], { month: "short", day: "numeric" }), timeStr };
+}
+
+function formatStartsAt(startTime: Date): { dateLabel: string; timeStr: string } {
+  return formatEndsAt(startTime);
+}
 
 function CountdownTimer({ endTime }: { endTime: Date }) {
   const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(endTime));
@@ -23,6 +47,27 @@ function CountdownTimer({ endTime }: { endTime: Date }) {
     <span className={`text-3xl md:text-4xl font-black uppercase tracking-tight ${
       urgency === "critical" ? "text-hot" : urgency === "soon" ? "text-electric" : "text-black"
     }`}>
+      {timeLeft}
+    </span>
+  );
+}
+
+function StartCountdown({ startTime }: { startTime: Date }) {
+  const [timeLeft, setTimeLeft] = useState(formatTimeRemaining(startTime));
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    (() => setMounted(true))();
+    const update = () => setTimeLeft(formatTimeRemaining(startTime));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  if (!mounted) return <span className="text-gray-400 font-bold">...</span>;
+
+  return (
+    <span className="text-3xl md:text-4xl font-black uppercase tracking-tight text-electric">
       {timeLeft}
     </span>
   );
@@ -49,16 +94,12 @@ function ShareButton() {
       >
         {copied ? (
           <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="w-4 h-4" />
             COPIED!
           </>
         ) : (
           <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
+            <Share2 className="w-4 h-4" />
             SHARE
           </>
         )}
@@ -67,9 +108,7 @@ function ShareButton() {
         onClick={handleTwitter}
         className="btn btn-sm btn-ghost font-bold uppercase"
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-        </svg>
+        <ExternalLink className="w-4 h-4" />
       </button>
     </div>
   );
@@ -115,18 +154,14 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-black shadow-[3px_3px_0_#0A0A0A] flex items-center justify-center hover:bg-acid transition-colors disabled:opacity-30"
               disabled={active === 0}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={() => setActive(prev => prev < images.length - 1 ? prev + 1 : prev)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-black shadow-[3px_3px_0_#0A0A0A] flex items-center justify-center hover:bg-acid transition-colors disabled:opacity-30"
               disabled={active === images.length - 1}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
+              <ChevronRight className="w-6 h-6" />
             </button>
           </>
         )}
@@ -157,7 +192,7 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-function BidHistory({ bids }: { bids: Bid[] }) {
+function BidHistory({ bids }: { bids: BidResult[] }) {
   if (bids.length === 0) {
     return (
       <div className="text-center py-12 border-2 border-dashed border-gray-300">
@@ -170,7 +205,7 @@ function BidHistory({ bids }: { bids: Bid[] }) {
     <div className="space-y-0">
       {bids.map((bid, index) => (
         <div
-          key={bid.id}
+          key={bid.bidId}
           className={`flex items-center justify-between py-4 ${
             index === 0 ? "bg-acid/10 border-b-3 border-black" : "border-b border-gray-200"
           }`}
@@ -178,8 +213,8 @@ function BidHistory({ bids }: { bids: Bid[] }) {
           <div className="flex items-center gap-4">
             <div className="relative">
               <img
-                src={bid.bidder.avatar}
-                alt={bid.bidder.name}
+                src="https://i.pravatar.cc/150?u=bidder"
+                alt="Bidder"
                 className="w-12 h-12 rounded-full object-cover border-2 border-black"
               />
               {index === 0 && (
@@ -190,10 +225,10 @@ function BidHistory({ bids }: { bids: Bid[] }) {
             </div>
             <div>
               <p className={`font-black text-sm uppercase tracking-tight ${index === 0 ? "text-black" : "text-gray-600"}`}>
-                {bid.bidder.name}
+                Bidder {bid.bidderId.slice(0, 8)}
               </p>
               <p className="text-xs text-gray-400 font-medium">
-                {new Date(bid.timestamp).toLocaleString()}
+                {new Date(bid.createdAt).toLocaleString()}
               </p>
             </div>
           </div>
@@ -209,34 +244,117 @@ function BidHistory({ bids }: { bids: Bid[] }) {
   );
 }
 
-function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
-  const [bidAmount, setBidAmount] = useState(listing.currentPrice + 50);
+function BidPanel({ listing, bids }: { listing: ParsedListing; bids: BidResult[] }) {
+  const initialBid = listing.currentPrice + listing.minBidIncrement;
+  const [bidAmount, setBidAmount] = useState(initialBid);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
+  const { showToast } = useToast();
+  const { isAuthenticated, isHydrating } = useAuth();
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [walletError, setWalletError] = useState("");
+  const [isWalletLoading, setIsWalletLoading] = useState(false);
 
-  const minBid = listing.currentPrice + 1;
+  const now = new Date();
+  const hasStarted = now.getTime() >= listing.startTime.getTime();
+  const canBid = hasStarted && isAuthenticated;
+
+  const minBid = listing.currentPrice + listing.minBidIncrement;
   const suggestedBids = [
-    listing.currentPrice + 50,
-    listing.currentPrice + 100,
-    listing.currentPrice + 250,
-    listing.currentPrice + 500,
+    minBid,
+    minBid + listing.minBidIncrement,
+    minBid + listing.minBidIncrement * 2,
+    minBid + listing.minBidIncrement * 5,
   ];
 
+  const remainingAfterBid = wallet
+    ? wallet.availableBalance - bidAmount
+    : null;
+
+  const loadWallet = async () => {
+    setIsWalletLoading(true);
+    setWalletError("");
+
+    try {
+      const walletResponse = await getMyWallet();
+      setWallet(walletResponse);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
+      setWalletError(message);
+    } finally {
+      setIsWalletLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (isHydrating || !isAuthenticated) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsWalletLoading(true);
+    setWalletError("");
+
+    getMyWallet()
+      .then((walletResponse) => {
+        if (isMounted) {
+          setWallet(walletResponse);
+        }
+      })
+      .catch((loadError) => {
+        if (isMounted) {
+          const message = loadError instanceof Error ? loadError.message : "Failed to load wallet";
+          setWalletError(message);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsWalletLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isHydrating]);
+
   const handleBid = async () => {
+    if (!isAuthenticated) {
+      setError("Please sign in to place a bid.");
+      showToast("Please sign in to place a bid.", "error");
+      return;
+    }
+
     if (bidAmount < minBid) {
       setError(`Minimum bid is ${formatCurrency(minBid)}`);
+      return;
+    }
+
+    if (wallet && bidAmount > wallet.availableBalance) {
+      setError("Saldo tidak mencukupi. Top up terlebih dahulu.");
+      showToast("Saldo tidak mencukupi. Top up terlebih dahulu.", "error");
       return;
     }
 
     setIsSubmitting(true);
     setError("");
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setIsSubmitting(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    try {
+      await placeBid({ listingId: listing.id, amount: bidAmount, bidType: "MANUAL" });
+      setIsSubmitting(false);
+      setShowSuccess(true);
+      showToast(`Bid of ${formatCurrency(bidAmount)} placed successfully!`, "success");
+      await loadWallet();
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      setIsSubmitting(false);
+      setError(err instanceof Error ? err.message : "Bid failed");
+      showToast(err instanceof Error ? err.message : "Bid failed", "error");
+    }
   };
 
   return (
@@ -248,7 +366,7 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
           <span className="text-5xl font-black text-black">
             {formatCurrency(listing.currentPrice)}
           </span>
-          <span className="text-gray-500 font-bold uppercase text-sm">{bids.length} bids</span>
+          <span className="text-gray-500 font-bold uppercase text-sm">{listing.bidCount} bids</span>
         </div>
         {listing.reservePrice && (
           <p className="text-sm font-bold mt-2">
@@ -265,24 +383,84 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
       <div className="bg-gray-100 border-2 border-black p-5 mb-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Time Remaining</p>
-            <CountdownTimer endTime={listing.endTime} />
+            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
+              {hasStarted ? "Time Remaining" : "Starting In"}
+            </p>
+            {hasStarted ? (
+              <CountdownTimer endTime={listing.endTime} />
+            ) : (
+              <StartCountdown startTime={listing.startTime} />
+            )}
           </div>
           <div className="text-right">
-            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Ends At</p>
+            <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">
+              {hasStarted ? "Ends At" : "Starts At"}
+            </p>
             <p className="font-black text-black">
-              {new Date(listing.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {hasStarted ? formatEndsAt(listing.endTime).timeStr : formatStartsAt(listing.startTime).timeStr}
+            </p>
+            <p className="text-xs font-black text-gray-500">
+              {hasStarted ? formatEndsAt(listing.endTime).dateLabel : formatStartsAt(listing.startTime).dateLabel}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Wallet */}
+      <div className="bg-white border-2 border-black p-4 mb-5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Wallet</p>
+          {isAuthenticated && !isWalletLoading && (
+            <button
+              type="button"
+              onClick={loadWallet}
+              className="text-[10px] font-black uppercase text-electric"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+
+        {!isAuthenticated ? (
+          <p className="text-sm font-bold text-gray-600 mt-3">
+            Sign in to view your balance and place bids.
+          </p>
+        ) : isWalletLoading ? (
+          <p className="text-sm font-bold text-gray-600 mt-3">Loading wallet...</p>
+        ) : walletError ? (
+          <p className="text-sm font-bold text-hot mt-3">{walletError}</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">Available</span>
+              <span>{formatCurrency(wallet?.availableBalance ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">Held</span>
+              <span>{formatCurrency(wallet?.heldBalance ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-bold">
+              <span className="text-[10px] font-black uppercase text-gray-500">After Bid</span>
+              <span className={remainingAfterBid !== null && remainingAfterBid < 0 ? "text-hot" : "text-black"}>
+                {remainingAfterBid === null
+                  ? formatCurrency(0)
+                  : formatCurrency(Math.max(remainingAfterBid, 0))}
+              </span>
+            </div>
+            {remainingAfterBid !== null && remainingAfterBid < 0 && (
+              <p className="text-xs font-bold text-hot">Insufficient available balance. Top up first.</p>
+            )}
+            <Link href="/profile" className="text-xs font-black uppercase text-electric">
+              Top up in profile
+            </Link>
+          </div>
+        )}
+      </div>
+
       {/* Anti-snipe */}
       <div className="bg-electric/10 border-2 border-electric p-4 mb-5">
         <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-electric shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Info className="w-5 h-5 text-electric shrink-0 mt-0.5" />
           <p className="text-xs font-bold text-black leading-relaxed">
             <strong>ANTI-SNIPE:</strong> Bid in the last 2 min? Auction extends 2 more minutes.
           </p>
@@ -295,15 +473,17 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
           Your Bid (min. {formatCurrency(minBid)})
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">$</span>
+          <div className="flex gap-2 justify-center items-center">
+            <span className="text-xl font-black text-black">Rp</span>
           <input
             type="number"
             value={bidAmount}
             onChange={(e) => setBidAmount(Number(e.target.value))}
-            className="input pl-12 text-2xl font-black"
+            className="input pl-48 pr-12 text-2xl font-black"
             min={minBid}
-            step="1"
+            step={listing.minBidIncrement}
           />
+          </div>
         </div>
         {error && <p className="text-hot text-sm font-bold mt-2">{error}</p>}
       </div>
@@ -328,35 +508,34 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
       {/* Submit */}
       <button
         onClick={handleBid}
-        disabled={isSubmitting}
+        disabled={isSubmitting || !canBid}
         className={`btn w-full text-base py-5 font-black uppercase tracking-wide ${
           showSuccess ? "bg-electric text-white border-electric" : "btn-black"
         }`}
       >
         {isSubmitting ? (
           <>
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
+            <Loader2 className="w-5 h-5 animate-spin" />
             Processing...
           </>
         ) : showSuccess ? (
           <>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="w-5 h-5" />
             BID PLACED!
           </>
         ) : (
           <>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            <Send className="w-5 h-5" />
             Place Bid — {formatCurrency(bidAmount)}
           </>
         )}
       </button>
+
+      {!canBid && (
+        <p className="text-xs text-center text-gray-500 mt-3 font-bold uppercase tracking-wide">
+          {hasStarted ? "Sign in to place a bid" : "Auction has not started yet"}
+        </p>
+      )}
 
       <p className="text-xs text-center text-gray-400 mt-4 font-medium">
         By bidding, you agree to our <Link href="/terms" className="underline font-bold hover:text-black">Terms</Link>
@@ -365,10 +544,14 @@ function BidPanel({ listing, bids }: { listing: Listing; bids: Bid[] }) {
   );
 }
 
-function RelatedListings({ category, currentId }: { category: string; currentId: string }) {
-  const related = mockListings
-    .filter(l => l.category === category && l.id !== currentId)
-    .slice(0, 4);
+function RelatedListings({ categoryId, categoryName, currentId }: { categoryId: number; categoryName: string; currentId: string }) {
+  const [related, setRelated] = useState<ParsedListing[]>([]);
+
+  useEffect(() => {
+    getListings({ categoryId, size: 4 }).then(r => {
+      setRelated(r.listings.filter(l => l.id !== currentId));
+    });
+  }, [categoryId, currentId]);
 
   if (related.length === 0) return null;
 
@@ -376,9 +559,9 @@ function RelatedListings({ category, currentId }: { category: string; currentId:
     <section className="border-t-3 border-black pt-16 mt-16">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-3xl font-black uppercase tracking-tighter">
-          More in {category}
+          More in {categoryName}
         </h2>
-        <Link href={`/categories/${category.toLowerCase()}`} className="btn btn-ghost btn-sm font-bold uppercase">
+        <Link href={`/categories/${categoryName.toLowerCase().replace(/\s+/g, '-')}`} className="btn btn-ghost btn-sm font-bold uppercase">
           View All
         </Link>
       </div>
@@ -422,18 +605,108 @@ function RelatedListings({ category, currentId }: { category: string; currentId:
 }
 
 export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [bids, setBids] = useState<Bid[]>([]);
+  const [listing, setListing] = useState<ParsedListing | null>(null);
+  const [bids, setBids] = useState<BidResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated, isHydrating } = useAuth();
 
   useEffect(() => {
-    params.then(({ id }) => {
-      const found = mockListings.find(l => l.id === id);
-      setListing(found || null);
-      setBids(mockBids[id] || []);
-      setLoading(false);
+    let isMounted = true;
+
+    params.then(async ({ id }) => {
+      if (isHydrating) {
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const [listingData, bidsData] = await Promise.all([
+          getListingById(id),
+          getBidsForListing(id),
+        ]);
+        if (!isMounted) {
+          return;
+        }
+        setListing(listingData);
+        setBids(bidsData);
+      } catch {
+        if (isAuthenticated) {
+          try {
+            const [listingData, bidsData] = await Promise.all([
+              getListingByIdOwner(id),
+              getBidsForListing(id),
+            ]);
+            if (!isMounted) {
+              return;
+            }
+            setListing(listingData);
+            setBids(bidsData);
+          } catch {
+            if (isMounted) {
+              setListing(null);
+            }
+          }
+        } else if (isMounted) {
+          setListing(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     });
-  }, [params]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params, isAuthenticated, isHydrating]);
+
+  // SSE stream for real-time updates
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let listingId: string | null = null;
+
+    params.then(({ id }) => {
+      if (isHydrating) {
+        return;
+      }
+      listingId = id;
+      es = new EventSource(`/api/auctions/${id}/stream`);
+
+      es.addEventListener("message", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === "price-change") {
+            setListing(prev => prev ? {
+              ...prev,
+              currentPrice: data.currentPrice,
+              bidCount: data.bidCount,
+            } : prev);
+          } else if (data.type === "auction-ended") {
+            setListing(prev => prev ? {
+              ...prev,
+              status: data.result === "WON" ? "sold" : "ended",
+            } : prev);
+          }
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es?.close();
+        // Reconnect after 3 seconds
+        setTimeout(() => {
+          if (listingId) {
+            es = new EventSource(`/api/auctions/${listingId}/stream`);
+          }
+        }, 3000);
+      };
+    });
+
+    return () => {
+      es?.close();
+    };
+  }, [params, isHydrating]);
 
   if (loading) {
     return (
@@ -471,8 +744,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           <Link href={`/categories/${listing.category.toLowerCase()}`} className="hover:text-black transition-colors">
             {listing.category}
           </Link>
-          <span>/</span>
-          <span className="text-black truncate max-w-50">{listing.title}</span>
         </nav>
       </div>
 
@@ -531,7 +802,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Related Listings */}
-            <RelatedListings category={listing.category} currentId={listing.id} />
+            <RelatedListings categoryId={listing.categoryId} categoryName={listing.category} currentId={listing.id} />
           </div>
 
           {/* Right Column - Bid Panel */}
@@ -556,9 +827,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="font-black text-lg text-black uppercase">{listing.seller.name}</p>
                 <div className="flex items-center gap-1">
-                  <svg className="w-4 h-4 text-electric" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                  </svg>
+                  <Star className="w-4 h-4 text-electric" />
                   <span className="font-black text-sm">{listing.seller.rating}</span>
                 </div>
               </div>

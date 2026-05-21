@@ -12,6 +12,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent.AuctionResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionTimeExtendedEvent;
@@ -30,6 +33,7 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.EventPublisher
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.WalletPort;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.output.redis.RedisAuctionEventPublisher;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.config.BiddingProperties;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +49,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
     private final WalletPort walletPort;
     private final AuctionValidator validator;
     private final BiddingProperties properties;
+    private final RedisAuctionEventPublisher auctionEventPublisher;
+    private final MeterRegistry meterRegistry;
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Jakarta");
     private static final int MAX_CACHE_RETRIES = 3;
@@ -55,40 +61,62 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     @Transactional
     public BidResult placeBid(UUID listingId, BigDecimal bidAmount, UUID bidderId, BidType bidType) {
+        Timer.Sample totalSample = Timer.start(meterRegistry);
+
+        Timer.Sample listingReadSample = Timer.start(meterRegistry);
         ListingInfo listing = listingPort.getListingInfo(listingId);
+        listingReadSample.stop(meterRegistry.timer("bidding.listing_read"));
+
+        Timer.Sample walletSample = Timer.start(meterRegistry);
         validateAndHoldFunds(listing, bidAmount, bidderId);
+        walletSample.stop(meterRegistry.timer("bidding.wallet_hold"));
 
         long bidRupiah = bidAmount.longValue();
         long minIncrementRupiah = listing.minBidIncrement().longValue();
+
+        Timer.Sample redisSample = Timer.start(meterRegistry);
         ConcurrencyResult result = runRedisWithRetry(listingId, listing, bidRupiah, minIncrementRupiah, bidderId,
                 bidType);
+        redisSample.stop(meterRegistry.timer("bidding.redis_decision"));
 
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
             walletPort.releaseFunds(bidderId, bidAmount);
+            totalSample.stop(meterRegistry.timer("bidding.place_bid", "outcome", "cache_miss"));
             throw new IllegalStateException("System unavailable, please try again.");
         }
 
         boolean stateMutated = result.status() == BidAcceptance.LEADING || result.status() == BidAcceptance.OUTBID;
 
         try {
+            Timer.Sample dbWriteSample = Timer.start(meterRegistry);
             BidProcessingOutcome outcome = switch (result.status()) {
                 case LEADING -> handleLeading(listingId, listing, bidderId, bidAmount, result);
                 case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
                 default -> handleReject(bidderId, bidAmount, result.status());
             };
+            dbWriteSample.stop(meterRegistry.timer("bidding.db_write",
+                    "outcome", result.status().name().toLowerCase()));
 
             outcome.publishActions().forEach(Runnable::run);
+
+            totalSample.stop(meterRegistry.timer("bidding.place_bid",
+                    "outcome", result.status().name().toLowerCase()));
             return outcome.bidResult();
         } catch (Exception e) {
             if (stateMutated) {
                 compensate(listingId, listing, bidderId, bidAmount, result);
             }
+            totalSample.stop(meterRegistry.timer("bidding.place_bid", "outcome", "error"));
             throw e;
         }
     }
 
     private void validateAndHoldFunds(ListingInfo listing, BigDecimal amount, UUID bidderId) {
         validator.validateStatic(listing.sellerId(), amount, bidderId);
+        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        if (listing.startTime() != null && now.isBefore(listing.startTime())) {
+            throw new IllegalStateException("Lelang belum dimulai");
+        }
 
         try {
             walletPort.holdFunds(bidderId, amount);
@@ -153,6 +181,11 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 visiblePrice,
                 now);
         publishActions.add(() -> eventPublisher.publishBidPlaced(bidPlacedEvent));
+
+        // Publish SSE event for real-time frontend updates
+        int bidCount = bidRepository.findByListing(listingId).size();
+        publishActions.add(() -> auctionEventPublisher.publishPriceChange(
+                listingId, visiblePrice, bidCount));
 
         AuctionTimeExtendedEvent extensionEvent = buildAuctionExtensionEventIfNeeded(
                 listingId,
@@ -355,26 +388,34 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     public AuctionStatusResult getAuctionStatus(UUID listingId) {
         ListingInfo listing = listingPort.getListingInfo(listingId);
-        Optional<Bid> topBid = bidRepository.findTopBid(listingId);
 
-        return new AuctionStatusResult(
-                listingId,
-                listing.currentPrice(),
-                topBid.map(Bid::getBidderId).orElse(null),
-                listing.endTime(),
-                listing.status().name());
+        BigDecimal livePrice = listing.currentPrice();
+        UUID liveWinnerId = null;
+
+        ConcurrencyPort.LiveAuctionState live = concurrencyPort.getAuctionLiveState(listingId);
+        if (live != null) {
+            livePrice = BigDecimal.valueOf(live.priceRupiah());
+            liveWinnerId = live.winnerId() != null && !live.winnerId().isBlank()
+                    ? UUID.fromString(live.winnerId()) : null;
+        } else {
+            Optional<Bid> topBid = bidRepository.findTopBid(listingId);
+            liveWinnerId = topBid.map(Bid::getBidderId).orElse(null);
+        }
+
+        return new AuctionStatusResult(listingId, livePrice, liveWinnerId,
+                listing.endTime(), listing.status().name());
     }
 
     @Override
     @Transactional
     public void closeAuction(UUID listingId) {
-        ListingInfo listing = listingPort.getListingInfo(listingId);
+        // Always clean Redis first — prevents stale expiry set entries
+        concurrencyPort.removeAuction(listingId);
 
+        ListingInfo listing = listingPort.getListingInfo(listingId);
         if (listing.status() != ListingStatus.ACTIVE) {
             return;
         }
-
-        concurrencyPort.removeAuction(listingId);
 
         Optional<Bid> topBid = bidRepository.findTopBid(listingId);
         LocalDateTime now = LocalDateTime.now();
@@ -388,6 +429,9 @@ public class BiddingServiceImpl implements BiddingUseCase {
             eventPublisher.publishAuctionClosed(new AuctionClosedEvent(
                     listingId, listing.sellerId(), winnerBid.getBidderId(),
                     winnerBid.getAmount(), AuctionResult.WON, now));
+
+            auctionEventPublisher.publishAuctionEnded(listingId, winnerBid.getBidderId(),
+                    winnerBid.getAmount(), "WON");
         } else {
             topBid.ifPresent(bid -> {
                 bid.setStatus(BidStatus.OUTBID);
@@ -397,6 +441,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
             eventPublisher.publishAuctionClosed(new AuctionClosedEvent(
                     listingId, listing.sellerId(), null,
                     null, AuctionResult.UNSOLD, now));
+
+            auctionEventPublisher.publishAuctionEnded(listingId, null, null, "UNSOLD");
         }
     }
 }

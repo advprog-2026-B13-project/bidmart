@@ -35,6 +35,10 @@ public class ListingSpecification {
         return (root, query, cb) -> cb.equal(root.get("status"), ListingStatus.ACTIVE);
     }
 
+    public static Specification<Listing> hasStatus(ListingStatus status) {
+        return (root, query, cb) -> status == null ? null : cb.equal(root.get("status"), status);
+    }
+
     public static Specification<Listing> hasTitleOrDescription(String keyword) {
         return (root, query, cb) -> keyword == null ? null :
                 cb.or(

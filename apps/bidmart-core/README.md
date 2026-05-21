@@ -1,11 +1,11 @@
 # Bidmart Core Service
 
 Core backend service built with Java and Spring Boot.
-
+ 
 ## Overview
 
 Main backend service for the Bidmart platform.
-
+ 
 **Technology Stack:**
 - Language: Java 21
 - Framework: Spring Boot 4.0.3
@@ -90,7 +90,7 @@ SPRING_PROFILES_ACTIVE=dev APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 ./grad
 ### Prod example
 ```bash
 SPRING_PROFILES_ACTIVE=prod APP_CORS_ALLOWED_ORIGINS=https://bidmart.store ./gradlew bootRun
-```
+``` 
 
 ### Prod with staging subdomains example
 ```bash

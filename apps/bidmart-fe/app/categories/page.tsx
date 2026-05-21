@@ -1,11 +1,30 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { categories } from "@/lib/mock-data";
+import { ArrowRight } from "lucide-react";
+import { getCategories, getSubCategories } from "@/lib/api/endpoints";
 
 export default function CategoriesPage() {
+  const [categories, setCategories] = useState<{ slug: string; name: string; id: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getCategories().then(cats => {
+      setCategories(cats);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
+
   const featured = categories.slice(0, 3);
-  // const rest = categories.slice(3);
 
   return (
     <div>
@@ -44,7 +63,7 @@ export default function CategoriesPage() {
               {/* Cover Image Background */}
               <div className="absolute inset-0">
                 <img
-                  src={cat.coverImage}
+                  src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
                   alt={cat.name}
                   className="w-full h-full object-cover"
                 />
@@ -59,14 +78,12 @@ export default function CategoriesPage() {
                   }`}>
                     {cat.name}
                   </h2>
-                  <p className="text-white/70 text-sm font-medium mb-4 max-w-xs">{cat.description}</p>
+                  <p className="text-white/70 text-sm font-medium mb-4 max-w-xs">Browse {cat.name} listings</p>
                   <div className="flex items-center gap-2">
                     <span className="bg-white text-black text-xs font-black px-3 py-1">
-                      {cat.count} LISTINGS
+                      EXPLORE
                     </span>
-                    <svg className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <ArrowRight className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" />
                   </div>
                 </div>
               </div>
@@ -98,7 +115,7 @@ export default function CategoriesPage() {
               >
                 <div className="relative aspect-4/3 overflow-hidden">
                   <img
-                    src={cat.coverImage}
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
                     alt={cat.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -107,7 +124,7 @@ export default function CategoriesPage() {
                     <h3 className="font-black text-lg text-white uppercase tracking-tight mb-1">
                       {cat.name}
                     </h3>
-                    <p className="text-white/70 text-xs font-medium uppercase">{cat.count} items</p>
+                    <p className="text-white/70 text-xs font-medium uppercase">Browse listings</p>
                   </div>
                 </div>
               </Link>

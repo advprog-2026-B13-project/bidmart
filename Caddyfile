@@ -1,0 +1,3 @@
+api.staging.bidmart.store {
+    reverse_proxy core:8080
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Lock } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { confirmSessionReplacement, requestEmailOtp } from "@/lib/auth/auth-api";
 import type { SessionSummaryResponse } from "@/lib/auth/types";
@@ -279,10 +280,7 @@ export default function Login() {
                 >
                   {isLoading ? (
                     <>
-                      <svg className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
+                      <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
                       Signing in...
                     </>
                   ) : (
@@ -327,9 +325,7 @@ export default function Login() {
               {/* MFA Verification */}
               <div className="mb-8 lg:mb-10 text-center">
                 <div className="w-14 h-14 lg:w-16 lg:h-16 bg-electric/10 flex items-center justify-center border-2 border-electric mx-auto mb-6">
-                  <svg className="w-7 h-7 lg:w-8 lg:h-8 text-electric" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                  <Lock className="w-7 h-7 lg:w-8 lg:h-8 text-electric" />
                 </div>
                 <h1 className="text-2xl lg:text-3xl font-black text-black mb-2 uppercase tracking-tighter">
                   VERIFY
