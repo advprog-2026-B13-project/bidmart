@@ -141,6 +141,7 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         String winner = info.winnerId() != null ? info.winnerId().toString() : "";
         long maxAmount = winner.isBlank() ? price : resolveHighestMaxAmount(listingId, price);
 
+        long bidCount = bidRepository.countByListing(listingId);
         redis.opsForHash().putAll(redisKey, Map.of(
                 "price", String.valueOf(price),
                 "endTime", String.valueOf(endTime),
@@ -153,6 +154,7 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
                 "minBidIncrement", String.valueOf(info.minBidIncrement().longValue()),
                 "startTime", String.valueOf(toEpochMillis(info.startTime()))
         ));
+        redis.opsForHash().put(redisKey, "bidCount", String.valueOf(bidCount));
 
         // Add to expiry sorted set
         addToExpirySet(listingId, endTime);
@@ -187,6 +189,12 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         return bidRepository.findTopBid(listingId)
                 .map(bid -> bid.getMaxAmount() != null ? bid.getMaxAmount().longValue() : bid.getAmount().longValue())
                 .orElse(fallbackPrice);
+    }
+
+    @Override
+    public long incrementAndGetBidCount(UUID listingId) {
+        Long count = redis.opsForHash().increment(key(listingId), "bidCount", 1L);
+        return count != null ? count : 1L;
     }
 
     @Override
