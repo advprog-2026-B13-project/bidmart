@@ -527,8 +527,8 @@ class BiddingServiceImplTest {
         ListingPort.ListingInfo futureListing = new ListingPort.ListingInfo(
                 sellerId, ListingStatus.ACTIVE,
                 BigDecimal.valueOf(1000), null, BigDecimal.valueOf(500), BigDecimal.ONE,
-                LocalDateTime.now().plusHours(1), // startTime in future
-                LocalDateTime.now().plusHours(2),
+                LocalDateTime.now(JAKARTA).plusHours(1), // startTime in future — use JAKARTA so CI (UTC) can't be ahead
+                LocalDateTime.now(JAKARTA).plusHours(2),
                 null);
         when(listingPort.getListingInfo(listingId)).thenReturn(futureListing);
 
