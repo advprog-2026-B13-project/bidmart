@@ -26,6 +26,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> getOrdersBySellerId(UUID sellerId) {
+        return orderRepository.findBySellerId(sellerId);
+    }
+
+    @Override
     public Order updateShipmentStatus(UUID orderId, UUID sellerId, OrderStatus newStatus, String trackingNumber) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Pesanan dengan ID " + orderId + " tidak ditemukan."));

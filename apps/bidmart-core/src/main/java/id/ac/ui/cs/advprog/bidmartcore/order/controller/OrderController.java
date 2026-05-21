@@ -37,6 +37,12 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    @GetMapping("/seller/{sellerId}")
+    public ResponseEntity<List<Order>> getSellerOrders(@PathVariable UUID sellerId) {
+        List<Order> orders = orderService.getOrdersBySellerId(sellerId);
+        return ResponseEntity.ok(orders);
+    }
+
     @PutMapping("/{orderId}/shipment")
     @RequireLogin
     public ResponseEntity<Order> updateShipmentStatus(@PathVariable UUID orderId, @RequestParam OrderStatus status, @RequestParam(required = false) String trackingNumber) {
