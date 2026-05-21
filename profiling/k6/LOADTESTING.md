@@ -1,7 +1,5 @@
 # BidMart Bidding — Load Testing & Profiling
 
-## For files & results, see: [Google Drive Folder](https://drive.google.com/drive/folders/1AUk5fvPy7J2pe2zIiCOx5gx2FeGdJaxF?usp=drive_link)
-
 ## Goal
 
 Prove that **PostgreSQL writes are the bottleneck** in the `placeBid` path, not the Java/Spring layer or service topology. This justifies the monolith-first architecture and motivates the async PSQL offload refactor (Redis Streams).
@@ -217,4 +215,48 @@ bidding_place_bid_seconds_sum{outcome="leading"}     5.0019886   → avg 16.67ms
 
 `db_write` is now the sole dominant stage at **58% of total latency**, confirming it as the next optimization target. The result validates the hypothesis: PSQL I/O is the bottleneck, not the Java layer or monolith topology.
 
-**Next optimization**: move `db_write` off the request path via Redis Streams (XADD + sequential consumer). Expected improvement: ≥50% reduction in `place_bid` avg latency (from 16.67 ms to ~8 ms).
+
+---
+
+## Staging Deployment Results (2026-05-21)
+
+Both runs executed against `https://api.staging.bidmart.store` — same k6 script, same 300 iterations, 1 VU.
+
+### k6 HTTP Latency — `place_bid_latency`
+
+| Metric | Baseline (before deploy) | After deploy | Delta |
+|---|---|---|---|
+| avg | 150.08 ms | **37.16 ms** | **-75%** |
+| median | 98.94 ms | **33.71 ms** | -66% |
+| p(90) | 300.77 ms | **48.61 ms** | -84% |
+| **p(95)** | **393.26 ms** | **54.80 ms** | **-86%** |
+| max | 2398.93 ms | **392.70 ms** | -84% |
+| errors | 0 / 300 | **0 / 300** | — |
+
+> Baseline: unoptimised build, warm server. After: fresh restart + HTTP warmup (20 × GET /api/catalog/listings).
+
+Raw k6 exports: `profiling/k6/baseline-staging.json`, `profiling/k6/after-staging.json`
+
+---
+
+### Micrometer Per-Stage Breakdown — Staging (Clean Delta Run)
+
+Computed as `(post − pre) / 300` from two Prometheus scrapes bracketing a 300-bid k6 run on a fully-warm JVM. Source files: `after-staging-pre2.txt` → `after-staging-prometheus-after.txt`.
+
+| Stage | Baseline avg | After avg | Delta | Baseline % | After % |
+|---|---|---|---|---|---|
+| `bidding.db_write` | 5.16 ms | **3.96 ms** | **-23%** | 49.8% | **48.9%** |
+| `bidding.listing_read` | 1.43 ms | **0.44 ms** | **-69%** | 13.8% | **5.5%** |
+| `bidding.wallet_hold` | 1.26 ms | **0.79 ms** | **-37%** | 12.1% | **9.8%** |
+| `bidding.redis_decision` | 1.08 ms | **0.69 ms** | **-36%** | 10.4% | **8.5%** |
+| *(unaccounted — overhead)* | ~1.44 ms | ~2.21 ms | — | 13.9% | 27.3% |
+| **`bidding.place_bid` (total)** | **10.37 ms** | **8.09 ms** | **-22%** | 100% | 100% |
+
+Raw Prometheus snapshots can be found in google drive: `after-staging-pre2.txt`, `after-staging-prometheus-after.txt`
+
+### Key Findings on Staging
+
+- **`listing_read` dropped 69%** (1.43 ms → 0.44 ms) — Redis cache-first eliminated the PSQL round-trip; confirmed on the real deployed environment with a clean warm-JVM delta measurement.
+- **`place_bid` total dropped 22%** (10.37 ms → 8.09 ms) — end-to-end improvement on staging.
+- **k6 p(95) dropped 86%** (393 ms → 54.8 ms) end-to-end.
+- Zero bid errors across all runs.
