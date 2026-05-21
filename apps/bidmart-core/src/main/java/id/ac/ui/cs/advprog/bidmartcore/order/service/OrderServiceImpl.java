@@ -1,13 +1,14 @@
 package id.ac.ui.cs.advprog.bidmartcore.order.service;
 
-import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
-import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
-import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
+import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
+import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -79,5 +80,15 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.DISPUTED);
         return orderRepository.save(order);
+    }
+
+    @Override
+    public Order getOrderById(UUID orderId, UUID currentUserId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Pesanan dengan ID " + orderId + " tidak ditemukan."));
+        if (!order.getBuyerId().equals(currentUserId) && !order.getSellerId().equals(currentUserId)) {
+            throw new SecurityException("Akses ditolak: Anda tidak memiliki akses ke pesanan ini.");
+        }
+        return order;
     }
 }

@@ -1,16 +1,22 @@
 package id.ac.ui.cs.advprog.bidmartcore.order.controller;
 
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
 import id.ac.ui.cs.advprog.bidmartcore.order.service.OrderService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -52,9 +58,17 @@ public class OrderController {
     @RequireLogin
     @PutMapping("/{orderId}/dispute")
     public ResponseEntity<Order> disputeOrder(@PathVariable UUID orderId, AuthContext authContext) {
-        UUID buyerId = authContext.getUserId();
+        UUID buyerId = this.authContext.getUserId();
 
         Order updatedOrder = orderService.disputeOrder(orderId, buyerId);
         return ResponseEntity.ok(updatedOrder);
+    }
+
+    @RequireLogin
+    @GetMapping("/{orderId}")
+    public ResponseEntity<Order> getOrderById(@PathVariable UUID orderId) {
+        UUID currentUserId = this.authContext.getUserId();
+        Order order = orderService.getOrderById(orderId, currentUserId);
+        return ResponseEntity.ok(order);
     }
 }
