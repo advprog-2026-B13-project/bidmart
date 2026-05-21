@@ -180,7 +180,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         BiddingUseCase.BidResult result = service.placeBid(listingId, amount, bidderId, BidType.MANUAL);
 
@@ -198,7 +198,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(3000L, bidderId.toString(), endTimeMillis, 3000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         BiddingUseCase.BidResult result = service.placeBid(listingId, amount, bidderId, BidType.PROXY);
 
@@ -219,7 +219,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(oldWinner));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
 
@@ -240,7 +240,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(8000L, bidderId.toString(), endTimeMillis, 8000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         service.placeBid(listingId, newMax, bidderId, BidType.PROXY);
 
@@ -267,7 +267,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(5501L, bidderId.toString(), endTimeMillis, 10000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, manualAttempt, bidderId, BidType.MANUAL);
 
@@ -298,7 +298,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(6000L, bidderId.toString(), endTimeMillis, 6000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, manualAmount, bidderId, BidType.MANUAL);
 
@@ -332,7 +332,7 @@ class BiddingServiceImplTest {
                         proxyVisibleAfter, proxyOwnerId.toString()));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         BiddingUseCase.BidResult result = service.placeBid(listingId, challengerAmount, bidderId, BidType.MANUAL);
 
@@ -368,7 +368,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         BiddingUseCase.BidResult result = service.placeBid(listingId, amount, bidderId, BidType.MANUAL);
 
@@ -412,7 +412,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), extendedEndTime, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         service.placeBid(listingId, amount, bidderId, BidType.MANUAL);
 
@@ -428,7 +428,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         service.placeBid(listingId, amount, bidderId, BidType.MANUAL);
 
@@ -572,12 +572,12 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.empty());
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
 
         verify(eventPublisher).publishBidPlaced(any());
-        verify(auctionNotifier).publishPriceChange(eq(listingId), any(), eq(1));
+        verify(auctionNotifier).publishPriceChange(eq(listingId), any(), eq((int) 1L));
     }
 
     @Test
@@ -590,7 +590,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(oldWinner));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
 
@@ -610,7 +610,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(2000L, bidderId.toString(), endTimeMillis, 2000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(oldWinner));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, BigDecimal.valueOf(2000), bidderId, BidType.MANUAL);
 
@@ -628,7 +628,7 @@ class BiddingServiceImplTest {
                 .thenReturn(ConcurrencyResult.leading(8000L, bidderId.toString(), endTimeMillis, 8000L));
         when(bidRepository.findTopBid(listingId)).thenReturn(Optional.of(existingProxy));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(1);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(1L);
 
         service.placeBid(listingId, BigDecimal.valueOf(8000), bidderId, BidType.PROXY);
 
@@ -724,7 +724,7 @@ class BiddingServiceImplTest {
                 .thenReturn(Optional.of(acceptedBid(proxyOwnerId, BigDecimal.valueOf(2000),
                         BigDecimal.valueOf(5000), BidSource.PROXY)));
         when(bidRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(bidRepository.countByListing(listingId)).thenReturn(2);
+        when(concurrencyPort.incrementAndGetBidCount(listingId)).thenReturn(2L);
 
         service.placeBid(listingId, BigDecimal.valueOf(3000), bidderId, BidType.MANUAL);
 
