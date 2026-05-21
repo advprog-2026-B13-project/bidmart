@@ -13,6 +13,8 @@ export interface BidResult {
   listingId: string;
   bidderId: string;
   amount: number;
+  maxAmount?: number;
+  source?: "MANUAL" | "PROXY";
   status: string;
   createdAt: string;
 }
@@ -35,7 +37,7 @@ export interface ParsedListing {
   id: string;
   title: string;
   description: string;
-  imageUrl: string;
+  imageUrl: string | null;
   categoryId: number;
   category: string;
   condition: "New" | "Like New" | "Excellent" | "Good" | "Fair";
@@ -54,7 +56,7 @@ export interface ParsedListing {
 export interface SellerListing {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl: string | null;
   status: string;
   startingPrice: number;
   reservePrice: number | null;
@@ -69,7 +71,7 @@ export interface ListingDetail {
   id: string;
   title: string;
   description: string;
-  imageUrl: string;
+  imageUrl: string | null;
   status: string;
   startingPrice: number;
   reservePrice: number | null;
@@ -90,6 +92,12 @@ function mapStatus(status: string): "active" | "ending-soon" | "ended" | "sold" 
   return "active";
 }
 
+function normalizeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 // Spring Page response — no ApiResponse envelope
 interface PageResponse {
   content: Record<string, unknown>[];
@@ -105,7 +113,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     id: listing.id as string,
     title: listing.title as string,
     description: listing.description as string,
-    imageUrl: (listing.imageUrl as string) || "",
+    imageUrl: normalizeImageUrl(listing.imageUrl),
     categoryId: (listing.category as { id: number })?.id ?? 0,
     category: (cat?.name as string) || "",
     condition: "Good",
@@ -120,7 +128,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     seller: {
       id: listing.sellerId as string,
       name: "Seller",
-      avatar: "https://i.pravatar.cc/150?u=seller",
+      avatar: `https://api.dicebear.com/9.x/open-peeps/svg?seed=${listing.sellerId as string}`,
       rating: 4.5,
     },
     topBidder: listing.winnerId ? { id: listing.winnerId as string, name: "Bidder" } : null,
@@ -132,7 +140,7 @@ function parseSellerListing(listing: Record<string, unknown>): SellerListing {
   return {
     id: listing.id as string,
     title: listing.title as string,
-    imageUrl: (listing.imageUrl as string) || "",
+    imageUrl: normalizeImageUrl(listing.imageUrl),
     status: (listing.status as string) || "UNKNOWN",
     startingPrice: Number(listing.startingPrice),
     reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,
@@ -150,7 +158,7 @@ function parseListingDetail(listing: Record<string, unknown>): ListingDetail {
     id: listing.id as string,
     title: listing.title as string,
     description: listing.description as string,
-    imageUrl: (listing.imageUrl as string) || "",
+    imageUrl: normalizeImageUrl(listing.imageUrl),
     status: (listing.status as string) || "UNKNOWN",
     startingPrice: Number(listing.startingPrice),
     reservePrice: listing.reservePrice != null ? Number(listing.reservePrice) : null,

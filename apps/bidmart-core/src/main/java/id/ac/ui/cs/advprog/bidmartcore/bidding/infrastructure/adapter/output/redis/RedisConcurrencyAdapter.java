@@ -1,5 +1,8 @@
 package id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.adapter.output.redis;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -14,7 +17,9 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.BidType;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.model.ConcurrencyResult;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.BidRepositoryPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ConcurrencyPort;
+import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.ListingPort.ListingInfo;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import lombok.RequiredArgsConstructor;
 
 @Component
@@ -136,13 +141,20 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         String winner = info.winnerId() != null ? info.winnerId().toString() : "";
         long maxAmount = winner.isBlank() ? price : resolveHighestMaxAmount(listingId, price);
 
+        long bidCount = bidRepository.countByListing(listingId);
         redis.opsForHash().putAll(redisKey, Map.of(
                 "price", String.valueOf(price),
                 "endTime", String.valueOf(endTime),
                 "status", info.status().name(),
                 "winner", winner,
-                "maxAmount", String.valueOf(maxAmount)
+                "maxAmount", String.valueOf(maxAmount),
+                "sellerId", info.sellerId().toString(),
+                "startingPrice", String.valueOf(info.startingPrice().longValue()),
+                "reservePrice", info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
+                "minBidIncrement", String.valueOf(info.minBidIncrement().longValue()),
+                "startTime", String.valueOf(toEpochMillis(info.startTime()))
         ));
+        redis.opsForHash().put(redisKey, "bidCount", String.valueOf(bidCount));
 
         // Add to expiry sorted set
         addToExpirySet(listingId, endTime);
@@ -161,7 +173,12 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
                 "endTime", String.valueOf(endTime),
                 "status", info.status().name(),
                 "winner", winner,
-                "maxAmount", String.valueOf(maxAmount)
+                "maxAmount", String.valueOf(maxAmount),
+                "sellerId", info.sellerId().toString(),
+                "startingPrice", String.valueOf(info.startingPrice().longValue()),
+                "reservePrice", info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
+                "minBidIncrement", String.valueOf(info.minBidIncrement().longValue()),
+                "startTime", String.valueOf(toEpochMillis(info.startTime()))
         ));
 
         // Update expiry sorted set (anti-snipe extends end time)
@@ -172,6 +189,12 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         return bidRepository.findTopBid(listingId)
                 .map(bid -> bid.getMaxAmount() != null ? bid.getMaxAmount().longValue() : bid.getAmount().longValue())
                 .orElse(fallbackPrice);
+    }
+
+    @Override
+    public long incrementAndGetBidCount(UUID listingId) {
+        Long count = redis.opsForHash().increment(key(listingId), "bidCount", 1L);
+        return count != null ? count : 1L;
     }
 
     @Override
@@ -194,6 +217,33 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         if (price == null) return null;
         String winner = values.get(1) != null ? values.get(1).toString() : "";
         return new LiveAuctionState(Long.parseLong(price.toString()), winner);
+    }
+
+    @Override
+    public ListingPort.ListingInfo getListingInfoFromCache(UUID listingId) {
+        List<Object> values = redis.opsForHash().multiGet(key(listingId), java.util.List.of(
+                "sellerId", "status", "startingPrice", "price",
+                "reservePrice", "minBidIncrement", "startTime", "endTime", "winner"));
+        if (values.get(0) == null) return null;
+        try {
+            UUID sellerId = UUID.fromString(values.get(0).toString());
+            ListingStatus status = ListingStatus.valueOf(values.get(1).toString());
+            BigDecimal startingPrice = BigDecimal.valueOf(Long.parseLong(values.get(2).toString()));
+            BigDecimal currentPrice = BigDecimal.valueOf(Long.parseLong(values.get(3).toString()));
+            long reservePriceLong = Long.parseLong(values.get(4).toString());
+            BigDecimal reservePrice = reservePriceLong > 0 ? BigDecimal.valueOf(reservePriceLong) : null;
+            BigDecimal minBidIncrement = BigDecimal.valueOf(Long.parseLong(values.get(5).toString()));
+            LocalDateTime startTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(Long.parseLong(values.get(6).toString())), BUSINESS_ZONE);
+            LocalDateTime endTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(Long.parseLong(values.get(7).toString())), BUSINESS_ZONE);
+            String winnerStr = values.get(8) != null ? values.get(8).toString() : "";
+            UUID winnerId = winnerStr.isBlank() ? null : UUID.fromString(winnerStr);
+            return new ListingPort.ListingInfo(sellerId, status, startingPrice, currentPrice,
+                    reservePrice, minBidIncrement, startTime, endTime, winnerId);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override

@@ -18,6 +18,7 @@ public class BidResponse {
     private UUID listingId;
     private UUID bidderId;
     private BigDecimal amount;
+    private String source;
     private String status;
     private LocalDateTime createdAt;
 }
