@@ -1,17 +1,22 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.service;
 
-import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
-import id.ac.ui.cs.advprog.bidmartcore.notification.repository.NotificationRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
+import id.ac.ui.cs.advprog.bidmartcore.notification.repository.NotificationRepository;
 
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public NotificationServiceImpl(NotificationRepository notificationRepository) {
@@ -30,6 +35,8 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setType(type);
         notification.setMessage(message);
         notification.setRead(false);
-        notificationRepository.save(notification);
+        Notification savedNotification = notificationRepository.save(notification);
+        
+        messagingTemplate.convertAndSend("/topic/notifications/" + userId, savedNotification);
     }
 }
