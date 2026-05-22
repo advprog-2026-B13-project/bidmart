@@ -668,7 +668,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     const connect = () => {
       if (cancelled) return;
       const apiBase = process.env.NEXT_PUBLIC_AUTH_API_URL || "";
-      es = new EventSource(`${apiBase}/api/bidding/auctions/${listingId}/stream`);
+      es = new EventSource(`${apiBase}/api/auctions/${listingId}/stream`);
 
       es.addEventListener("message", (e) => {
         try {
