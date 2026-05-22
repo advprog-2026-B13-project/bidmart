@@ -15,6 +15,8 @@ import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
 @Service
 public class OrderServiceImpl implements OrderService {
 
+    private static final String ORDER_NOT_FOUND_PREFIX = "Pesanan dengan ID ";
+
     private final OrderRepository orderRepository;
 
     @Autowired
@@ -36,7 +38,7 @@ public class OrderServiceImpl implements OrderService {
     public Order updateShipmentStatus(UUID orderId, UUID sellerId, OrderStatus newStatus, String trackingNumber) {
         log.info("Order shipment update: orderId={} sellerId={} newStatus={}", orderId, sellerId, newStatus);
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pesanan dengan ID " + orderId + " tidak ditemukan."));
+                .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND_PREFIX + orderId + " tidak ditemukan."));
 
         if (!order.getSellerId().equals(sellerId)) {
             throw new RuntimeException("Anda bukan penjual dari pesanan ini.");
@@ -60,7 +62,7 @@ public class OrderServiceImpl implements OrderService {
     public Order confirmDelivery(UUID orderId, UUID buyerId) {
         log.info("Order delivery confirmed: orderId={} buyerId={}", orderId, buyerId);
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pesanan dengan ID " + orderId + " tidak ditemukan"));
+                .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND_PREFIX + orderId + " tidak ditemukan"));
 
         if (!order.getBuyerId().equals(buyerId)) {
             throw new RuntimeException("Anda bukan pembeli dari pesanan ini.");
@@ -96,7 +98,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order getOrderById(UUID orderId, UUID currentUserId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Pesanan dengan ID " + orderId + " tidak ditemukan."));
+                .orElseThrow(() -> new IllegalArgumentException(ORDER_NOT_FOUND_PREFIX + orderId + " tidak ditemukan."));
         if (!order.getBuyerId().equals(currentUserId) && !order.getSellerId().equals(currentUserId)) {
             throw new SecurityException("Akses ditolak: Anda tidak memiliki akses ke pesanan ini.");
         }

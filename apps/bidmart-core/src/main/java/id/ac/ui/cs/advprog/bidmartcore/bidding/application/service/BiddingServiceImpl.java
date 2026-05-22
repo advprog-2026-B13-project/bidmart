@@ -43,6 +43,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class BiddingServiceImpl implements BiddingUseCase {
 
+    private static final String METRIC_PLACE_BID = "bidding.place_bid";
+    private static final String TAG_OUTCOME = "outcome";
+
     private final BidRepositoryPort bidRepository;
     private final ListingPort listingPort;
     private final EventPublisherPort eventPublisher;
@@ -83,7 +86,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
 
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
             walletPort.releaseFunds(bidderId, bidAmount);
-            metrics.record(totalSample, "bidding.place_bid", "outcome", "cache_miss");
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, "cache_miss");
             log.warn("Bid cache miss after retries: listingId={} bidderId={}", listingId, bidderId);
             throw new IllegalStateException("System unavailable, please try again.");
         }
@@ -97,11 +100,11 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
                 default -> handleReject(bidderId, bidAmount, result.status());
             };
-            metrics.record(dbWriteSample, "bidding.db_write", "outcome", result.status().name().toLowerCase());
+            metrics.record(dbWriteSample, "bidding.db_write", TAG_OUTCOME, result.status().name().toLowerCase());
 
             outcome.publishActions().forEach(Runnable::run);
 
-            metrics.record(totalSample, "bidding.place_bid", "outcome", result.status().name().toLowerCase());
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, result.status().name().toLowerCase());
             log.info("Bid result: listingId={} bidderId={} outcome={}", listingId, bidderId, result.status());
             return outcome.bidResult();
         } catch (Exception e) {
@@ -109,7 +112,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 log.error("Bid error - compensating: listingId={} bidderId={}", listingId, bidderId, e);
                 compensate(listingId, listing, bidderId, bidAmount, result);
             }
-            metrics.record(totalSample, "bidding.place_bid", "outcome", "error");
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, "error");
             throw e;
         }
     }
