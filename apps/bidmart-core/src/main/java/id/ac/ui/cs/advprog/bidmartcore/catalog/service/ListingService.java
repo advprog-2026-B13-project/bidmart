@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -15,7 +16,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 
 public interface ListingService {
     Listing createListing(ListingCreateRequest request, UUID sellerId);
-    Listing updateListing(UUID id, UUID requesterId, ListingUpdateRequest request);
+    Listing updateListing(UUID id, AuthContext authContext, ListingUpdateRequest request);
     Listing getListingById(UUID id);
 
     Listing getListingForOwner(UUID id, UUID ownerId);
@@ -37,4 +38,6 @@ public interface ListingService {
     void updateStatus(UUID listingId, ListingStatus status);
 
     void updateEndTime(UUID listingId, LocalDateTime endTime);
+
+    boolean canEditListing(Listing listing, AuthContext authContext);
 }

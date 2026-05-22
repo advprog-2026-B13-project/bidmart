@@ -232,6 +232,65 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/password-reset/request")
+    @Operation(
+            summary = "Request a password reset link",
+            description = "Sends a password reset link to the provided email address if the account exists.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reset email sent if the account exists"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid email address"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Email service unavailable")
+    })
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@RequestBody PasswordResetRequest request) {
+        try {
+            authUseCase.requestPasswordReset(request.getEmail());
+            return ResponseEntity.ok(ApiResponse.success("If the account exists, a reset link has been sent", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/password-reset/verify")
+    @Operation(
+            summary = "Verify password reset token",
+            description = "Checks whether a password reset token is still valid.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token validation result")
+    })
+    public ResponseEntity<ApiResponse<PasswordResetVerifyResponse>> verifyPasswordResetToken(
+            @RequestBody PasswordResetVerifyRequest request) {
+        boolean valid = authUseCase.verifyPasswordResetToken(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success("Reset token checked", new PasswordResetVerifyResponse(valid)));
+    }
+
+    @PostMapping("/password-reset/confirm")
+    @Operation(
+            summary = "Confirm password reset",
+            description = "Resets the password using a valid reset token.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password updated"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired reset token"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Account suspended")
+    })
+    public ResponseEntity<ApiResponse<Void>> confirmPasswordReset(@RequestBody PasswordResetConfirmRequest request) {
+        try {
+            authUseCase.resetPassword(request.getToken(), request.getNewPassword());
+            return ResponseEntity.ok(ApiResponse.success("Password reset successful", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     private ResponseEntity.BodyBuilder addCookies(ResponseEntity.BodyBuilder builder, Iterable<String> cookies) {
         for (String cookie : cookies) {
             builder.header(HttpHeaders.SET_COOKIE, cookie);

@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartcore.order.service;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
 import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
 
+@Slf4j
 @Service
 public class OrderServiceImpl implements OrderService {
 
@@ -34,6 +36,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Order updateShipmentStatus(UUID orderId, UUID sellerId, OrderStatus newStatus, String trackingNumber) {
+        log.info("Order shipment update: orderId={} sellerId={} newStatus={}", orderId, sellerId, newStatus);
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND_PREFIX + orderId + " tidak ditemukan."));
 
@@ -50,11 +53,14 @@ public class OrderServiceImpl implements OrderService {
             order.setTrackingNumber(trackingNumber);
         }
 
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        log.info("Order shipment updated: orderId={} status={}", orderId, newStatus);
+        return saved;
     }
 
     @Override
     public Order confirmDelivery(UUID orderId, UUID buyerId) {
+        log.info("Order delivery confirmed: orderId={} buyerId={}", orderId, buyerId);
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND_PREFIX + orderId + " tidak ditemukan"));
 

@@ -3,8 +3,10 @@ package id.ac.ui.cs.advprog.bidmartcore.notification.controller;
 import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
 import id.ac.ui.cs.advprog.bidmartcore.notification.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,5 +38,10 @@ public class NotificationController {
     public ResponseEntity<Void> markAllAsRead(@PathVariable UUID userId) {
         notificationService.markAllAsRead(userId);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping(path = "/user/{userId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamNotifications(@PathVariable UUID userId) {
+        return notificationService.subscribe(userId);
     }
 }

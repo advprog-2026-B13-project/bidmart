@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { Check, Star, Loader2, Send, Share2, ChevronLeft, ChevronRight, Info, ExternalLink, Pencil } from "lucide-react";
 import { getListingById, getListingByIdOwner, getBidsForListing, placeBid, getListings, type ParsedListing, type BidResult } from "@/lib/api/endpoints";
 import { getMyWallet, type WalletSummary } from "@/lib/api/wallet";
 import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
@@ -732,6 +732,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       ]
     : [];
 
+  const canEditListing = Boolean(listing.canEdit);
+
   return (
     <div className="bg-white">
       {/* Breadcrumb */}
@@ -766,7 +768,18 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   <span className="text-sm font-bold text-gray-500">Listed {new Date().toLocaleDateString()}</span>
                 </div>
               </div>
-              <ShareButton />
+              <div className="flex items-center gap-3">
+                {canEditListing && (
+                  <Link
+                    href={`/listing/${listing.id}/edit`}
+                    className="btn btn-sm font-bold uppercase"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Link>
+                )}
+                <ShareButton />
+              </div>
             </div>
 
             {/* Description */}

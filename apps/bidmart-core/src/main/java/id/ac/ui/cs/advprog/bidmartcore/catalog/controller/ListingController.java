@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.PermissionValue;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.OptionalAuth;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequireLogin;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest;
@@ -39,6 +41,7 @@ public class ListingController {
     private final AuthContext authContext;
 
     @GetMapping("/search")
+    @OptionalAuth
     public ResponseEntity<Page<Listing>> searchListings(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -52,30 +55,32 @@ public class ListingController {
             return ResponseEntity.ok(Page.empty(pageable));
         }
         Page<Listing> results = listingService.searchListings(keyword, minPrice, maxPrice, categoryId, status, pageable);
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(results.map(this::withCanEdit));
     }
 
     @GetMapping("/detail/{id}")
+    @OptionalAuth
     public ResponseEntity<Listing> getListingById(@PathVariable UUID id) {
         Listing listing = listingService.getListingById(id);
         if (listing.getStatus() == ListingStatus.DRAFT) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(listing);
+
+        return ResponseEntity.ok(withCanEdit(listing));
     }
 
     @GetMapping("/detail/{id}/owner")
     @RequireLogin
     public ResponseEntity<Listing> getListingByOwner(@PathVariable UUID id) {
         Listing listing = listingService.getListingForOwner(id, authContext.getUserId());
-        return ResponseEntity.ok(listing);
+        return ResponseEntity.ok(withCanEdit(listing));
     }
 
     @GetMapping("/mine")
     @RequireLogin
     public ResponseEntity<List<Listing>> getMyListings() {
         List<Listing> listings = listingService.getListingsBySeller(authContext.getUserId());
-        return ResponseEntity.ok(listings);
+        return ResponseEntity.ok(listings.stream().map(this::withCanEdit).toList());
     }
 
     @PostMapping("/create")
@@ -83,7 +88,7 @@ public class ListingController {
     public ResponseEntity<Listing> createListing(
             @Valid @RequestBody ListingCreateRequest requestDTO) {
         Listing savedListing = listingService.createListing(requestDTO, authContext.getUserId());
-        return new ResponseEntity<>(savedListing, HttpStatus.CREATED);
+        return new ResponseEntity<>(withCanEdit(savedListing), HttpStatus.CREATED);
     }
 
     @PutMapping("/update/{id}")
@@ -91,22 +96,22 @@ public class ListingController {
     public ResponseEntity<Listing> updateListing(
             @PathVariable UUID id,
             @Valid @RequestBody ListingUpdateRequest requestDTO) {
-        Listing updatedListing = listingService.updateListing(id, authContext.getUserId(), requestDTO);
-        return ResponseEntity.ok(updatedListing);
+        Listing updatedListing = listingService.updateListing(id, authContext, requestDTO);
+        return ResponseEntity.ok(withCanEdit(updatedListing));
     }
 
     @PutMapping("/{id}/activate")
     @RequireLogin
     public ResponseEntity<Listing> activateListing(@PathVariable UUID id) {
         Listing listing = listingService.activateListing(id, authContext.getUserId());
-        return ResponseEntity.ok(listing);
+        return ResponseEntity.ok(withCanEdit(listing));
     }
 
     @PutMapping("/{id}/close")
     @RequireLogin
     public ResponseEntity<Listing> closeListing(@PathVariable UUID id) {
         Listing listing = listingService.closeListing(id, authContext.getUserId());
-        return ResponseEntity.ok(listing);
+        return ResponseEntity.ok(withCanEdit(listing));
     }
 
     @DeleteMapping("/delete/{id}")
@@ -121,5 +126,14 @@ public class ListingController {
     public ResponseEntity<Boolean> validateListingForBid(@PathVariable UUID id) {
         boolean isValid = listingService.isListingValidForBid(id);
         return ResponseEntity.ok(isValid);
+    }
+
+    private Listing withCanEdit(Listing listing) {
+        if (listing == null) {
+            return null;
+        }
+
+        listing.setCanEdit(listingService.canEditListing(listing, authContext));
+        return listing;
     }
 }

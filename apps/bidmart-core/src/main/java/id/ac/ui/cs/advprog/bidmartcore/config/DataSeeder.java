@@ -18,6 +18,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,12 +29,16 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder {
+    @Value("${seeder.admin.email}")
+    private String adminEmail;
+
+    @Value("${seeder.admin.password}")
+    private String adminPassword;
 
     private static final String DEFAULT_PASSWORD = "password123";
     private static final String CAT_ELECTRONICS = "Electronics";
@@ -80,6 +85,8 @@ public class DataSeeder {
                 });
 
         // --- Users ---
+        User admin = createUser(adminEmail, adminPassword, "Admin User",
+                "https://i.pravatar.cc/150?u=admin", adminRole, 0.00);
         User sarah = createUser("sarah.chen@email.com", DEFAULT_PASSWORD, "Sarah Chen",
                 "https://i.pravatar.cc/150?u=sarah", userRole, 2450.00);
         User marcus = createUser("marcus.wong@email.com", DEFAULT_PASSWORD, "Marcus Wong",
@@ -87,7 +94,7 @@ public class DataSeeder {
         User elena = createUser("elena.rossi@email.com", DEFAULT_PASSWORD, "Elena Rossi",
                 "https://i.pravatar.cc/150?u=elena", userRole, 3200.00);
 
-        List<User> allUsers = List.of(sarah, marcus, elena);
+        List<User> allUsers = List.of(admin, sarah, marcus, elena);
 
         // --- Categories ---
         Map<String, Category> topCategories = Map.of(

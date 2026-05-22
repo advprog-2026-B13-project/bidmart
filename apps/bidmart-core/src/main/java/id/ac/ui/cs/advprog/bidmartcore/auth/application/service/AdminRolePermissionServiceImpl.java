@@ -12,6 +12,9 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionCachePort;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionRepositoryPort;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.UserRepositoryPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,9 +26,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCase {
+
+    private static final Logger AUDIT = LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
     private static final Set<String> RESERVED_ROLES = Set.of("USER", "ADMIN");
     private static final String ROLE_NOT_FOUND = "Role not found";
@@ -81,25 +87,31 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     @Override
     @Transactional
     public void deleteRole(int roleId) {
+        log.info("Role delete requested: roleId={}", roleId);
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         String roleName = role.getName() == null ? "" : role.getName().trim().toUpperCase(Locale.ROOT);
         if (RESERVED_ROLES.contains(roleName)) {
+            log.warn("Role delete rejected - reserved: roleId={} roleName={}", roleId, roleName);
             throw new IllegalArgumentException("Reserved role cannot be deleted");
         }
 
         if (userRepository.countByRoleId(roleId) > 0) {
+            log.warn("Role delete rejected - still assigned to users: roleId={}", roleId);
             throw new IllegalArgumentException("Role is still assigned to users");
         }
 
         rolePermissionPort.deleteAllByRoleId(roleId);
         roleRepository.deleteById(roleId);
+        AUDIT.info("ROLE_DELETED roleId={} roleName={}", roleId, roleName);
+        log.info("Role deleted: roleId={} roleName={}", roleId, roleName);
     }
 
     @Override
     @Transactional
     public void assignRoleToUser(UUID userId, int roleId) {
+        log.info("Role assign: userId={} roleId={}", userId, roleId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -109,17 +121,20 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
         user.setRole(role);
         userRepository.save(user);
         evictUserSessions(userId);
+        AUDIT.info("ROLE_ASSIGNED userId={} roleId={} roleName={}", userId, roleId, role.getName());
     }
 
     @Override
     @Transactional
     public void unassignRoleFromUser(UUID userId) {
+        log.info("Role unassign: userId={}", userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         user.setRole(null);
         userRepository.save(user);
         evictUserSessions(userId);
+        AUDIT.info("ROLE_UNASSIGNED userId={}", userId);
     }
 
     @Override
