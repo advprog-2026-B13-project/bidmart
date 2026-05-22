@@ -11,6 +11,8 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent.AuctionResult;
@@ -102,7 +104,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
             };
             metrics.record(dbWriteSample, "bidding.db_write", TAG_OUTCOME, result.status().name().toLowerCase());
 
-            outcome.publishActions().forEach(Runnable::run);
+            publishAfterCommit(outcome.publishActions());
 
             metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, result.status().name().toLowerCase());
             log.info("Bid result: listingId={} bidderId={} outcome={}", listingId, bidderId, result.status());
@@ -114,6 +116,22 @@ public class BiddingServiceImpl implements BiddingUseCase {
             }
             metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, "error");
             throw e;
+        }
+    }
+
+    private void publishAfterCommit(List<Runnable> actions) {
+        if (actions.isEmpty()) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    actions.forEach(Runnable::run);
+                }
+            });
+        } else {
+            actions.forEach(Runnable::run);
         }
     }
 

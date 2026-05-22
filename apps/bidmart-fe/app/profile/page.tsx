@@ -682,10 +682,11 @@ export default function ProfilePage() {
               <div className="grid gap-4 md:grid-cols-2 mt-6">
                 <div className="border-2 border-black bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Top Up</p>
-                  <form onSubmit={handleTopUp} className="grid gap-3 mt-3">
+                  <form onSubmit={(event) => { handleTopUp(event); }} className="grid gap-3 mt-3">
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Amount (IDR)</label>
+                      <label htmlFor="topUpAmount" className="text-[10px] font-black uppercase tracking-widest text-gray-500">Amount (IDR)</label>
                       <input
+                        id="topUpAmount"
                         type="number"
                         min={1}
                         step={1}
@@ -697,8 +698,9 @@ export default function ProfilePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Bank</label>
+                      <label htmlFor="topUpBank" className="text-[10px] font-black uppercase tracking-widest text-gray-500">Bank</label>
                       <select
+                        id="topUpBank"
                         value={topUpBank}
                         onChange={(event) => setTopUpBank(event.target.value)}
                         className="input mt-2"
