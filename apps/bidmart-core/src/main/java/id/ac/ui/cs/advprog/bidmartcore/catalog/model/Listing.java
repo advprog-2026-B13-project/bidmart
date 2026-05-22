@@ -86,6 +86,8 @@ public class Listing {
     @Transient
     private Boolean canEdit;
 
+    private LocalDateTime createdAt;
+
     @PrePersist
     public void prePersistSetup() {
         if (startTime != null && endTime != null && !endTime.isAfter(startTime)) {
