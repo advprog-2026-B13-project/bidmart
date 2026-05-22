@@ -258,7 +258,7 @@ export interface NotificationItem {
   type: string;
   message: string;
   isRead: boolean;
-  referenceId: string;
+  referenceId?: string;
   createdAt: string;
 }
 
