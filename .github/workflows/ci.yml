@@ -147,11 +147,10 @@ jobs:
         uses: sonarsource/sonarqube-quality-gate-action@master
         with:
           pollingTimeoutSec: 600
+          scanMetadataReportFile: apps/bidmart-fe/.scannerwork/report-task.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          scanMetadataReportFile: apps/bidmart-fe/.scannerwork/report-task.txt
 
   ci-summary:
     runs-on: ubuntu-latest
