@@ -5,7 +5,17 @@ import { useRouter } from "next/navigation";
 import { SubmitEventHandler, useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { activateListing, closeListing, deleteListing, getListingById, getMyListings, type SellerListing } from "@/lib/api/endpoints";
+import {
+  activateListing,
+  closeListing,
+  deleteListing,
+  getListingById,
+  getMyListings,
+  type SellerListing,
+  type Order,
+  getBuyerOrders,
+  getSellerOrders
+} from "@/lib/api/endpoints";
 import {
   createTopUpTransaction,
   getMyWallet,
@@ -16,6 +26,7 @@ import {
 } from "@/lib/api/wallet";
 import { getProfile, listMyBids } from "@/lib/auth/auth-api";
 import type { BidResponse, ProfileResponse } from "@/lib/auth/types";
+
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -180,6 +191,150 @@ function BidTable({ bids }: { bids: BidResponse[] }) {
   );
 }
 
+function BuyerOrderList({ orders }: { orders: Order[] }) {
+  const [listingNames, setListingNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const uniqueIds = [...new Set(orders.map(o => o.listingId))];
+    Promise.all(uniqueIds.map(id => getListingById(id).catch(() => null)))
+        .then(listings => {
+          const map: Record<string, string> = {};
+          listings.forEach((listing, i) => {
+            if (listing) map[uniqueIds[i]] = listing.title;
+          });
+          setListingNames(map);
+        });
+  }, [orders]);
+
+  if (orders.length === 0) {
+    return (
+        <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
+          <p className="text-sm font-bold uppercase tracking-wide text-gray-600">No purchases found.</p>
+        </div>
+    );
+  }
+
+  const getStatusStyle = (status: string) => {
+    switch (status.toUpperCase()) {
+      case "PENDING": return "bg-yellow-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "PACKED": return "bg-blue-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "SHIPPED": return "bg-purple-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "COMPLETED": return "bg-acid text-black border border-black shadow-[2px_2px_0_#000]";
+      case "DISPUTED": return "bg-hot text-white border border-black shadow-[2px_2px_0_#000]";
+      default: return "bg-gray-100 text-gray-600 border border-gray-300";
+    }
+  };
+
+  return (
+      <div className="space-y-3">
+        {orders.map((order) => {
+          const listingName = listingNames[order.listingId] || order.listingId;
+          return (
+              <div key={order.id} className="border-2 border-black bg-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[4px_4px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] transition-all">
+                <div>
+                  <p className="font-black text-xs text-electric uppercase tracking-wide">
+                    Order #{order.id.slice(0, 8).toUpperCase()}
+                  </p>
+                  <h3 className="font-bold text-base mt-1 text-black">{listingName}</h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Created: {formatDate(order.createdAt)}
+                  </p>
+                  {order.trackingNumber && (
+                      <p className="text-xs font-bold text-gray-600 mt-1">
+                        Resi: <span className="font-mono text-black bg-gray-100 px-1.5 py-0.5 border border-black">{order.trackingNumber}</span>
+                      </p>
+                  )}
+                </div>
+                <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3">
+                  <div className="md:text-right">
+                    <p className="font-black text-sm">{formatCurrency(order.totalAmount)}</p>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 mt-1 inline-block ${getStatusStyle(order.status)}`}>
+                  {order.status}
+                </span>
+                  </div>
+                  <Link href={`/orders/${order.id}`} className="btn btn-ghost btn-sm text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000]">
+                    Track / Manage
+                  </Link>
+                </div>
+              </div>
+          );
+        })}
+      </div>
+  );
+}
+
+function SellerOrderList({ orders }: { orders: Order[] }) {
+  const [listingNames, setListingNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const uniqueIds = [...new Set(orders.map(o => o.listingId))];
+    Promise.all(uniqueIds.map(id => getListingById(id).catch(() => null)))
+        .then(listings => {
+          const map: Record<string, string> = {};
+          listings.forEach((listing, i) => {
+            if (listing) map[uniqueIds[i]] = listing.title;
+          });
+          setListingNames(map);
+        });
+  }, [orders]);
+
+  if (orders.length === 0) {
+    return (
+        <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-6">
+          <p className="text-sm font-bold uppercase tracking-wide text-gray-600">No sales found.</p>
+        </div>
+    );
+  }
+
+  const getStatusStyle = (status: string) => {
+    switch (status.toUpperCase()) {
+      case "PENDING": return "bg-yellow-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "PACKED": return "bg-blue-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "SHIPPED": return "bg-purple-200 text-black border border-black shadow-[2px_2px_0_#000]";
+      case "COMPLETED": return "bg-acid text-black border border-black shadow-[2px_2px_0_#000]";
+      case "DISPUTED": return "bg-hot text-white border border-black shadow-[2px_2px_0_#000]";
+      default: return "bg-gray-100 text-gray-600 border border-gray-300";
+    }
+  };
+
+  return (
+      <div className="space-y-3">
+        {orders.map((order) => {
+          const listingName = listingNames[order.listingId] || order.listingId;
+          return (
+              <div key={order.id} className="border-2 border-black bg-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[4px_4px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] transition-all">
+                <div>
+                  <p className="font-black text-xs text-electric uppercase tracking-wide">
+                    Order #{order.id.slice(0, 8).toUpperCase()}
+                  </p>
+                  <h3 className="font-bold text-base mt-1 text-black">{listingName}</h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Created: {formatDate(order.createdAt)}
+                  </p>
+                  {order.trackingNumber && (
+                      <p className="text-xs font-bold text-gray-600 mt-1">
+                        Resi: <span className="font-mono text-black bg-gray-100 px-1.5 py-0.5 border border-black">{order.trackingNumber}</span>
+                      </p>
+                  )}
+                </div>
+                <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3">
+                  <div className="md:text-right">
+                    <p className="font-black text-sm">{formatCurrency(order.totalAmount)}</p>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 mt-1 inline-block ${getStatusStyle(order.status)}`}>
+                  {order.status}
+                </span>
+                  </div>
+                  <Link href={`/orders/${order.id}`} className="btn btn-ghost btn-sm text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000]">
+                    Track / Manage
+                  </Link>
+                </div>
+              </div>
+          );
+        })}
+      </div>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, isHydrating, user } = useAuth();
@@ -187,6 +342,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [myBids, setMyBids] = useState<BidResponse[]>([]);
   const [myListings, setMyListings] = useState<SellerListing[]>([]);
+  const [buyerOrders, setBuyerOrders] = useState<Order[]>([]);
+  const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -233,6 +390,18 @@ export default function ProfilePage() {
         setProfile(profileResponse);
         setMyBids(bidsResponse);
         setMyListings(listingsResponse);
+
+        if (profileResponse?.userId) {
+          const [buyerOrdersRes, sellerOrdersRes] = await Promise.all([
+            getBuyerOrders(profileResponse.userId),
+            getSellerOrders(profileResponse.userId),
+          ]);
+          if (isMounted) {
+            setBuyerOrders(buyerOrdersRes);
+            setSellerOrders(sellerOrdersRes);
+          }
+        }
+
         await loadWallet(() => isMounted);
       } catch (loadError) {
         if (isMounted) {
@@ -604,6 +773,34 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+            </section>
+
+            <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Purchases</p>
+                  <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">My Purchases</h2>
+                </div>
+                <span className="px-3 py-1 border-2 border-black bg-blue-200 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0_#000]">
+                  {buyerOrders.length} Orders
+                </span>
+              </div>
+
+              <BuyerOrderList orders={buyerOrders} />
+            </section>
+
+            <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Sales</p>
+                  <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">My Sales</h2>
+                </div>
+                <span className="px-3 py-1 border-2 border-black bg-blue-200 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0_#000]">
+                  {sellerOrders.length} Sales
+                </span>
+              </div>
+
+              <SellerOrderList orders={sellerOrders} />
             </section>
 
             <section className="border-2 border-black bg-white p-6 shadow-[6px_6px_0_#0A0A0A]">

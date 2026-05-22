@@ -4,21 +4,17 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
 import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 @Slf4j
-@Service
+@Component
+@RequiredArgsConstructor
 public class OrderEventListener {
 
     private final OrderRepository orderRepository;
-
-    @Autowired
-    public OrderEventListener(OrderRepository orderRepository) {
-        this.orderRepository = orderRepository;
-    }
 
     @EventListener
     public void handleAuctionClosed(AuctionClosedEvent event) {

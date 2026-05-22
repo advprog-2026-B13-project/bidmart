@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { getNotifications, markNotificationAsRead, type NotificationItem } from "@/lib/api/endpoints";
-import { Client } from "@stomp/stompjs";
 
 export function NotificationBell() {
   const { user, isAuthenticated, isHydrating } = useAuth();
@@ -14,12 +13,36 @@ export function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const handleReadAll = () => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    };
+
+    const handleReadOne = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id: string }>;
+      const id = customEvent.detail?.id;
+      if (id) {
+        setNotifications((prev) =>
+            prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+      }
+    };
+
+    window.addEventListener("notifications-read-all", handleReadAll);
+    window.addEventListener("notification-marked-read", handleReadOne);
+
+    return () => {
+      window.removeEventListener("notifications-read-all", handleReadAll);
+      window.removeEventListener("notification-marked-read", handleReadOne);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
     const ignore = { current: false };
     getNotifications(user.userId)
-      .then(n => { if (!ignore.current) setNotifications(n); })
-      .catch(() => {});
+        .then(n => { if (!ignore.current) setNotifications(n); })
+        .catch(() => {});
 
     return () => { ignore.current = true; };
   }, [isAuthenticated, user?.userId]);
@@ -27,16 +50,17 @@ export function NotificationBell() {
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
-    const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
+    let es: EventSource | null = null;
+    let cancelled = false;
 
-    const client = new Client({
-      brokerURL: wsUrl,
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe(`/topic/notifications/${user.userId}`, (message) => {
-          const newNotif = JSON.parse(message.body);
-          
+    const connect = () => {
+      if (cancelled) return;
+      const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
+      es = new EventSource(`${apiBaseUrl}/api/notifications/user/${user.userId}/stream`);
+
+      es.addEventListener("notification", (event) => {
+        try {
+          const newNotif = JSON.parse(event.data);
           const mappedNotif: NotificationItem = {
             id: newNotif.id,
             userId: newNotif.userId,
@@ -46,16 +70,25 @@ export function NotificationBell() {
             referenceId: newNotif.referenceId,
             createdAt: newNotif.createdAt,
           };
-
           setNotifications((prev) => [mappedNotif, ...prev]);
-        });
-      },
-    });
+        } catch (err) {
+          console.error("Failed to parse SSE notification:", err);
+        }
+      });
 
-    client.activate();
+      es.onerror = () => {
+        es?.close();
+        if (!cancelled) {
+          setTimeout(connect, 3000);
+        }
+      };
+    };
+
+    connect();
 
     return () => {
-      client.deactivate();
+      cancelled = true;
+      es?.close();
     };
   }, [isAuthenticated, user?.userId]);
 
@@ -74,100 +107,105 @@ export function NotificationBell() {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative w-10 h-10 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all bg-white"
-      >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-hot text-white text-[10px] font-black flex items-center justify-center">
+      <div className="relative" ref={dropdownRef}>
+        <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="relative w-10 h-10 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all bg-white"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-hot text-white text-[10px] font-black flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
-        )}
-      </button>
+          )}
+        </button>
 
-      {isOpen && (
-        <div className="absolute right-0 top-12 w-80 bg-white border-3 border-black shadow-[8px_8px_0_#0A0A0A] z-50">
-          <div className="flex items-center justify-between p-4 border-b-2 border-black">
-            <h3 className="font-black text-sm uppercase tracking-tight">Notifications</h3>
-            {unreadCount > 0 && (
-              <span className="text-xs font-bold text-hot uppercase">{unreadCount} unread</span>
-            )}
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-gray-500 font-bold text-sm uppercase">No notifications yet</p>
+        {isOpen && (
+            <div className="absolute right-0 top-12 w-80 bg-white border-3 border-black shadow-[8px_8px_0_#0A0A0A] z-50">
+              <div className="flex items-center justify-between p-4 border-b-2 border-black">
+                <h3 className="font-black text-sm uppercase tracking-tight">Notifications</h3>
+                {unreadCount > 0 && (
+                    <span className="text-xs font-bold text-hot uppercase">{unreadCount} unread</span>
+                )}
               </div>
-            ) : (
-              notifications.slice(0, 5).map((notification) => {
-                  const handleClick = async () => {
-                    try {
-                      if (!notification.isRead) {
-                        await markNotificationAsRead(notification.id);
-                        setNotifications(prev =>
-                            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-500 font-bold text-sm uppercase">No notifications yet</p>
+                    </div>
+                ) : (
+                    notifications.slice(0, 5).map((notification) => {
+                      const handleClick = async () => {
+                        try {
+                          if (!notification.isRead) {
+                            await markNotificationAsRead(notification.id);
+                            setNotifications(prev =>
+                                prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+                            );
+                            window.dispatchEvent(
+                                new CustomEvent("notification-marked-read", {
+                                  detail: { id: notification.id },
+                                })
+                            );
+                          }
+                        } catch (err) {
+                          console.error("Failed to mark notification as read:", err);
+                        }
+                        setIsOpen(false);
+                      };
+                      const content = (
+                          <div className="flex items-start gap-3 text-left">
+                            <div className={`w-2 h-2 mt-2 shrink-0 rounded-full ${getNotificationColor(notification.type)}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-black leading-tight">{notification.message}</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {formatNotifTime(notification.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                      );
+                      if (notification.referenceId) {
+                        return (
+                            <Link
+                                key={notification.id}
+                                href={`/listing/${notification.referenceId}`}
+                                onClick={handleClick}
+                                className={`block p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                                    !notification.isRead ? "bg-acid/5" : ""
+                                }`}
+                            >
+                              {content}
+                            </Link>
                         );
                       }
-                    } catch (err) {
-                      console.error("Failed to mark notification as read:", err);
-                    }
-                    setIsOpen(false);
-                  };
-                  const content = (
-                      <div className="flex items-start gap-3 text-left">
-                        <div className={`w-2 h-2 mt-2 shrink-0 rounded-full ${getNotificationColor(notification.type)}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-black leading-tight">{notification.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {formatNotifTime(notification.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                  );
-                  if (notification.referenceId) {
-                    return (
-                        <Link
-                            key={notification.id}
-                            href={`/listing/${notification.referenceId}`}
-                            onClick={handleClick}
-                            className={`block p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                                !notification.isRead ? "bg-acid/5" : ""
-                            }`}
-                        >
-                          {content}
-                        </Link>
-                    );
-                  }
-                  return (
-                      <div
-                          key={notification.id}
-                          onClick={handleClick}
-                          className={`p-4 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors ${
-                              !notification.isRead ? "bg-acid/5" : ""
-                          }`}
-                      >
-                        {content}
-                      </div>
-                  );
-                })
-            )}
-          </div>
+                      return (
+                          <div
+                              key={notification.id}
+                              onClick={handleClick}
+                              className={`p-4 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors ${
+                                  !notification.isRead ? "bg-acid/5" : ""
+                              }`}
+                          >
+                            {content}
+                          </div>
+                      );
+                    })
+                )}
+              </div>
 
-          <div className="p-3 border-t-2 border-black">
-            <Link
-              href="/notifications"
-              onClick={() => setIsOpen(false)}
-              className="block w-full text-center text-xs font-black uppercase text-electric hover:underline"
-            >
-              View all {notifications.length} notifications
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+              <div className="p-3 border-t-2 border-black">
+                <Link
+                    href="/notifications"
+                    onClick={() => setIsOpen(false)}
+                    className="block w-full text-center text-xs font-black uppercase text-electric hover:underline"
+                >
+                  View all {notifications.length} notifications
+                </Link>
+              </div>
+            </div>
+        )}
+      </div>
   );
 }
 
