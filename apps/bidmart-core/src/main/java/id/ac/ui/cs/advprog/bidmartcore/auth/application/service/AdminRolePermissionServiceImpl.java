@@ -34,6 +34,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     private static final Logger AUDIT = LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
     private static final Set<String> RESERVED_ROLES = Set.of("USER", "ADMIN");
+    private static final String ROLE_NOT_FOUND = "Role not found";
 
     private final RoleRepositoryPort roleRepository;
     private final RolePermissionPort rolePermissionPort;
@@ -74,7 +75,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     @Transactional
     public RoleWithPermissionsView setRolePermissions(int roleId, Set<PermissionValue> permissions) {
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         Set<PermissionValue> safePermissions = permissions == null ? Set.of() : permissions;
         validatePermissionsExist(safePermissions);
@@ -88,7 +89,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     public void deleteRole(int roleId) {
         log.info("Role delete requested: roleId={}", roleId);
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         String roleName = role.getName() == null ? "" : role.getName().trim().toUpperCase(Locale.ROOT);
         if (RESERVED_ROLES.contains(roleName)) {
@@ -115,7 +116,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         user.setRole(role);
         userRepository.save(user);

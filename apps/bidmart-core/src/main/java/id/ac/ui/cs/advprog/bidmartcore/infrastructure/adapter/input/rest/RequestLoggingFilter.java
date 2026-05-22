@@ -1,9 +1,9 @@
 package id.ac.ui.cs.advprog.bidmartcore.infrastructure.adapter.input.rest;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Set;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -13,9 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
-import java.io.IOException;
-import java.util.Set;
-import java.util.UUID;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -36,7 +37,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (shouldSkip(path)) {
+        if (shouldSkip(path) || isEventStream(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -68,6 +69,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             responseWrapper.copyBodyToResponse();
             MDC.remove("traceId");
         }
+    }
+
+    private boolean isEventStream(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains("text/event-stream");
     }
 
     private boolean shouldSkip(String path) {

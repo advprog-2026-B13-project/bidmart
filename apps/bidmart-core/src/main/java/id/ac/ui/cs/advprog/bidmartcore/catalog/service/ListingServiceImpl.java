@@ -30,6 +30,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
 
+    private static final String LISTING_NOT_FOUND_BY_ID = "Listing dengan ID tersebut tidak ditemukan";
+    private static final String LISTING_NOT_FOUND = "Listing tidak ditemukan";
+
     private final ListingRepository listingRepository;
     private final CategoryRepository categoryRepository;
 
@@ -71,7 +74,7 @@ public class ListingServiceImpl implements ListingService {
     public Listing updateListing(UUID id, AuthContext authContext, ListingUpdateRequest request) {
         log.info("Listing update: listingId={}", id);
         Listing existingListing = listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
         boolean hasGlobalPermission = authContext != null
                 && authContext.hasPermission(PermissionValue.LISTING_UPDATE_ALL_LISTING);
         UUID requesterId = authContext != null ? authContext.getUserId() : null;
@@ -107,13 +110,13 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public Listing getListingById(UUID id) {
         return listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
     }
 
     @Override
     public Listing getListingForOwner(UUID id, UUID ownerId) {
         Listing listing = listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
         if (!listing.getSellerId().equals(ownerId)) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
@@ -130,7 +133,7 @@ public class ListingServiceImpl implements ListingService {
     public Listing activateListing(UUID id, UUID requesterId) {
         log.info("Listing activate: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
         if (!listing.getSellerId().equals(requesterId)) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
@@ -150,7 +153,7 @@ public class ListingServiceImpl implements ListingService {
     public Listing closeListing(UUID id, UUID requesterId) {
         log.info("Listing close: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
         if (!listing.getSellerId().equals(requesterId)) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
@@ -172,7 +175,7 @@ public class ListingServiceImpl implements ListingService {
     public void deleteListing(UUID id, UUID requesterId) {
         log.info("Listing delete requested: listingId={} requesterId={}", id, requesterId);
         Listing existingListing = listingRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND_BY_ID));
         if (!existingListing.getSellerId().equals(requesterId)) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
@@ -208,7 +211,7 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public void updateStatus(UUID listingId, ListingStatus status) {
         Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND));
         listing.setStatus(status);
         listingRepository.save(listing);
     }
@@ -217,7 +220,7 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public void updateEndTime(UUID listingId, LocalDateTime endTime) {
         Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND));
         listing.setEndTime(endTime);
         listingRepository.save(listing);
     }
@@ -267,7 +270,7 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public void updateFinalResult(UUID listingId, BigDecimal finalPrice, UUID winnerId) {
         Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(LISTING_NOT_FOUND));
 
         listing.setCurrentPrice(finalPrice);
         listing.setWinnerId(winnerId);

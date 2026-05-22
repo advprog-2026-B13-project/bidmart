@@ -1,5 +1,19 @@
 package id.ac.ui.cs.advprog.bidmartcore.auth.application.service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.EmailOtp;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.PasswordResetToken;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.Role;
@@ -10,29 +24,27 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.MFAType;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.UserStatus;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.input.AuthUseCase;
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.input.SessionUseCase;
-import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.*;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.EmailOtpRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.EmailOtpSenderPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.PasswordResetEmailSenderPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.PasswordResetTokenRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.PreAuthSessionPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.RoleRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionCachePort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionRepositoryPort;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.UserRepositoryPort;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtToken;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtUtil;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
-import io.jsonwebtoken.JwtException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthUseCase {
 
+    private static final String REQUIRES_MFA = "requiresMfa";
     private static final org.slf4j.Logger AUDIT = org.slf4j.LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
     private final UserRepositoryPort userRepository;
@@ -208,7 +220,7 @@ public class AuthServiceImpl implements AuthUseCase {
                     user.getDefault2FAMethod().name(), preAuthTtlSeconds);
 
             Map<String, Object> result = new HashMap<>();
-            result.put("requiresMfa", true);
+            result.put(REQUIRES_MFA, true);
             result.put("preAuthToken", preAuthToken);
             result.put("mfaType", user.getDefault2FAMethod().name());
             return result;
@@ -216,7 +228,7 @@ public class AuthServiceImpl implements AuthUseCase {
 
         // No 2FA, create session directly
         Map<String, Object> tokens = sessionUseCase.createSession(user.getId(), clientInfo);
-        tokens.put("requiresMfa", false);
+        tokens.put(REQUIRES_MFA, false);
         return tokens;
     }
 
@@ -224,7 +236,7 @@ public class AuthServiceImpl implements AuthUseCase {
     @Transactional
     public Map<String, Object> confirmSessionReplacement(String replacementToken, boolean shouldReplace, SessionClientInfo clientInfo) {
         Map<String, Object> tokens = sessionUseCase.confirmSessionReplacement(replacementToken, shouldReplace, clientInfo);
-        tokens.put("requiresMfa", false);
+        tokens.put(REQUIRES_MFA, false);
         return tokens;
     }
 

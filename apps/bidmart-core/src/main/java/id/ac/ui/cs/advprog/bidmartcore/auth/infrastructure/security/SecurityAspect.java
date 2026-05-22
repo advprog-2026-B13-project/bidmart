@@ -30,6 +30,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SecurityAspect {
 
+    private static final String KEY_SUCCESS = "success";
+    private static final String KEY_MESSAGE = "message";
+
     private final HttpServletRequest request;
     private final JwtUtil jwtUtil;
     private final SessionCachePort sessionCache;
@@ -45,7 +48,7 @@ public class SecurityAspect {
         if (session == null) {
             log.debug("RequireLogin rejected: path={} method={}", request.getRequestURI(), request.getMethod());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Unauthorized"));
+                    .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Unauthorized"));
         }
 
         populateAuthContext(session);
@@ -58,7 +61,7 @@ public class SecurityAspect {
         Session session = resolveSession();
         if (session == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Unauthorized"));
+                    .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Unauthorized"));
         }
 
         populateAuthContext(session);
@@ -77,7 +80,7 @@ public class SecurityAspect {
                 log.warn("RequirePermission denied: userId={} path={} requiredPermissions={}",
                         authContext.getUserId(), request.getRequestURI(), Arrays.toString(required));
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Forbidden"));
+                        .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Forbidden"));
             }
         }
 
