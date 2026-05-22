@@ -26,7 +26,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
     const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
 
     const client = new Client({
