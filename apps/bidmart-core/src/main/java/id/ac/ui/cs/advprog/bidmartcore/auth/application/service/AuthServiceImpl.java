@@ -14,6 +14,7 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.*;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtToken;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,9 +28,12 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthUseCase {
+
+    private static final org.slf4j.Logger AUDIT = org.slf4j.LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
     private final UserRepositoryPort userRepository;
     private final RoleRepositoryPort roleRepository;
@@ -64,7 +68,9 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public Map<String, Object> register(String email, String password, String displayName) {
+        log.info("Registration attempt: email={}", email);
         if (userRepository.existsByEmail(email)) {
+            log.warn("Registration failed - email already exists: email={}", email);
             throw new IllegalArgumentException("Email already registered");
         }
 
@@ -86,6 +92,8 @@ public class AuthServiceImpl implements AuthUseCase {
 
         User saved = userRepository.save(user);
         sendEmailVerificationOtp(saved);
+        AUDIT.info("USER_REGISTERED userId={} email={}", saved.getId(), saved.getEmail());
+        log.info("Registration successful: userId={} email={}", saved.getId(), saved.getEmail());
 
         JwtToken verificationToken = jwtUtil.generateEmailVerificationToken(
                 saved.getId(),
@@ -105,14 +113,17 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public void verifyEmailOtp(String email, String otpCode) {
+        log.info("Email verification attempt: email={}", email);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid verification request"));
 
         if (user.getStatus() == UserStatus.ACTIVE) {
+            log.debug("Email already verified: email={}", email);
             return;
         }
 
         if (user.getStatus() == UserStatus.SUSPENDED) {
+            log.warn("Email verification rejected - account suspended: email={}", email);
             throw new IllegalStateException("Account is suspended");
         }
 
@@ -132,6 +143,8 @@ public class AuthServiceImpl implements AuthUseCase {
 
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
+        AUDIT.info("EMAIL_VERIFIED userId={} email={}", user.getId(), email);
+        log.info("Email verified successfully: email={}", email);
     }
 
     @Override
@@ -164,8 +177,12 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public Map<String, Object> login(String email, String password, SessionClientInfo clientInfo) {
+        log.info("Login attempt: email={} ip={}", email, clientInfo != null ? clientInfo.ipAddress() : "unknown");
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+                .orElseThrow(() -> {
+                    log.warn("Login failed - user not found: email={}", email);
+                    return new IllegalArgumentException("Invalid email or password");
+                });
 
         if (user.getStatus() == UserStatus.SUSPENDED) {
             throw new IllegalStateException("Account is suspended");
@@ -176,8 +193,13 @@ public class AuthServiceImpl implements AuthUseCase {
         }
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            log.warn("Login failed - invalid password: email={}", email);
             throw new IllegalArgumentException("Invalid email or password");
         }
+
+        AUDIT.info("LOGIN_SUCCESS userId={} email={} ip={}", user.getId(), email,
+                clientInfo != null ? clientInfo.ipAddress() : "unknown");
+        log.info("Login successful: userId={} email={}", user.getId(), email);
 
         // Check if 2FA is enabled
         if (user.getDefault2FAMethod() != MFAType.DISABLED) {
@@ -209,11 +231,15 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public void logout(String sessionId) {
+        log.info("Logout: sessionId={}", sessionId);
         Session session = sessionRepository.findById(sessionId).orElse(null);
         if (session != null) {
             session.setActive(false);
             sessionRepository.save(session);
             sessionCache.evictSession(sessionId);
+            AUDIT.info("LOGOUT userId={} sessionId={}", session.getUser() != null ? session.getUser().getId() : null, sessionId);
+        } else {
+            log.warn("Logout - session not found: sessionId={}", sessionId);
         }
     }
 
@@ -262,12 +288,14 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public void requestPasswordReset(String email) {
+        log.info("Password reset requested: email={}", email);
         if (!StringUtils.hasText(email) || !email.contains("@")) {
             throw new IllegalArgumentException("Invalid email address");
         }
 
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            log.info("Password reset - user not found or inactive, silently ignoring: email={}", email);
             return;
         }
 
@@ -315,6 +343,7 @@ public class AuthServiceImpl implements AuthUseCase {
     @Override
     @Transactional
     public void resetPassword(String token, String newPassword) {
+        log.info("Password reset attempt: token={}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
         if (!StringUtils.hasText(newPassword)) {
             throw new IllegalArgumentException("New password is required");
         }
@@ -336,6 +365,8 @@ public class AuthServiceImpl implements AuthUseCase {
         passwordResetTokenRepository.invalidateAllByUserId(user.getId());
         resetToken.setUsed(true);
         passwordResetTokenRepository.save(resetToken);
+        AUDIT.info("PASSWORD_RESET userId={}", user.getId());
+        log.info("Password reset successful: userId={}", user.getId());
     }
 
     private void sendEmailVerificationOtp(User user) {

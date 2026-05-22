@@ -22,7 +22,9 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingSpecification;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
 
@@ -37,6 +39,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing createListing(ListingCreateRequest request, UUID sellerId) {
+        log.info("Listing created: sellerId={} title={}", sellerId, request.getTitle());
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Kategori tidak ditemukan"));
 
@@ -64,6 +67,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing updateListing(UUID id, AuthContext authContext, ListingUpdateRequest request) {
+        log.info("Listing update: listingId={}", id);
         Listing existingListing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         boolean hasGlobalPermission = authContext != null
@@ -122,6 +126,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing activateListing(UUID id, UUID requesterId) {
+        log.info("Listing activate: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!listing.getSellerId().equals(requesterId)) {
@@ -141,6 +146,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing closeListing(UUID id, UUID requesterId) {
+        log.info("Listing close: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!listing.getSellerId().equals(requesterId)) {
@@ -162,6 +168,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public void deleteListing(UUID id, UUID requesterId) {
+        log.info("Listing delete requested: listingId={} requesterId={}", id, requesterId);
         Listing existingListing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!existingListing.getSellerId().equals(requesterId)) {
@@ -175,6 +182,7 @@ public class ListingServiceImpl implements ListingService {
         }
 
         listingRepository.deleteById(id);
+        log.info("Listing deleted: listingId={} requesterId={}", id, requesterId);
     }
 
     private List<Integer> getAllCategoryIdsWithChildren(Integer parentId) {

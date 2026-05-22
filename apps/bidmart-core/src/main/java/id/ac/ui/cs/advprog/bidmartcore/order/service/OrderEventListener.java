@@ -4,10 +4,12 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
 import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class OrderEventListener {
 
@@ -20,7 +22,7 @@ public class OrderEventListener {
 
     @EventListener
     public void handleAuctionClosed(AuctionClosedEvent event) {
-        System.out.println("Sinyal lelang diterima! Listing ID " + event.getListingId());
+        log.info("Auction closed event received: listingId={} result={}", event.getListingId(), event.getResult());
 
         if (event.getResult() == AuctionClosedEvent.AuctionResult.WON) {
             Order newOrder = new Order();
@@ -32,9 +34,10 @@ public class OrderEventListener {
             newOrder.setStatus(OrderStatus.PENDING);
 
             orderRepository.save(newOrder);
-            System.out.println("Pesanan otomatis dibuat untuk Pembeli: " + event.getWinnerBidderId());
+            log.info("Order auto-created for auction winner: listingId={} buyerId={} sellerId={} amount={}",
+                    event.getListingId(), event.getWinnerBidderId(), event.getSellerId(), event.getFinalAmount());
         } else {
-            System.out.println("Lelang ditutup tanpa pemenang. Tidak ada pesanan yang dibuat.");
+            log.info("Auction closed without winner, no order created: listingId={}", event.getListingId());
         }
     }
 }

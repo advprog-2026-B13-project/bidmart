@@ -9,6 +9,7 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionRepository
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.RolePermissionPort;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
+@Slf4j
 @Aspect
 @Component
 @RequiredArgsConstructor
@@ -41,6 +43,7 @@ public class SecurityAspect {
     public Object checkLogin(ProceedingJoinPoint joinPoint) throws Throwable {
         Session session = resolveSession();
         if (session == null) {
+            log.debug("RequireLogin rejected: path={} method={}", request.getRequestURI(), request.getMethod());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "message", "Unauthorized"));
         }
@@ -71,6 +74,8 @@ public class SecurityAspect {
             PermissionValue[] required = annotation.value();
             boolean hasAll = Arrays.stream(required).allMatch(authContext::hasPermission);
             if (!hasAll) {
+                log.warn("RequirePermission denied: userId={} path={} requiredPermissions={}",
+                        authContext.getUserId(), request.getRequestURI(), Arrays.toString(required));
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("success", false, "message", "Forbidden"));
             }

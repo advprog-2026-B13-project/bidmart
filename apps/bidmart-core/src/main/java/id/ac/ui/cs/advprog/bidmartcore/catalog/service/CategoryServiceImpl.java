@@ -2,11 +2,13 @@ package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class CategoryServiceImpl implements CategoryService {
 
@@ -49,10 +51,13 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public void deleteCategory(Integer id) {
+        log.info("Category delete: categoryId={}", id);
         Category category = getCategoryById(id);
         if (category.getSubCategories() != null && !category.getSubCategories().isEmpty()) {
+            log.warn("Category delete rejected - has subcategories: categoryId={}", id);
             throw new IllegalStateException("Kategori tidak bisa dihapus karena masih memiliki sub-kategori.");
         }
         categoryRepository.delete(category);
+        log.info("Category deleted: categoryId={}", id);
     }
 }
