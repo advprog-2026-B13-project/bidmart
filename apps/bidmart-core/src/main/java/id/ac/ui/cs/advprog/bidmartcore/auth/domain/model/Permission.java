@@ -7,13 +7,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name="permissions")
-public class Permission {
+public class Permission implements Serializable {
     @Id
     @SequenceGenerator(name = "permission_seq_gen", sequenceName = "permission_seq", allocationSize = 1)
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "permission_seq_gen")

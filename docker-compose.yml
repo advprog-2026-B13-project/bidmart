@@ -52,6 +52,7 @@ services:
       AUTH_MFA_EMAIL_SUBJECT: Your BidMart OTP code
       AUTH_MFA_EMAIL_APP_NAME: BidMart
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      APP_VERSION: ghcr.io/advprog-2026-b13-project/bidmart-core:staging
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-change-me}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-change-me}
     healthcheck:

@@ -6,12 +6,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Entity
 @Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name="roles")
-public class Role {
+public class Role implements Serializable {
     @Id
     @SequenceGenerator(name = "role_seq_gen", sequenceName = "role_seq", allocationSize = 1)
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "role_seq_gen")
