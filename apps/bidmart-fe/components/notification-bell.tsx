@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useAuth } from "./auth-provider";
-import { getNotifications, type NotificationItem } from "@/lib/api/endpoints";
+import { getNotifications, markNotificationAsRead, type NotificationItem } from "@/lib/api/endpoints";
 import { Client } from "@stomp/stompjs";
 
 export function NotificationBell() {
@@ -43,6 +43,7 @@ export function NotificationBell() {
             type: newNotif.type,
             message: newNotif.message,
             isRead: newNotif.read !== undefined ? newNotif.read : newNotif.isRead,
+            referenceId: newNotif.referenceId,
             createdAt: newNotif.createdAt,
           };
 
@@ -101,24 +102,57 @@ export function NotificationBell() {
                 <p className="text-gray-500 font-bold text-sm uppercase">No notifications yet</p>
               </div>
             ) : (
-              notifications.slice(0, 5).map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                    !notification.isRead ? "bg-acid/5" : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-2 h-2 mt-2 shrink-0 rounded-full ${getNotificationColor(notification.type)}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-black leading-tight">{notification.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {formatNotifTime(notification.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
+              notifications.slice(0, 5).map((notification) => {
+                  const handleClick = async () => {
+                    try {
+                      if (!notification.isRead) {
+                        await markNotificationAsRead(notification.id);
+                        setNotifications(prev =>
+                            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+                        );
+                      }
+                    } catch (err) {
+                      console.error("Failed to mark notification as read:", err);
+                    }
+                    setIsOpen(false);
+                  };
+                  const content = (
+                      <div className="flex items-start gap-3 text-left">
+                        <div className={`w-2 h-2 mt-2 shrink-0 rounded-full ${getNotificationColor(notification.type)}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-black leading-tight">{notification.message}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {formatNotifTime(notification.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                  );
+                  if (notification.referenceId) {
+                    return (
+                        <Link
+                            key={notification.id}
+                            href={`/listing/${notification.referenceId}`}
+                            onClick={handleClick}
+                            className={`block p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                                !notification.isRead ? "bg-acid/5" : ""
+                            }`}
+                        >
+                          {content}
+                        </Link>
+                    );
+                  }
+                  return (
+                      <div
+                          key={notification.id}
+                          onClick={handleClick}
+                          className={`p-4 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors ${
+                              !notification.isRead ? "bg-acid/5" : ""
+                          }`}
+                      >
+                        {content}
+                      </div>
+                  );
+                })
             )}
           </div>
 

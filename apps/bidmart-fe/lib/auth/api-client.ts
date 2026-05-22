@@ -151,7 +151,7 @@ export async function apiFetch<T>(
   }
 
   if (!payload) {
-    throw new ApiError("Empty response payload", response.status);
+    return {} as T;
   }
 
   return payload;

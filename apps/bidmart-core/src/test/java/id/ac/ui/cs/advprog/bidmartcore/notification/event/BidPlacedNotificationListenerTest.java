@@ -64,7 +64,8 @@ class BidPlacedNotificationListenerTest {
         verify(notificationService, times(1)).createNotification(
                 eq(sellerId),
                 eq("NEW_BID"),
-                messageCaptor.capture()
+                messageCaptor.capture(),
+                eq(listingId)
         );
 
         String message = messageCaptor.getValue();
@@ -82,6 +83,6 @@ class BidPlacedNotificationListenerTest {
 
         listener.onBidPlaced(event);
 
-        verify(notificationService, never()).createNotification(any(), any(), any());
+        verify(notificationService, never()).createNotification(any(), any(), any(), any());
     }
 }
