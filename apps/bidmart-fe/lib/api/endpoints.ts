@@ -439,3 +439,6 @@ export async function disputeOrder(orderId: string): Promise<Order> {
   }, { auth: true }) as Order;
   return raw;
 }
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  await apiFetch(`/api/notifications/user/${userId}/read-all`, { method: "POST" }, { auth: true });
+}

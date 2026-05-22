@@ -8,4 +8,5 @@ public interface NotificationService {
     List<Notification> getUserNotifications(UUID userId);
     void createNotification(UUID userId, String type, String message, UUID referenceId);
     void markAsRead(UUID notificationId);
+    void markAllAsRead(UUID userId);
 }

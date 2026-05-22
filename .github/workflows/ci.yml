@@ -143,13 +143,24 @@ jobs:
         with:
           projectBaseDir: apps/bidmart-fe
 
-  # Depends only on detect-changes (always runs) to avoid the GitHub workflow_call
-  # bug where all-skipped needs permanently stalls ci-summary.
-  # core/fe/sonar-fe still report their own pass/fail status on the PR.
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes]
+    needs: [detect-changes, core, fe, sonar-fe]
     if: always()
     steps:
-      - name: CI complete
-        run: echo "✅ CI checks passed (core=${{ needs.detect-changes.outputs.core }}, fe=${{ needs.detect-changes.outputs.fe }})"
+      - name: Check CI results
+        run: |
+          CORE="${{ needs.core.result }}"
+          FE="${{ needs.fe.result }}"
+          SONAR_FE="${{ needs.sonar-fe.result }}"
+          echo "core=$CORE  fe=$FE  sonar-fe=$SONAR_FE"
+          if [[ "$CORE" == "failure" || "$CORE" == "cancelled" ]]; then
+            echo "❌ core job $CORE"; exit 1
+          fi
+          if [[ "$FE" == "failure" || "$FE" == "cancelled" ]]; then
+            echo "❌ fe job $FE"; exit 1
+          fi
+          if [[ "$SONAR_FE" == "failure" || "$SONAR_FE" == "cancelled" ]]; then
+            echo "❌ sonar-fe job $SONAR_FE"; exit 1
+          fi
+          echo "✅ CI passed"
