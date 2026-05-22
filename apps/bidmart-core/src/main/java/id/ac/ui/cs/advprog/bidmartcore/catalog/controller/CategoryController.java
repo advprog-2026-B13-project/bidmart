@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CategoryController {
 
+    private static final String ADMIN_ROLE = ADMIN_ROLE;
+
     private final CategoryService categoryService;
 
     @GetMapping("/main")
@@ -45,7 +47,7 @@ public class CategoryController {
             @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role,
             @RequestBody Category category) {
 
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!ADMIN_ROLE.equalsIgnoreCase(role)) {
             throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat menambah kategori.");
         }
 
@@ -59,7 +61,7 @@ public class CategoryController {
             @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role,
             @RequestBody Category categoryDetails) {
 
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!ADMIN_ROLE.equalsIgnoreCase(role)) {
             throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat mengubah kategori.");
         }
 
@@ -72,7 +74,7 @@ public class CategoryController {
             @PathVariable Integer id,
             @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role) {
 
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!ADMIN_ROLE.equalsIgnoreCase(role)) {
             throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat menghapus kategori.");
         }
 

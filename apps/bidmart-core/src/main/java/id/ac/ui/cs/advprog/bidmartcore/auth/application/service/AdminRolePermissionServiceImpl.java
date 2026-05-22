@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCase {
 
     private static final Set<String> RESERVED_ROLES = Set.of("USER", "ADMIN");
+    private static final String ROLE_NOT_FOUND = ROLE_NOT_FOUND;
 
     private final RoleRepositoryPort roleRepository;
     private final RolePermissionPort rolePermissionPort;
@@ -68,7 +69,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     @Transactional
     public RoleWithPermissionsView setRolePermissions(int roleId, Set<PermissionValue> permissions) {
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         Set<PermissionValue> safePermissions = permissions == null ? Set.of() : permissions;
         validatePermissionsExist(safePermissions);
@@ -81,7 +82,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
     @Transactional
     public void deleteRole(int roleId) {
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         String roleName = role.getName() == null ? "" : role.getName().trim().toUpperCase(Locale.ROOT);
         if (RESERVED_ROLES.contains(roleName)) {
@@ -103,7 +104,7 @@ public class AdminRolePermissionServiceImpl implements AdminRolePermissionUseCas
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+                .orElseThrow(() -> new IllegalArgumentException(ROLE_NOT_FOUND));
 
         user.setRole(role);
         userRepository.save(user);

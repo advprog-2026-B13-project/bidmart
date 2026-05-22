@@ -34,6 +34,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletService walletService;
     private final MidtransCoreApi midtransCoreApi;
 
+    private static final String BANK_TRANSFER = BANK_TRANSFER;
+    private static final String GOPAY = GOPAY;
+
     @Value("${midtrans.server-key}")
     private String serverKey;
 
@@ -61,7 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         String resolvedPaymentType = (paymentType == null || paymentType.isBlank())
-                ? "bank_transfer"
+                ? BANK_TRANSFER
                 : paymentType.toLowerCase(Locale.ROOT);
         String bankCode = (bank == null || bank.isBlank()) ? "bca" : bank.toLowerCase(Locale.ROOT);
 
@@ -75,20 +78,20 @@ public class PaymentServiceImpl implements PaymentService {
 
         String responseBank = resolvedPaymentType;
         switch (resolvedPaymentType) {
-            case "bank_transfer" -> {
+            case BANK_TRANSFER -> {
                 Map<String, Object> bankTransfer = new HashMap<>();
                 bankTransfer.put("bank", bankCode);
-                requestBody.put("bank_transfer", bankTransfer);
+                requestBody.put(BANK_TRANSFER, bankTransfer);
                 responseBank = bankCode;
             }
             case "qris" -> {
                 Map<String, Object> qris = new HashMap<>();
-                String acquirer = (bank == null || bank.isBlank()) ? "gopay" : bankCode;
+                String acquirer = (bank == null || bank.isBlank()) ? GOPAY : bankCode;
                 qris.put("acquirer", acquirer);
                 requestBody.put("qris", qris);
                 responseBank = acquirer;
             }
-            case "gopay" -> requestBody.put("gopay", new HashMap<>());
+            case GOPAY -> requestBody.put(GOPAY, new HashMap<>());
             case "shopeepay" -> requestBody.put("shopeepay", new HashMap<>());
             default -> throw new IllegalArgumentException("Unsupported payment type: " + paymentType);
         }
@@ -99,7 +102,7 @@ public class PaymentServiceImpl implements PaymentService {
             String transactionStatus = response.optString("transaction_status", "pending");
 
             String vaNumber = null;
-            if ("bank_transfer".equals(resolvedPaymentType)) {
+            if (BANK_TRANSFER.equals(resolvedPaymentType)) {
                 if (response.has("va_numbers")) {
                     JSONArray vaNumbers = response.getJSONArray("va_numbers");
                     if (!vaNumbers.isEmpty()) {

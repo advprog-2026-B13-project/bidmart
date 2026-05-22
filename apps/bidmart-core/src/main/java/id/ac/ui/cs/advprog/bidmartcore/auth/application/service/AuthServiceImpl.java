@@ -30,6 +30,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthUseCase {
 
+    private static final String REQUIRES_MFA = REQUIRES_MFA;
+
     private final UserRepositoryPort userRepository;
     private final RoleRepositoryPort roleRepository;
     private final SessionRepositoryPort sessionRepository;
@@ -180,7 +182,7 @@ public class AuthServiceImpl implements AuthUseCase {
                     user.getDefault2FAMethod().name(), preAuthTtlSeconds);
 
             Map<String, Object> result = new HashMap<>();
-            result.put("requiresMfa", true);
+            result.put(REQUIRES_MFA, true);
             result.put("preAuthToken", preAuthToken);
             result.put("mfaType", user.getDefault2FAMethod().name());
             return result;
@@ -188,7 +190,7 @@ public class AuthServiceImpl implements AuthUseCase {
 
         // No 2FA, create session directly
         Map<String, Object> tokens = sessionUseCase.createSession(user.getId(), clientInfo);
-        tokens.put("requiresMfa", false);
+        tokens.put(REQUIRES_MFA, false);
         return tokens;
     }
 
@@ -196,7 +198,7 @@ public class AuthServiceImpl implements AuthUseCase {
     @Transactional
     public Map<String, Object> confirmSessionReplacement(String replacementToken, boolean shouldReplace, SessionClientInfo clientInfo) {
         Map<String, Object> tokens = sessionUseCase.confirmSessionReplacement(replacementToken, shouldReplace, clientInfo);
-        tokens.put("requiresMfa", false);
+        tokens.put(REQUIRES_MFA, false);
         return tokens;
     }
 

@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class ListingSpecification {
+
+    private static final String CURRENT_PRICE = CURRENT_PRICE;
+
     public static Specification<Listing> hasTitle(String keyword) {
         return (root, query, cb) -> keyword == null ? null :
                 cb.like(cb.lower(root.get("title")), "%" + keyword.toLowerCase() + "%");
@@ -16,9 +19,9 @@ public class ListingSpecification {
     public static Specification<Listing> hasPriceBetween(BigDecimal minPrice, BigDecimal maxPrice) {
         return (root, query, cb) -> {
             if (minPrice == null && maxPrice == null) return null;
-            if (minPrice != null && maxPrice != null) return cb.between(root.get("currentPrice"), minPrice, maxPrice);
-            if (minPrice != null) return cb.greaterThanOrEqualTo(root.get("currentPrice"), minPrice);
-            return cb.lessThanOrEqualTo(root.get("currentPrice"), maxPrice);
+            if (minPrice != null && maxPrice != null) return cb.between(root.get(CURRENT_PRICE), minPrice, maxPrice);
+            if (minPrice != null) return cb.greaterThanOrEqualTo(root.get(CURRENT_PRICE), minPrice);
+            return cb.lessThanOrEqualTo(root.get(CURRENT_PRICE), maxPrice);
         };
     }
 

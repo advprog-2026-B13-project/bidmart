@@ -22,6 +22,9 @@ import java.util.Map;
 @Tag(name = "Authentication", description = "Register, Login, Logout, Token Refresh")
 public class AuthController {
 
+    private static final String ACCESS_TOKEN = ACCESS_TOKEN;
+    private static final String REFRESH_TOKEN = REFRESH_TOKEN;
+
     private final AuthUseCase authUseCase;
     private final AuthContext authContext;
     private final AuthCookieService authCookieService;
@@ -126,8 +129,8 @@ public class AuthController {
 
             if (Boolean.FALSE.equals(result.get("requiresMfa"))
                     && Boolean.FALSE.equals(result.getOrDefault("requiresSessionReplacement", false))) {
-                String accessToken = (String) result.get("accessToken");
-                String refreshToken = (String) result.get("refreshToken");
+                String accessToken = (String) result.get(ACCESS_TOKEN);
+                String refreshToken = (String) result.get(REFRESH_TOKEN);
 
                 ResponseEntity.BodyBuilder builder = addCookies(
                         ResponseEntity.ok(),
@@ -166,8 +169,8 @@ public class AuthController {
                     sessionClientInfoResolver.resolve(httpRequest)
             );
 
-            String accessToken = (String) result.get("accessToken");
-            String refreshToken = (String) result.get("refreshToken");
+            String accessToken = (String) result.get(ACCESS_TOKEN);
+            String refreshToken = (String) result.get(REFRESH_TOKEN);
 
             ResponseEntity.BodyBuilder builder = addCookies(
                     ResponseEntity.ok(),
@@ -216,8 +219,8 @@ public class AuthController {
             }
 
             Map<String, Object> result = authUseCase.refreshToken(refreshToken);
-            String accessToken = (String) result.get("accessToken");
-            String newRefreshToken = (String) result.get("refreshToken");
+            String accessToken = (String) result.get(ACCESS_TOKEN);
+            String newRefreshToken = (String) result.get(REFRESH_TOKEN);
 
             ResponseEntity.BodyBuilder builder = addCookies(
                     ResponseEntity.ok(),

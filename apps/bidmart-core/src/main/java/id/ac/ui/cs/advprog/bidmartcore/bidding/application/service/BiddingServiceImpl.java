@@ -41,6 +41,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BiddingServiceImpl implements BiddingUseCase {
 
+    private static final String METRIC_PLACE_BID = METRIC_PLACE_BID;
+    private static final String TAG_OUTCOME = TAG_OUTCOME;
+
     private final BidRepositoryPort bidRepository;
     private final ListingPort listingPort;
     private final EventPublisherPort eventPublisher;
@@ -80,7 +83,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
 
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
             walletPort.releaseFunds(bidderId, bidAmount);
-            metrics.record(totalSample, "bidding.place_bid", "outcome", "cache_miss");
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, "cache_miss");
             throw new IllegalStateException("System unavailable, please try again.");
         }
 
@@ -93,17 +96,17 @@ public class BiddingServiceImpl implements BiddingUseCase {
                 case OUTBID -> handleOutbid(listingId, listing, bidderId, bidAmount, result);
                 default -> handleReject(bidderId, bidAmount, result.status());
             };
-            metrics.record(dbWriteSample, "bidding.db_write", "outcome", result.status().name().toLowerCase());
+            metrics.record(dbWriteSample, "bidding.db_write", TAG_OUTCOME, result.status().name().toLowerCase());
 
             outcome.publishActions().forEach(Runnable::run);
 
-            metrics.record(totalSample, "bidding.place_bid", "outcome", result.status().name().toLowerCase());
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, result.status().name().toLowerCase());
             return outcome.bidResult();
         } catch (Exception e) {
             if (stateMutated) {
                 compensate(listingId, listing, bidderId, bidAmount, result);
             }
-            metrics.record(totalSample, "bidding.place_bid", "outcome", "error");
+            metrics.record(totalSample, METRIC_PLACE_BID, TAG_OUTCOME, "error");
             throw e;
         }
     }
