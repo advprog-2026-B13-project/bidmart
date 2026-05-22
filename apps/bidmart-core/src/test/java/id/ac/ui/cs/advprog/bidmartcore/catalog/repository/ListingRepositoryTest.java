@@ -233,11 +233,12 @@ class ListingRepositoryTest {
     void testRecordNewBidNotFound() {
         UUID wrongId = UUID.randomUUID();
         UUID listingId = activeListing.getId();
+        BigDecimal price = new BigDecimal("99000000");
+        doNothing().when(listingRepository).recordNewBid(eq(wrongId), eq(price), any(UUID.class));
 
-        doNothing().when(listingRepository).recordNewBid(wrongId, new BigDecimal("99000000"), any(UUID.class));
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(activeListing));
 
-        listingRepository.recordNewBid(wrongId, new BigDecimal("99000000"), UUID.randomUUID());
+        listingRepository.recordNewBid(wrongId, price, UUID.randomUUID());
         Listing original = listingRepository.findById(listingId).orElse(null);
 
         assertNotNull(original);
@@ -362,10 +363,12 @@ class ListingRepositoryTest {
     @Test
     @DisplayName("Edge Case [findBySellerId]: Kebal dari ancaman error sewaktu sellerId bernilai null")
     void testFindBySellerIdNull() {
+        // Pastikan tidak ada aksi lain yang terpanggil sebelum ini
         when(listingRepository.findBySellerId(null)).thenReturn(Collections.emptyList());
 
         List<Listing> results = listingRepository.findBySellerId(null);
 
+        assertNotNull(results); // Tambahkan assertion null-check agar coverage lebih kuat
         assertTrue(results.isEmpty());
     }
 
