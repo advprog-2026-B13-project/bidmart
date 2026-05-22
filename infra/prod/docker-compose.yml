@@ -1,0 +1,90 @@
+services:
+  core:
+    image: ${CORE_IMAGE:?CORE_IMAGE required}
+    container_name: bidmart-core
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
+      DATABASE_USER: ${DATABASE_USER:?DATABASE_USER required}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD required}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST required}
+      REDIS_PORT: 6379
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET required}
+      AUTH_REGISTRATION_VERIFICATION_FRONTEND_BASE_URL: ${FRONTEND_URL:?FRONTEND_URL required}
+      APP_CORS_ALLOWED_ORIGINS: ${FRONTEND_URL:?FRONTEND_URL required}
+      AUTH_COOKIE_SAME_SITE: None
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_MFA_EMAIL_FROM: ${MAIL_FROM:-no-reply@bidmart.store}
+      AUTH_MFA_EMAIL_SUBJECT: Your BidMart OTP code
+      AUTH_MFA_EMAIL_APP_NAME: BidMart
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:?MIDTRANS_SERVER_KEY required}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:?MIDTRANS_CLIENT_KEY required}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bidmart-network
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: bidmart-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    depends_on:
+      - core
+    networks:
+      - bidmart-network
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: bidmart-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://grafana.bidmart.store"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - bidmart-network
+
+  caddy:
+    image: caddy:alpine
+    container_name: bidmart-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - core
+    networks:
+      - bidmart-network
+
+volumes:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  bidmart-network:
+    driver: bridge
