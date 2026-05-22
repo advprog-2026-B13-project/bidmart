@@ -94,7 +94,11 @@ jobs:
           SERENITY_BIDDER_PASSWORD: ${{ secrets.SERENITY_BIDDER_PASSWORD }}
           SERENITY_TEST_LISTING_ID: ${{ secrets.SERENITY_TEST_LISTING_ID }}
           SERENITY_BID_INCREMENT: "1"
-        run: chmod +x gradlew && ./gradlew test
+        run: |
+          chmod +x gradlew
+          ./gradlew test --continue; TEST_RESULT=$?
+          ./gradlew aggregate
+          exit $TEST_RESULT
 
       - name: Upload Serenity report
         if: always()
