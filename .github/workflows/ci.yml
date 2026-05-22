@@ -18,9 +18,11 @@ jobs:
             core:
               - 'apps/bidmart-core/**'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/main.yml'
             fe:
               - 'apps/bidmart-fe/**'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/main.yml'
 
   # ========== BUILD & TEST ==========
 
