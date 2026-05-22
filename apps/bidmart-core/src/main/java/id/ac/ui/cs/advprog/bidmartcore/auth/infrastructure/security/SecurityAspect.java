@@ -9,6 +9,7 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.SessionRepository
 import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.RolePermissionPort;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -23,10 +24,14 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
+@Slf4j
 @Aspect
 @Component
 @RequiredArgsConstructor
 public class SecurityAspect {
+
+    private static final String KEY_SUCCESS = "success";
+    private static final String KEY_MESSAGE = "message";
 
     private final HttpServletRequest request;
     private final JwtUtil jwtUtil;
@@ -41,8 +46,9 @@ public class SecurityAspect {
     public Object checkLogin(ProceedingJoinPoint joinPoint) throws Throwable {
         Session session = resolveSession();
         if (session == null) {
+            log.debug("RequireLogin rejected: path={} method={}", request.getRequestURI(), request.getMethod());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Unauthorized"));
+                    .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Unauthorized"));
         }
 
         populateAuthContext(session);
@@ -55,7 +61,7 @@ public class SecurityAspect {
         Session session = resolveSession();
         if (session == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Unauthorized"));
+                    .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Unauthorized"));
         }
 
         populateAuthContext(session);
@@ -71,11 +77,23 @@ public class SecurityAspect {
             PermissionValue[] required = annotation.value();
             boolean hasAll = Arrays.stream(required).allMatch(authContext::hasPermission);
             if (!hasAll) {
+                log.warn("RequirePermission denied: userId={} path={} requiredPermissions={}",
+                        authContext.getUserId(), request.getRequestURI(), Arrays.toString(required));
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Forbidden"));
+                        .body(Map.of(KEY_SUCCESS, false, KEY_MESSAGE, "Forbidden"));
             }
         }
 
+        return joinPoint.proceed();
+    }
+
+    @Around("@annotation(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.OptionalAuth) || " +
+            "@within(id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.OptionalAuth)")
+    public Object populateOptionalLogin(ProceedingJoinPoint joinPoint) throws Throwable {
+        Session session = resolveSession();
+        if (session != null) {
+            populateAuthContext(session);
+        }
         return joinPoint.proceed();
     }
 

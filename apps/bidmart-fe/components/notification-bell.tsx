@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { getNotifications, markNotificationAsRead, type NotificationItem } from "@/lib/api/endpoints";
-import { Client } from "@stomp/stompjs";
 
 export function NotificationBell() {
   const { user, isAuthenticated, isHydrating } = useAuth();
@@ -51,16 +50,17 @@ export function NotificationBell() {
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
-    const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
+    let es: EventSource | null = null;
+    let cancelled = false;
 
-    const client = new Client({
-      brokerURL: wsUrl,
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe(`/topic/notifications/${user.userId}`, (message) => {
-          const newNotif = JSON.parse(message.body);
+    const connect = () => {
+      if (cancelled) return;
+      const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
+      es = new EventSource(`${apiBaseUrl}/api/notifications/user/${user.userId}/stream`);
 
+      es.addEventListener("notification", (event) => {
+        try {
+          const newNotif = JSON.parse(event.data);
           const mappedNotif: NotificationItem = {
             id: newNotif.id,
             userId: newNotif.userId,
@@ -70,16 +70,25 @@ export function NotificationBell() {
             referenceId: newNotif.referenceId,
             createdAt: newNotif.createdAt,
           };
-
           setNotifications((prev) => [mappedNotif, ...prev]);
-        });
-      },
-    });
+        } catch (err) {
+          console.error("Failed to parse SSE notification:", err);
+        }
+      });
 
-    client.activate();
+      es.onerror = () => {
+        es?.close();
+        if (!cancelled) {
+          setTimeout(connect, 3000);
+        }
+      };
+    };
+
+    connect();
 
     return () => {
-      client.deactivate();
+      cancelled = true;
+      es?.close();
     };
   }, [isAuthenticated, user?.userId]);
 

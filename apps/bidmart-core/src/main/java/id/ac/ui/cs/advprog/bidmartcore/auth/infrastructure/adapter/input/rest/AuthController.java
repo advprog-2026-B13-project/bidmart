@@ -22,6 +22,9 @@ import java.util.Map;
 @Tag(name = "Authentication", description = "Register, Login, Logout, Token Refresh")
 public class AuthController {
 
+    private static final String ACCESS_TOKEN = "accessToken";
+    private static final String REFRESH_TOKEN = "refreshToken";
+
     private final AuthUseCase authUseCase;
     private final AuthContext authContext;
     private final AuthCookieService authCookieService;
@@ -126,8 +129,8 @@ public class AuthController {
 
             if (Boolean.FALSE.equals(result.get("requiresMfa"))
                     && Boolean.FALSE.equals(result.getOrDefault("requiresSessionReplacement", false))) {
-                String accessToken = (String) result.get("accessToken");
-                String refreshToken = (String) result.get("refreshToken");
+                String accessToken = (String) result.get(ACCESS_TOKEN);
+                String refreshToken = (String) result.get(REFRESH_TOKEN);
 
                 ResponseEntity.BodyBuilder builder = addCookies(
                         ResponseEntity.ok(),
@@ -166,8 +169,8 @@ public class AuthController {
                     sessionClientInfoResolver.resolve(httpRequest)
             );
 
-            String accessToken = (String) result.get("accessToken");
-            String refreshToken = (String) result.get("refreshToken");
+            String accessToken = (String) result.get(ACCESS_TOKEN);
+            String refreshToken = (String) result.get(REFRESH_TOKEN);
 
             ResponseEntity.BodyBuilder builder = addCookies(
                     ResponseEntity.ok(),
@@ -216,8 +219,8 @@ public class AuthController {
             }
 
             Map<String, Object> result = authUseCase.refreshToken(refreshToken);
-            String accessToken = (String) result.get("accessToken");
-            String newRefreshToken = (String) result.get("refreshToken");
+            String accessToken = (String) result.get(ACCESS_TOKEN);
+            String newRefreshToken = (String) result.get(REFRESH_TOKEN);
 
             ResponseEntity.BodyBuilder builder = addCookies(
                     ResponseEntity.ok(),
@@ -226,6 +229,65 @@ public class AuthController {
             return builder.body(ApiResponse.success("Token refreshed", TokenResponse.fromMap(result)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/password-reset/request")
+    @Operation(
+            summary = "Request a password reset link",
+            description = "Sends a password reset link to the provided email address if the account exists.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reset email sent if the account exists"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid email address"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Email service unavailable")
+    })
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@RequestBody PasswordResetRequest request) {
+        try {
+            authUseCase.requestPasswordReset(request.getEmail());
+            return ResponseEntity.ok(ApiResponse.success("If the account exists, a reset link has been sent", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/password-reset/verify")
+    @Operation(
+            summary = "Verify password reset token",
+            description = "Checks whether a password reset token is still valid.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token validation result")
+    })
+    public ResponseEntity<ApiResponse<PasswordResetVerifyResponse>> verifyPasswordResetToken(
+            @RequestBody PasswordResetVerifyRequest request) {
+        boolean valid = authUseCase.verifyPasswordResetToken(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success("Reset token checked", new PasswordResetVerifyResponse(valid)));
+    }
+
+    @PostMapping("/password-reset/confirm")
+    @Operation(
+            summary = "Confirm password reset",
+            description = "Resets the password using a valid reset token.",
+            security = {}
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password updated"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired reset token"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Account suspended")
+    })
+    public ResponseEntity<ApiResponse<Void>> confirmPasswordReset(@RequestBody PasswordResetConfirmRequest request) {
+        try {
+            authUseCase.resetPassword(request.getToken(), request.getNewPassword());
+            return ResponseEntity.ok(ApiResponse.success("Password reset successful", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
         }
     }
 

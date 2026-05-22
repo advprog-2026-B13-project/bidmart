@@ -49,6 +49,7 @@ export interface ParsedListing {
   startTime: Date;
   endTime: Date;
   status: "active" | "ending-soon" | "ended" | "sold";
+  canEdit: boolean;
   seller: { id: string; name: string; avatar: string; rating: number };
   topBidder: { id: string; name: string } | null;
 }
@@ -125,6 +126,7 @@ function parseListing(listing: Record<string, unknown>): ParsedListing {
     startTime: new Date(listing.startTime as string),
     endTime: new Date(listing.endTime as string),
     status: mapStatus(listing.status as string),
+    canEdit: Boolean(listing.canEdit),
     seller: {
       id: listing.sellerId as string,
       name: "Seller",
@@ -229,12 +231,13 @@ export async function placeBid(request: BidRequest) {
 }
 
 export async function getCategories() {
-  const raw = await apiFetch("/api/catalog/categories/main", { method: "GET" }, { auth: false }) as { id: number; name: string; parentId: number | null }[];
+  const raw = await apiFetch("/api/catalog/categories/main", { method: "GET" }, { auth: false }) as { id: number; name: string; parentId: number | null; imageUrl: string }[];
   const cats = Array.isArray(raw) ? raw : [];
   return cats.map((c) => ({
     id: c.id,
     name: c.name,
     parentId: c.parentId,
+    imageUrl: c.imageUrl,
     slug: toSlug(c.name),
     coverImage: `https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80`,
   }));

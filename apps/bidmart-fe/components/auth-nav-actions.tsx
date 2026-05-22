@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./auth-provider";
+import { UserRoundCog } from "lucide-react";
 
 export function AuthNavActions() {
   const router = useRouter();
@@ -48,16 +49,14 @@ export function AuthNavActions() {
 
   return (
     <>
-      <span className="hidden lg:inline px-3 py-2 border-2 border-black text-sm font-black uppercase tracking-wide bg-white">
-        {displayName}
-      </span>
-      <button
-        type="button"
-        onClick={() => router.push("/profile")}
-        className="btn btn-ghost btn-sm"
-      >
-        Profile
-      </button>
+      {isAdmin && (
+        <Link href="/admin" className="w-10 h-10 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all bg-white">
+          <UserRoundCog className="w-5 h-5" />
+        </Link>
+      )}
+      <Link href="/profile" className="px-3 py-2 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all bg-white">
+        <span className="text-lg font-black leading-none">{displayName}</span>
+      </Link>
       <button
         type="button"
         onClick={() => router.push("/settings")}
@@ -65,15 +64,6 @@ export function AuthNavActions() {
       >
         Settings
       </button>
-      {isAdmin && (
-        <button
-          type="button"
-          onClick={() => router.push("/admin")}
-          className="btn btn-ghost btn-sm"
-        >
-          Admin
-        </button>
-      )}
       <button
         type="button"
         onClick={handleLogout}

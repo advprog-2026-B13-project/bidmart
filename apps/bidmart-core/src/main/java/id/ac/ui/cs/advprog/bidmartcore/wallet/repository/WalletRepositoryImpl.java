@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Component
@@ -21,7 +22,7 @@ public class WalletRepositoryImpl implements WalletRepository {
     @Override
     public WalletModel findByUserId(UUID userId) {
         return walletSpringRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Wallet not found for userId: " + userId));
+                .orElseThrow(() -> new NoSuchElementException("Wallet not found for userId: " + userId));
     }
 
     @Override

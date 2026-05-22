@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthProvider } from "@/components/auth-provider";
+import { UserProfileProvider } from "@/lib/stores/user-profile";
 import { AuthNavActions } from "@/components/auth-nav-actions";
 import { NotificationBell } from "@/components/notification-bell";
 import { Search } from "lucide-react";
@@ -147,24 +148,28 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${dmSans.variable} antialiased`}>
         {clarityId && (
-          <Script id="clarity" strategy="afterInteractive">{`
-            (function(c,l,a,r,i,t,y){
-              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-              y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            })(window,document,"clarity","script","${clarityId}");
-          `}</Script>
+          <>
+            <Script id="clarity-init" strategy="beforeInteractive">{`
+              window.clarity=window.clarity||function(){(window.clarity.q=window.clarity.q||[]).push(arguments)};
+            `}</Script>
+            <Script
+              id="clarity-tag"
+              src={`https://www.clarity.ms/tag/${clarityId}`}
+              strategy="afterInteractive"
+            />
+          </>
         )}
         <AuthProvider>
-
-          <ToastProvider>
+          <UserProfileProvider>
+            <ToastProvider>
             <div className="min-h-screen flex flex-col bg-white">
               <NavBar />
               <MarqueeStrip />
               <main className="flex-1">{children}</main>
               <Footer />
             </div>
-          </ToastProvider>
+            </ToastProvider>
+          </UserProfileProvider>
         </AuthProvider>
       </body>
     </html>

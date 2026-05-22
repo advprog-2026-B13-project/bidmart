@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (input: LoginInput) => {
     const result = await loginRequest(input);
 
-    if (!result.requiresMfa) {
+    if (!result.requiresMfa && !result.requiresSessionReplacement) {
       await refreshProfile();
     }
 

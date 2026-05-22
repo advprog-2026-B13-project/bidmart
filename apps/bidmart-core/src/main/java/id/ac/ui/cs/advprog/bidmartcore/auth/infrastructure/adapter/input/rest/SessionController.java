@@ -35,6 +35,7 @@ public class SessionController {
     public ResponseEntity<ApiResponse<List<SessionSummaryResponse>>> listSessions() {
         List<Session> sessions = sessionUseCase.listSessions(authContext.getUserId());
         List<SessionSummaryResponse> result = sessions.stream()
+                .filter(s -> s.isActive())
                 .map(s -> new SessionSummaryResponse(
                         s.getId(),
                         s.isActive(),

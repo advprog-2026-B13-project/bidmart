@@ -21,6 +21,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileUseCase {
 
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final UserRepositoryPort userRepository;
     private final SessionRepositoryPort sessionRepository;
     private final SessionCachePort sessionCache;
@@ -29,14 +31,14 @@ public class ProfileServiceImpl implements ProfileUseCase {
     @Override
     public User getProfile(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
     }
 
     @Override
     @Transactional
     public User updateProfile(UUID userId, String displayName, String photoUrl, String shippingAddress) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         if (displayName != null) {
             user.setDisplayName(displayName);
@@ -54,7 +56,7 @@ public class ProfileServiceImpl implements ProfileUseCase {
     @Override
     public OtherUserProfileView getOtherUserProfile(UUID targetUserId, boolean includeBidHistory) {
         User targetUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         if (!includeBidHistory) {
             return new OtherUserProfileView(targetUser, List.of(), List.of());
@@ -91,7 +93,7 @@ public class ProfileServiceImpl implements ProfileUseCase {
     @Transactional
     public void deactivateAccount(UUID targetUserId) {
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         user.setStatus(UserStatus.SUSPENDED);
         userRepository.save(user);

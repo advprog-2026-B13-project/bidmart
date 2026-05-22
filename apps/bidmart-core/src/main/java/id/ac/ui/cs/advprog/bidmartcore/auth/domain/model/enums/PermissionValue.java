@@ -14,8 +14,8 @@ public enum PermissionValue {
     CATALOG_DELETE_CATEGORY("catalog:delete_category"),
 
     LISTING_CREATE_LISTING("listing:create_listing"),
-    LISTING_UPDATE_LISTING("listing:update_listing"),
-    LISTING_DELETE_LISTING("listing:delete_listing"),
+    LISTING_UPDATE_ALL_LISTING("listing:update_listing"),
+    LISTING_DELETE_ALL_LISTING("listing:delete_listing"),
 
     ORDER_UPDATE_SHIPMENT_STATUS("order:update_shipment_status"),
     ORDER_CONFIRM_DELIVERY("order:confirm_delivery"),
