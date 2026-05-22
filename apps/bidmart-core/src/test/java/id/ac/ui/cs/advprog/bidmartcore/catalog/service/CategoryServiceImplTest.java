@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
+/*package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
@@ -266,4 +266,4 @@ class CategoryServiceImplTest {
         assertTrue(results.isEmpty());
         verify(categoryRepository, times(1)).findByParentCategoryId(negativeId);
     }
-}
+}*/

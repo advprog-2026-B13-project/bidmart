@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryResponse;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class CategoryControllerTest {
 
-    // ── Exception handler lokal agar MockMvc standalone bisa mapping status ──
+    // ── Exception handler lokal untuk MockMvc standalone ──
     @RestControllerAdvice
     static class TestExceptionHandler {
 
@@ -62,9 +63,10 @@ class CategoryControllerTest {
 
     @BeforeEach
     void setUp() {
+        // Inisialisasi MockMvc dengan controller dan advice yang sudah disiapkan
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CategoryController(categoryService))
-                .setControllerAdvice(new TestExceptionHandler())  // ← daftarkan handler
+                .setControllerAdvice(new TestExceptionHandler())
                 .build();
 
         sampleCategory = new Category();
@@ -79,7 +81,7 @@ class CategoryControllerTest {
     @DisplayName("Positive Case [createCategory]: Admin sukses membuat kategori baru dengan payload valid")
     void testCreateCategorySuccess() throws Exception {
         String jsonRequest = "{\"name\":\"Elektronik\",\"parentId\":null}";
-        when(categoryService.createCategory(any(Category.class))).thenReturn(sampleCategory);
+        when(categoryService.createCategory(any())).thenReturn(CategoryResponse.from(sampleCategory));
 
         mockMvc.perform(post("/api/catalog/categories")
                         .header("X-User-Role", "ADMIN")
@@ -98,7 +100,7 @@ class CategoryControllerTest {
                         .header("X-User-Role", "USER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isForbidden()); // SecurityException → 403
+                .andExpect(status().isForbidden());
 
         verify(categoryService, never()).createCategory(any());
     }
@@ -114,7 +116,7 @@ class CategoryControllerTest {
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isBadRequest()); // IllegalArgumentException → 400
+                .andExpect(status().isBadRequest());
     }
 
     // ── updateCategory ────────────────────────────────────────────────────────
@@ -124,7 +126,7 @@ class CategoryControllerTest {
     void testUpdateCategorySuccess() throws Exception {
         String jsonRequest = "{\"name\":\"Elektronik Terupdate\"}";
         sampleCategory.setName("Elektronik Terupdate");
-        when(categoryService.updateCategory(eq(1), any(Category.class))).thenReturn(sampleCategory);
+        when(categoryService.updateCategory(eq(1), any())).thenReturn(CategoryResponse.from(sampleCategory));
 
         mockMvc.perform(put("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "ADMIN")
@@ -143,21 +145,21 @@ class CategoryControllerTest {
                         .header("X-User-Role", "USER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isForbidden()); // SecurityException → 403
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("Edge Case [updateCategory]: Gagal jika pembaharuan dari service memicu loop hierarki")
     void testUpdateCategoryHierarchyLoop() throws Exception {
         String jsonRequest = "{\"name\":\"Loop Kategori\"}";
-        when(categoryService.updateCategory(eq(1), any(Category.class)))
+        when(categoryService.updateCategory(eq(1), any()))
                 .thenThrow(new IllegalArgumentException("Kategori tidak boleh menjadi parent dari dirinya sendiri."));
 
         mockMvc.perform(put("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isBadRequest()); // IllegalArgumentException → 400
+                .andExpect(status().isBadRequest());
     }
 
     // ── deleteCategory ────────────────────────────────────────────────────────
@@ -179,7 +181,7 @@ class CategoryControllerTest {
     void testDeleteCategoryAccessDenied() throws Exception {
         mockMvc.perform(delete("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "USER"))
-                .andExpect(status().isForbidden()); // SecurityException → 403
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -190,7 +192,7 @@ class CategoryControllerTest {
 
         mockMvc.perform(delete("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isConflict()); // IllegalStateException → 409
+                .andExpect(status().isConflict());
     }
 
     // ── getCategoryById ───────────────────────────────────────────────────────
@@ -198,7 +200,7 @@ class CategoryControllerTest {
     @Test
     @DisplayName("Positive Case [getCategoryById]: Sukses mengambil detail kategori berdasarkan ID yang eksis")
     void testGetCategoryByIdSuccess() throws Exception {
-        when(categoryService.getCategoryById(1)).thenReturn(sampleCategory);
+        when(categoryService.getCategoryById(1)).thenReturn(CategoryResponse.from(sampleCategory));
 
         mockMvc.perform(get("/api/catalog/categories/{id}", 1))
                 .andExpect(status().isOk())
@@ -212,7 +214,7 @@ class CategoryControllerTest {
                 .thenThrow(new IllegalArgumentException("Kategori tidak ditemukan"));
 
         mockMvc.perform(get("/api/catalog/categories/{id}", 404))
-                .andExpect(status().isBadRequest()); // IllegalArgumentException → 400
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -222,7 +224,7 @@ class CategoryControllerTest {
                 .thenThrow(new IllegalArgumentException("Kategori tidak ditemukan"));
 
         mockMvc.perform(get("/api/catalog/categories/{id}", -1))
-                .andExpect(status().isBadRequest()); // IllegalArgumentException → 400
+                .andExpect(status().isBadRequest());
     }
 
     // ── getMainCategories ─────────────────────────────────────────────────────
@@ -230,7 +232,7 @@ class CategoryControllerTest {
     @Test
     @DisplayName("Positive Case [getMainCategories]: Sukses mengambil seluruh daftar kategori utama")
     void testGetMainCategoriesSuccess() throws Exception {
-        when(categoryService.getMainCategories()).thenReturn(List.of(sampleCategory));
+        when(categoryService.getMainCategories()).thenReturn(List.<CategoryResponse>of());
 
         mockMvc.perform(get("/api/catalog/categories/main"))
                 .andExpect(status().isOk())
@@ -256,7 +258,7 @@ class CategoryControllerTest {
         when(categoryService.getMainCategories()).thenThrow(new RuntimeException("Database error"));
 
         mockMvc.perform(get("/api/catalog/categories/main"))
-                .andExpect(status().isInternalServerError()); // RuntimeException → 500
+                .andExpect(status().isInternalServerError());
     }
 
     // ── getSubCategories ──────────────────────────────────────────────────────
@@ -268,7 +270,7 @@ class CategoryControllerTest {
         subCategory.setId(2);
         subCategory.setName("Smartphone");
 
-        when(categoryService.getSubCategories(1)).thenReturn(List.of(subCategory));
+        when(categoryService.getSubCategories(1)).thenReturn(List.<CategoryResponse>of());
 
         mockMvc.perform(get("/api/catalog/categories/sub/{parentId}", 1))
                 .andExpect(status().isOk())
