@@ -32,15 +32,15 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     private final RedisScript<Long> rollbackScript;
 
     private static final String KEY_PREFIX = "auction:";
-    private static final String FIELD_STATUS = FIELD_STATUS;
-    private static final String FIELD_PRICE = FIELD_PRICE;
-    private static final String FIELD_END_TIME = FIELD_END_TIME;
-    private static final String FIELD_WINNER = FIELD_WINNER;
-    private static final String FIELD_SELLER_ID = FIELD_SELLER_ID;
-    private static final String FIELD_STARTING_PRICE = FIELD_STARTING_PRICE;
-    private static final String FIELD_RESERVE_PRICE = FIELD_RESERVE_PRICE;
-    private static final String FIELD_MIN_BID_INCREMENT = FIELD_MIN_BID_INCREMENT;
-    private static final String FIELD_START_TIME = FIELD_START_TIME;
+    private static final String FIELD_STATUS = "status";
+    private static final String FIELD_PRICE = "price";
+    private static final String FIELD_END_TIME = "endTime";
+    private static final String FIELD_WINNER = "winner";
+    private static final String FIELD_SELLER_ID = "sellerId";
+    private static final String FIELD_STARTING_PRICE = "startingPrice";
+    private static final String FIELD_RESERVE_PRICE = "reservePrice";
+    private static final String FIELD_MIN_BID_INCREMENT = "minBidIncrement";
+    private static final String FIELD_START_TIME = "startTime";
     private static final String EXPIRY_SET_KEY = "auction:expiry";
 
     private String key(UUID listingId) {

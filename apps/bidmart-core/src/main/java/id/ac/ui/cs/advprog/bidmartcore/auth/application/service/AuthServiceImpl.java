@@ -30,7 +30,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthUseCase {
 
-    private static final String REQUIRES_MFA = REQUIRES_MFA;
+    private static final String REQUIRES_MFA = "requiresMfa";
 
     private final UserRepositoryPort userRepository;
     private final RoleRepositoryPort roleRepository;

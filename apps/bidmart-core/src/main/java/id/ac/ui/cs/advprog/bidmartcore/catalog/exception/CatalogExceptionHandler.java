@@ -12,10 +12,10 @@ import java.util.Map;
 @RestControllerAdvice(basePackages = "id.ac.ui.cs.advprog.bidmartcore.catalog")
 public class CatalogExceptionHandler {
 
-    private static final String KEY_TIMESTAMP = KEY_TIMESTAMP;
-    private static final String KEY_STATUS = KEY_STATUS;
-    private static final String KEY_ERROR = KEY_ERROR;
-    private static final String KEY_MESSAGE = KEY_MESSAGE;
+    private static final String KEY_TIMESTAMP = "timestamp";
+    private static final String KEY_STATUS = "status";
+    private static final String KEY_ERROR = "error";
+    private static final String KEY_MESSAGE = "message";
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {

@@ -41,8 +41,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BiddingServiceImpl implements BiddingUseCase {
 
-    private static final String METRIC_PLACE_BID = METRIC_PLACE_BID;
-    private static final String TAG_OUTCOME = TAG_OUTCOME;
+    private static final String METRIC_PLACE_BID = "bidding.place_bid";
+    private static final String TAG_OUTCOME = "outcome";
 
     private final BidRepositoryPort bidRepository;
     private final ListingPort listingPort;

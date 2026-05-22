@@ -9,7 +9,7 @@ import java.util.List;
 
 public class ListingSpecification {
 
-    private static final String CURRENT_PRICE = CURRENT_PRICE;
+    private static final String CURRENT_PRICE = "currentPrice";
 
     public static Specification<Listing> hasTitle(String keyword) {
         return (root, query, cb) -> keyword == null ? null :

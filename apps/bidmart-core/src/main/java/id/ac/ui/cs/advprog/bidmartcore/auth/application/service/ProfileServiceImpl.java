@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileUseCase {
 
-    private static final String USER_NOT_FOUND = USER_NOT_FOUND;
+    private static final String USER_NOT_FOUND = "User not found";
 
     private final UserRepositoryPort userRepository;
     private final SessionRepositoryPort sessionRepository;

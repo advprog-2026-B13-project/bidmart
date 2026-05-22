@@ -35,16 +35,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DataSeeder {
 
-    private static final String DEFAULT_PASSWORD = DEFAULT_PASSWORD;
-    private static final String CAT_ELECTRONICS = CAT_ELECTRONICS;
-    private static final String CAT_WATCHES = CAT_WATCHES;
-    private static final String CAT_FURNITURE = CAT_FURNITURE;
-    private static final String CAT_BOOKS = CAT_BOOKS;
-    private static final String CAT_MUSICAL_INSTRUMENTS = CAT_MUSICAL_INSTRUMENTS;
-    private static final String CAT_GAMING = CAT_GAMING;
-    private static final String CAT_JEWELRY = CAT_JEWELRY;
-    private static final String CAT_COLLECTIBLES = CAT_COLLECTIBLES;
-    private static final String CAT_FASHION = CAT_FASHION;
+    private static final String DEFAULT_PASSWORD = "password123";
+    private static final String CAT_ELECTRONICS = "Electronics";
+    private static final String CAT_WATCHES = "Watches";
+    private static final String CAT_FURNITURE = "Furniture";
+    private static final String CAT_BOOKS = "Books";
+    private static final String CAT_MUSICAL_INSTRUMENTS = "Musical Instruments";
+    private static final String CAT_GAMING = "Gaming";
+    private static final String CAT_JEWELRY = "Jewelry";
+    private static final String CAT_COLLECTIBLES = "Collectibles";
+    private static final String CAT_FASHION = "Fashion";
 
     private final UserSpringRepository userRepository;
     private final RoleSpringRepository roleRepository;

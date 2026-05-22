@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CategoryController {
 
-    private static final String ADMIN_ROLE = ADMIN_ROLE;
+    private static final String ADMIN_ROLE = "ADMIN";
 
     private final CategoryService categoryService;
 

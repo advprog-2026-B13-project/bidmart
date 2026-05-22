@@ -33,7 +33,7 @@ public class MfaServiceImpl implements MfaUseCase {
     private final PasswordEncoder passwordEncoder;
     private final EmailOtpSenderPort emailOtpSenderPort;
 
-    private static final String USER_NOT_FOUND = USER_NOT_FOUND;
+    private static final String USER_NOT_FOUND = "User not found";
 
     private final GoogleAuthenticator googleAuthenticator = new GoogleAuthenticator();
     private final SecureRandom secureRandom = new SecureRandom();

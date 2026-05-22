@@ -22,8 +22,8 @@ import java.util.Map;
 @Tag(name = "Authentication", description = "Register, Login, Logout, Token Refresh")
 public class AuthController {
 
-    private static final String ACCESS_TOKEN = ACCESS_TOKEN;
-    private static final String REFRESH_TOKEN = REFRESH_TOKEN;
+    private static final String ACCESS_TOKEN = "accessToken";
+    private static final String REFRESH_TOKEN = "refreshToken";
 
     private final AuthUseCase authUseCase;
     private final AuthContext authContext;

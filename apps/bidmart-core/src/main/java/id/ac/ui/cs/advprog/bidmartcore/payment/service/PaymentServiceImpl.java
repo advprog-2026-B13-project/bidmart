@@ -34,8 +34,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletService walletService;
     private final MidtransCoreApi midtransCoreApi;
 
-    private static final String BANK_TRANSFER = BANK_TRANSFER;
-    private static final String GOPAY = GOPAY;
+    private static final String BANK_TRANSFER = "bank_transfer";
+    private static final String GOPAY = "gopay";
 
     @Value("${midtrans.server-key}")
     private String serverKey;
@@ -78,7 +78,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         String responseBank = resolvedPaymentType;
         switch (resolvedPaymentType) {
-            case BANK_TRANSFER -> {
+            case "bank_transfer" -> {
                 Map<String, Object> bankTransfer = new HashMap<>();
                 bankTransfer.put("bank", bankCode);
                 requestBody.put(BANK_TRANSFER, bankTransfer);
@@ -91,7 +91,7 @@ public class PaymentServiceImpl implements PaymentService {
                 requestBody.put("qris", qris);
                 responseBank = acquirer;
             }
-            case GOPAY -> requestBody.put(GOPAY, new HashMap<>());
+            case "gopay" -> requestBody.put(GOPAY, new HashMap<>());
             case "shopeepay" -> requestBody.put("shopeepay", new HashMap<>());
             default -> throw new IllegalArgumentException("Unsupported payment type: " + paymentType);
         }
