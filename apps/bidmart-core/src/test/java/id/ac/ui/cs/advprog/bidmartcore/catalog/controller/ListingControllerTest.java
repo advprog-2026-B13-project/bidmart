@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
@@ -8,14 +7,20 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,20 +32,43 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ListingController.class)
+@ExtendWith(MockitoExtension.class)
 class ListingControllerTest {
 
-    @Autowired
+    @RestControllerAdvice
+    static class TestExceptionHandler {
+
+        @ExceptionHandler(SecurityException.class)
+        public ResponseEntity<String> handleSecurity(SecurityException ex) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+        }
+
+        @ExceptionHandler(IllegalArgumentException.class)
+        public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
+
+        @ExceptionHandler(IllegalStateException.class)
+        public ResponseEntity<String> handleIllegalState(IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+
+        @ExceptionHandler(RuntimeException.class)
+        public ResponseEntity<String> handleRuntime(RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
+        }
+    }
+
     private MockMvc mockMvc;
 
-    @MockBean
+    @Mock
     private ListingService listingService;
 
-    @MockBean
+    @Mock
     private AuthContext authContext;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private ListingController listingController;
 
     private UUID listingId;
     private UUID userId;
@@ -48,6 +76,11 @@ class ListingControllerTest {
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(listingController)
+                .setControllerAdvice(new TestExceptionHandler())
+                .build();
+
         listingId = UUID.randomUUID();
         userId = UUID.randomUUID();
 
@@ -59,11 +92,14 @@ class ListingControllerTest {
         sampleListing.setStatus(ListingStatus.ACTIVE);
     }
 
+    // ─────────────────────────── searchListings ───────────────────────────
+
     @Test
     @DisplayName("Positive Case [searchListings]: Sukses mencari listing dengan parameter filter lengkap")
     void testSearchListingsSuccess() throws Exception {
         Page<Listing> page = new PageImpl<>(List.of(sampleListing));
-        when(listingService.searchListings(any(), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        when(listingService.searchListings(any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(page);
 
         mockMvc.perform(get("/api/catalog/listings/search")
                         .param("keyword", "ROG")
@@ -89,8 +125,28 @@ class ListingControllerTest {
                 .thenThrow(new RuntimeException("Database error"));
 
         mockMvc.perform(get("/api/catalog/listings/search"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isInternalServerError());
     }
+
+    @Test
+    @DisplayName("Edge Case [searchListings]: Sukses mencari listing dengan semua filter termasuk maxPrice dan categoryId")
+    void testSearchListingsAllFilters() throws Exception {
+        Page<Listing> page = new PageImpl<>(List.of(sampleListing));
+        when(listingService.searchListings(any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/catalog/listings/search")
+                        .param("keyword", "ROG")
+                        .param("minPrice", "10000000")
+                        .param("maxPrice", "30000000")
+                        .param("categoryId", "2")
+                        .param("status", "ACTIVE")
+                        .param("page", "0")
+                        .param("size", "5"))
+                .andExpect(status().isOk());
+    }
+
+    // ─────────────────────────── getListingById ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [getListingById]: Sukses mengambil detail produk aktif berdasarkan ID")
@@ -115,15 +171,14 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [getListingById]: Melempar ralat client error jika service tidak menemukan ID produk")
     void testGetListingByIdServiceException() throws Exception {
-        when(listingService.getListingById(listingId)).thenThrow(new IllegalArgumentException("Not found"));
+        when(listingService.getListingById(listingId))
+                .thenThrow(new IllegalArgumentException("Not found"));
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isBadRequest());
     }
+
+    // ─────────────────────────── getListingByOwner ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [getListingByOwner]: Owner asli sukses memanggil detail privat miliknya")
@@ -139,28 +194,25 @@ class ListingControllerTest {
     @DisplayName("Negative Case [getListingByOwner]: Menolak akses jika requester bukan pemilik sah produk")
     void testGetListingByOwnerAccessDenied() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.getListingForOwner(listingId, userId)).thenThrow(new SecurityException("Akses ditolak"));
+        when(listingService.getListingForOwner(listingId, userId))
+                .thenThrow(new SecurityException("Akses ditolak"));
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}/owner", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("Edge Case [getListingByOwner]: Menggagalkan request jika context userId bernilai null")
     void testGetListingByOwnerNullUser() throws Exception {
         when(authContext.getUserId()).thenReturn(null);
+        when(listingService.getListingForOwner(listingId, null))
+                .thenThrow(new IllegalArgumentException("User tidak terautentikasi"));
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}/owner", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isBadRequest());
     }
+
+    // ─────────────────────────── getMyListings ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [getMyListings]: Sukses mengumpulkan semua produk dagangan milik saya")
@@ -188,11 +240,25 @@ class ListingControllerTest {
     @DisplayName("Edge Case [getMyListings]: Mengembalikan ralat internal server jika database timeout")
     void testGetMyListingsServerError() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.getListingsBySeller(userId)).thenThrow(new RuntimeException("Timeout"));
+        when(listingService.getListingsBySeller(userId))
+                .thenThrow(new RuntimeException("Timeout"));
 
         mockMvc.perform(get("/api/catalog/listings/mine"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isInternalServerError());
     }
+
+    @Test
+    @DisplayName("Edge Case [getMyListings]: Menolak akses jika userId null saat memanggil daftar listing milik sendiri")
+    void testGetMyListingsNullUser() throws Exception {
+        when(authContext.getUserId()).thenReturn(null);
+        when(listingService.getListingsBySeller(null))
+                .thenThrow(new IllegalArgumentException("User tidak terautentikasi"));
+
+        mockMvc.perform(get("/api/catalog/listings/mine"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─────────────────────────── createListing ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [createListing]: Berhasil menerbitkan produk baru dalam database")
@@ -221,18 +287,32 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [createListing]: Menolak eksekusi pembuatan jika otentikasi gagal")
     void testCreateListingUnauthenticated() throws Exception {
-        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\"}";
+        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1}";
         when(authContext.getUserId()).thenReturn(null);
+        when(listingService.createListing(any(), eq(null)))
+                .thenThrow(new IllegalArgumentException("User tidak terautentikasi"));
 
         mockMvc.perform(post("/api/catalog/listings/create")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Edge Case [createListing]: Menolak pembuatan jika service melempar SecurityException")
+    void testCreateListingSecurityException() throws Exception {
+        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1}";
+        when(authContext.getUserId()).thenReturn(userId);
+        when(listingService.createListing(any(), eq(userId)))
+                .thenThrow(new SecurityException("Tidak memiliki izin"));
+
+        mockMvc.perform(post("/api/catalog/listings/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isForbidden());
+    }
+
+    // ─────────────────────────── updateListing ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [updateListing]: Berhasil memperbarui kelengkapan deskripsi listing")
@@ -258,11 +338,7 @@ class ListingControllerTest {
         mockMvc.perform(put("/api/catalog/listings/update/{id}", listingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -276,12 +352,24 @@ class ListingControllerTest {
         mockMvc.perform(put("/api/catalog/listings/update/{id}", listingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isConflict());
     }
+
+    @Test
+    @DisplayName("Edge Case [updateListing]: Menolak pembaruan jika ID listing tidak ditemukan")
+    void testUpdateListingNotFound() throws Exception {
+        String payload = "{\"description\":\"Update Tidak Ada\"}";
+        when(authContext.getUserId()).thenReturn(userId);
+        when(listingService.updateListing(eq(listingId), eq(userId), any()))
+                .thenThrow(new IllegalArgumentException("Listing tidak ditemukan"));
+
+        mockMvc.perform(put("/api/catalog/listings/update/{id}", listingId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─────────────────────────── activateListing ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [activateListing]: Owner berhasil mengaktifkan produk lelang draf")
@@ -297,29 +385,36 @@ class ListingControllerTest {
     @DisplayName("Negative Case [activateListing]: Gagal aktivasi jika status data awal bukan DRAFT")
     void testActivateListingInvalidState() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.activateListing(listingId, userId)).thenThrow(new IllegalStateException("Bukan draf"));
+        when(listingService.activateListing(listingId, userId))
+                .thenThrow(new IllegalStateException("Bukan draf"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/activate", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isConflict());
     }
 
     @Test
     @DisplayName("Edge Case [activateListing]: Menangani error jika ID produk target salah")
     void testActivateListingNotFound() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.activateListing(listingId, userId)).thenThrow(new IllegalArgumentException("Not Found"));
+        when(listingService.activateListing(listingId, userId))
+                .thenThrow(new IllegalArgumentException("Not Found"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/activate", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Edge Case [activateListing]: Menolak aktivasi jika bukan pemilik listing")
+    void testActivateListingNotOwner() throws Exception {
+        when(authContext.getUserId()).thenReturn(userId);
+        when(listingService.activateListing(listingId, userId))
+                .thenThrow(new SecurityException("Bukan pemilik"));
+
+        mockMvc.perform(put("/api/catalog/listings/{id}/activate", listingId))
+                .andExpect(status().isForbidden());
+    }
+
+    // ─────────────────────────── closeListing ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [closeListing]: Pemilik sukses menutup paksa lapak sebelum jatuh tempo")
@@ -335,28 +430,36 @@ class ListingControllerTest {
     @DisplayName("Negative Case [closeListing]: Menolak penutupan jika durasi tayang lelang telah kadaluwarsa")
     void testCloseListingAlreadyExpired() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.closeListing(listingId, userId)).thenThrow(new IllegalStateException("Expired"));
+        when(listingService.closeListing(listingId, userId))
+                .thenThrow(new IllegalStateException("Expired"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/close", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isConflict());
     }
 
     @Test
     @DisplayName("Edge Case [closeListing]: Menolak penutupan jika otentikasi user terlepas")
     void testCloseListingUnauthenticated() throws Exception {
         when(authContext.getUserId()).thenReturn(null);
+        when(listingService.closeListing(listingId, null))
+                .thenThrow(new IllegalArgumentException("User tidak terautentikasi"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/close", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Edge Case [closeListing]: Menolak penutupan jika bukan pemilik listing")
+    void testCloseListingNotOwner() throws Exception {
+        when(authContext.getUserId()).thenReturn(userId);
+        when(listingService.closeListing(listingId, userId))
+                .thenThrow(new SecurityException("Bukan pemilik"));
+
+        mockMvc.perform(put("/api/catalog/listings/{id}/close", listingId))
+                .andExpect(status().isForbidden());
+    }
+
+    // ─────────────────────────── deleteListing ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [deleteListing]: Owner berhasil menghapus data listing draf miliknya")
@@ -372,29 +475,36 @@ class ListingControllerTest {
     @DisplayName("Negative Case [deleteListing]: Gagal membatalkan barang jualan jika bidCount > 0")
     void testDeleteListingHasBidsConflict() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        doThrow(new IllegalStateException("Sudah ada penawaran aktif")).when(listingService).deleteListing(listingId, userId);
+        doThrow(new IllegalStateException("Sudah ada penawaran aktif"))
+                .when(listingService).deleteListing(listingId, userId);
 
         mockMvc.perform(delete("/api/catalog/listings/delete/{id}", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isConflict());
     }
 
     @Test
     @DisplayName("Edge Case [deleteListing]: Menolak penghapusan jika dilemparkan oleh hacker")
     void testDeleteListingNotOwner() throws Exception {
         when(authContext.getUserId()).thenReturn(userId);
-        doThrow(new SecurityException("Bukan pemilik")).when(listingService).deleteListing(listingId, userId);
+        doThrow(new SecurityException("Bukan pemilik"))
+                .when(listingService).deleteListing(listingId, userId);
 
         mockMvc.perform(delete("/api/catalog/listings/delete/{id}", listingId))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+                .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("Edge Case [deleteListing]: Menolak penghapusan jika ID listing tidak ditemukan")
+    void testDeleteListingNotFound() throws Exception {
+        when(authContext.getUserId()).thenReturn(userId);
+        doThrow(new IllegalArgumentException("Listing tidak ditemukan"))
+                .when(listingService).deleteListing(listingId, userId);
+
+        mockMvc.perform(delete("/api/catalog/listings/delete/{id}", listingId))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─────────────────────────── validateListingForBid ───────────────────────────
 
     @Test
     @DisplayName("Positive Case [validateListingForBid]: Mengembalikan true jika valid untuk proses bidding")
@@ -420,61 +530,16 @@ class ListingControllerTest {
     @DisplayName("Edge Case [validateListingForBid]: Menolak komputasi jika format parameter ID hancur")
     void testValidateListingForBidInvalidId() throws Exception {
         mockMvc.perform(get("/api/catalog/listings/id-format-salah/validate"))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
                 .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
-    @DisplayName("Positive Case [takeDownListing]: Admin sukses melakukan takedown darurat dengan mencantumkan alasan")
-    void testTakeDownListingSuccess() throws Exception {
-        String jsonRequest = "{\"takedownReason\":\"Pelanggaran hak cipta\"}";
-        when(authContext.getUserId()).thenReturn(userId);
-        sampleListing.setStatus(ListingStatus.CLOSED);
-        when(listingService.takeDownListing(eq(listingId), any(String.class), eq(userId))).thenReturn(sampleListing);
+    @DisplayName("Edge Case [validateListingForBid]: Menangani exception dari service saat validasi")
+    void testValidateListingForBidServiceException() throws Exception {
+        when(listingService.isListingValidForBid(listingId))
+                .thenThrow(new IllegalArgumentException("Listing tidak ditemukan"));
 
-        mockMvc.perform(patch("/api/catalog/listings/{id}/takedown", listingId)
-                        .header("X-User-Role", "ADMIN")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CLOSED"));
-    }
-
-    @Test
-    @DisplayName("Negative Case [takeDownListing]: Menggagalkan takedown jika role panggil adalah USER biasa")
-    void testTakeDownListingAccessDenied() throws Exception {
-        String jsonRequest = "{\"takedownReason\":\"Iseng Takedown\"}";
-
-        mockMvc.perform(patch("/api/catalog/listings/{id}/takedown", listingId)
-                        .header("X-User-Role", "USER")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
-    }
-
-    @Test
-    @DisplayName("Edge Case [takeDownListing]: Menolak moderasi jika produk lelang telah memasuki status final")
-    void testTakeDownListingFinalStateConflict() throws Exception {
-        String jsonRequest = "{\"takedownReason\":\"Terlambat\"}";
-        when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.takeDownListing(eq(listingId), any(String.class), eq(userId)))
-                .thenThrow(new IllegalStateException("Status final"));
-
-        mockMvc.perform(patch("/api/catalog/listings/{id}/takedown", listingId)
-                        .header("X-User-Role", "ADMIN")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-<<<<<<< HEAD
-                .andExpect(status().is5xxClientError());
-=======
-                .andExpect(status().is4xxClientError());
->>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
+        mockMvc.perform(get("/api/catalog/listings/{id}/validate", listingId))
+                .andExpect(status().isBadRequest());
     }
 }

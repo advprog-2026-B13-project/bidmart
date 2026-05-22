@@ -57,21 +57,4 @@ class ListingTest {
 
         assertEquals("Waktu selesai lelang harus setelah waktu mulai", exception.getMessage());
     }
-
-    @Test
-    @DisplayName("Edge Case: Menjaga konsistensi data finansial saat melakukan mutasi pada field audit moderasi admin")
-    void testDataIntegrityOnAuditFieldsMutation() {
-        UUID adminId = UUID.randomUUID();
-        String reason = "Melanggar hak cipta deskripsi produk.";
-        listing.setCurrentPrice(new BigDecimal("27500000"));
-        listing.setBidCount(5);
-        listing.setModeratedByAdminId(adminId);
-        listing.setTakedownReason(reason);
-        listing.setStatus(ListingStatus.CLOSED);
-        assertEquals(adminId, listing.getModeratedByAdminId());
-        assertEquals(reason, listing.getTakedownReason());
-        assertEquals(ListingStatus.CLOSED, listing.getStatus());
-        assertEquals(new BigDecimal("27500000"), listing.getCurrentPrice(), "currentPrice tidak boleh rusak saat data moderasi masuk");
-        assertEquals(5, listing.getBidCount(), "bidCount harus tetap terjaga akurat demi konsistensi finansial");
-    }
 }

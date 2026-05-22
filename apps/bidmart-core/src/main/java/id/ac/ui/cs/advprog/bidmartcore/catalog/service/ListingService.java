@@ -37,5 +37,4 @@ public interface ListingService {
     void updateStatus(UUID listingId, ListingStatus status);
 
     void updateEndTime(UUID listingId, LocalDateTime endTime);
-    Listing takeDownListing(UUID listingId, String reason, UUID adminId);
 }
