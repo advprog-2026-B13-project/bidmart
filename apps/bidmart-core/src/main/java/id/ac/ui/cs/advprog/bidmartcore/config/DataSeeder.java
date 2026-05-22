@@ -18,6 +18,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,12 +29,16 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder {
+    @Value("${seeder.admin.email}")
+    private String adminEmail;
+
+    @Value("${seeder.admin.password}")
+    private String adminPassword;
 
     private final UserSpringRepository userRepository;
     private final RoleSpringRepository roleRepository;
@@ -69,6 +74,8 @@ public class DataSeeder {
                 });
 
         // --- Users ---
+        User admin = createUser(adminEmail, adminPassword, "Admin User",
+                "https://i.pravatar.cc/150?u=admin", adminRole, 0.00);
         User sarah = createUser("sarah.chen@email.com", "password123", "Sarah Chen",
                 "https://i.pravatar.cc/150?u=sarah", userRole, 2450.00);
         User marcus = createUser("marcus.wong@email.com", "password123", "Marcus Wong",

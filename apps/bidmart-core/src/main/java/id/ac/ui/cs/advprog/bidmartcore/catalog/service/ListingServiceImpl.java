@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.PermissionValue;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -20,7 +22,9 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingSpecification;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
 
@@ -35,6 +39,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing createListing(ListingCreateRequest request, UUID sellerId) {
+        log.info("Listing created: sellerId={} title={}", sellerId, request.getTitle());
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Kategori tidak ditemukan"));
 
@@ -61,10 +66,14 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
-    public Listing updateListing(UUID id, UUID requesterId, ListingUpdateRequest request) {
+    public Listing updateListing(UUID id, AuthContext authContext, ListingUpdateRequest request) {
+        log.info("Listing update: listingId={}", id);
         Listing existingListing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
-        if (!existingListing.getSellerId().equals(requesterId)) {
+        boolean hasGlobalPermission = authContext != null
+                && authContext.hasPermission(PermissionValue.LISTING_UPDATE_ALL_LISTING);
+        UUID requesterId = authContext != null ? authContext.getUserId() : null;
+        if (!hasGlobalPermission && (requesterId == null || !existingListing.getSellerId().equals(requesterId))) {
             throw new SecurityException("Akses ditolak: Anda bukan pemilik listing ini.");
         }
         if (existingListing.getStatus() != ListingStatus.DRAFT) {
@@ -117,6 +126,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing activateListing(UUID id, UUID requesterId) {
+        log.info("Listing activate: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!listing.getSellerId().equals(requesterId)) {
@@ -136,6 +146,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public Listing closeListing(UUID id, UUID requesterId) {
+        log.info("Listing close: listingId={} requesterId={}", id, requesterId);
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!listing.getSellerId().equals(requesterId)) {
@@ -157,6 +168,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public void deleteListing(UUID id, UUID requesterId) {
+        log.info("Listing delete requested: listingId={} requesterId={}", id, requesterId);
         Listing existingListing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Listing dengan ID tersebut tidak ditemukan"));
         if (!existingListing.getSellerId().equals(requesterId)) {
@@ -170,6 +182,7 @@ public class ListingServiceImpl implements ListingService {
         }
 
         listingRepository.deleteById(id);
+        log.info("Listing deleted: listingId={} requesterId={}", id, requesterId);
     }
 
     private List<Integer> getAllCategoryIdsWithChildren(Integer parentId) {
@@ -257,5 +270,26 @@ public class ListingServiceImpl implements ListingService {
         listing.setCurrentPrice(finalPrice);
         listing.setWinnerId(winnerId);
         listingRepository.save(listing);
+    }
+
+    @Override
+    public boolean canEditListing(Listing listing, AuthContext authContext) {
+        if (listing == null || authContext == null || authContext.getUserId() == null) {
+            return false;
+        }
+
+        if (authContext.hasPermission(PermissionValue.LISTING_UPDATE_ALL_LISTING)) {
+            return true;
+        }
+
+        if (listing.getStatus() != ListingStatus.DRAFT) {
+            return false;
+        }
+
+        if (listing.getBidCount() != null && listing.getBidCount() > 0) {
+            return false;
+        }
+
+        return listing.getSellerId().equals(authContext.getUserId());
     }
 }

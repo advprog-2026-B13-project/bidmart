@@ -1,22 +1,29 @@
     package id.ac.ui.cs.advprog.bidmartcore.wallet.service;
 
-    import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
-    import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletRepository;
-    import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletTransactionModel;
-    import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletTransactionRepository;
-    import id.ac.ui.cs.advprog.bidmartcore.wallet.model.TransactionType;
-    import org.springframework.transaction.annotation.Transactional;
-    import lombok.RequiredArgsConstructor;
-    import org.springframework.stereotype.Service;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletRepository;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletTransactionModel;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletTransactionRepository;
+import id.ac.ui.cs.advprog.bidmartcore.wallet.model.TransactionType;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
     import java.math.BigDecimal;
     import java.util.List;
+    import java.util.NoSuchElementException;
     import java.util.UUID;
     import java.time.LocalDateTime;
 
+    @Slf4j
     @Service
     @RequiredArgsConstructor
     public class WalletServiceImpl implements WalletService {
+
+        private static final Logger AUDIT = LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
         private final WalletRepository walletRepository;
         private final WalletTransactionRepository transactionRepository;
@@ -30,7 +37,7 @@
         private WalletModel getOrCreateWallet(UUID userId) {
             try {
                 return walletRepository.findByUserId(userId);
-            } catch (Exception e) {
+            } catch (NoSuchElementException e) {
                 return createWallet(userId);
             }
         }
@@ -66,8 +73,13 @@
                         WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+                log.warn("Withdraw failed - insufficient balance: userId={} available={} requested={}",
+                        userId, wallet.getAvailableBalance(), amount);
                                 throw new IllegalArgumentException("Insufficient balance");
             }
+
+            log.info("Withdraw: userId={} amount={}", userId, amount);
+            AUDIT.info("WALLET_WITHDRAW userId={} amount={}", userId, amount);
 
             wallet.setAvailableBalance(
                     wallet.getAvailableBalance().subtract(amount)
@@ -102,8 +114,13 @@
                         WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getHeldBalance().compareTo(amount) < 0) {
+                log.warn("Convert hold to payment failed - insufficient held balance: userId={} held={} requested={}",
+                        userId, wallet.getHeldBalance(), amount);
                                 throw new IllegalArgumentException("Insufficient held balance");
             }
+
+            log.info("Convert hold to payment: userId={} amount={}", userId, amount);
+            AUDIT.info("WALLET_HOLD_TO_PAYMENT userId={} amount={}", userId, amount);
 
             wallet.setHeldBalance(
                     wallet.getHeldBalance().subtract(amount)
@@ -132,8 +149,12 @@
                         WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getHeldBalance().compareTo(amount) < 0) {
+                log.warn("Release failed - insufficient held balance: userId={} held={} requested={}",
+                        userId, wallet.getHeldBalance(), amount);
                                 throw new IllegalArgumentException("Insufficient held balance");
             }
+
+            log.debug("Release balance: userId={} amount={}", userId, amount);
 
             wallet.setHeldBalance(
                     wallet.getHeldBalance().subtract(amount)
@@ -166,8 +187,12 @@
                         WalletModel wallet = getOrCreateWallet(userId);
 
             if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+                log.warn("Hold failed - insufficient available balance: userId={} available={} requested={}",
+                        userId, wallet.getAvailableBalance(), amount);
                                 throw new IllegalArgumentException("Insufficient available balance");
             }
+
+            log.debug("Hold balance: userId={} amount={}", userId, amount);
 
             wallet.setAvailableBalance(
                     wallet.getAvailableBalance().subtract(amount)
@@ -197,6 +222,9 @@
         @Transactional
         public WalletModel deposit(UUID userId, BigDecimal amount) {
                         requirePositiveAmount(amount, "Deposit");
+
+            log.info("Deposit: userId={} amount={}", userId, amount);
+            AUDIT.info("WALLET_DEPOSIT userId={} amount={}", userId, amount);
                         WalletModel wallet = getOrCreateWallet(userId);
 
             wallet.setAvailableBalance(
@@ -226,6 +254,9 @@
                 UUID sellerId,
                 BigDecimal amount
         ) {
+
+            log.info("Transfer held balance: buyerId={} sellerId={} amount={}", buyerId, sellerId, amount);
+            AUDIT.info("WALLET_TRANSFER buyerId={} sellerId={} amount={}", buyerId, sellerId, amount);
 
             WalletModel buyerWallet = walletRepository.findByUserId(buyerId);
 

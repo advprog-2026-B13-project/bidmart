@@ -36,7 +36,9 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.port.output.WalletPort;
 import id.ac.ui.cs.advprog.bidmartcore.bidding.infrastructure.config.BiddingProperties;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BiddingServiceImpl implements BiddingUseCase {
@@ -60,6 +62,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     @Transactional
     public BidResult placeBid(UUID listingId, BigDecimal bidAmount, UUID bidderId, BidType bidType) {
+        log.info("Bid placed: listingId={} bidderId={} amount={} bidType={}", listingId, bidderId, bidAmount, bidType);
         Sample totalSample = metrics.start();
 
         Sample listingReadSample = metrics.start();
@@ -81,6 +84,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
         if (result == null || result.status() == BidAcceptance.CACHE_MISS) {
             walletPort.releaseFunds(bidderId, bidAmount);
             metrics.record(totalSample, "bidding.place_bid", "outcome", "cache_miss");
+            log.warn("Bid cache miss after retries: listingId={} bidderId={}", listingId, bidderId);
             throw new IllegalStateException("System unavailable, please try again.");
         }
 
@@ -98,9 +102,11 @@ public class BiddingServiceImpl implements BiddingUseCase {
             outcome.publishActions().forEach(Runnable::run);
 
             metrics.record(totalSample, "bidding.place_bid", "outcome", result.status().name().toLowerCase());
+            log.info("Bid result: listingId={} bidderId={} outcome={}", listingId, bidderId, result.status());
             return outcome.bidResult();
         } catch (Exception e) {
             if (stateMutated) {
+                log.error("Bid error - compensating: listingId={} bidderId={}", listingId, bidderId, e);
                 compensate(listingId, listing, bidderId, bidAmount, result);
             }
             metrics.record(totalSample, "bidding.place_bid", "outcome", "error");
@@ -472,11 +478,12 @@ public class BiddingServiceImpl implements BiddingUseCase {
     @Override
     @Transactional
     public void closeAuction(UUID listingId) {
-        // Always clean Redis first — prevents stale expiry set entries
+        log.info("Closing auction: listingId={}", listingId);
         concurrencyPort.removeAuction(listingId);
 
         ListingInfo listing = listingPort.getListingInfo(listingId);
         if (listing.status() != ListingStatus.ACTIVE) {
+            log.debug("Auction close skipped - not active: listingId={} status={}", listingId, listing.status());
             return;
         }
 
@@ -489,6 +496,8 @@ public class BiddingServiceImpl implements BiddingUseCase {
             winnerBid.setStatus(BidStatus.WON);
             bidRepository.save(winnerBid);
 
+            log.info("Auction WON: listingId={} winnerId={} amount={}", listingId, winnerBid.getBidderId(), winnerBid.getAmount());
+
             eventPublisher.publishAuctionClosed(new AuctionClosedEvent(
                     listingId, listing.sellerId(), winnerBid.getBidderId(),
                     winnerBid.getAmount(), AuctionResult.WON, now));
@@ -496,6 +505,7 @@ public class BiddingServiceImpl implements BiddingUseCase {
             auctionNotifier.publishAuctionEnded(listingId, winnerBid.getBidderId(),
                     winnerBid.getAmount(), "WON");
         } else {
+            log.info("Auction UNSOLD: listingId={}", listingId);
             topBid.ifPresent(bid -> {
                 bid.setStatus(BidStatus.OUTBID);
                 bidRepository.save(bid);

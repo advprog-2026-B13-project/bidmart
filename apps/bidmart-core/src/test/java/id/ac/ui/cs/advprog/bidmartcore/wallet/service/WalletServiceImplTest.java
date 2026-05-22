@@ -1,11 +1,10 @@
-package id.ac.ui.cs.advprog.bidmartcore.wallet.application.service;
+package id.ac.ui.cs.advprog.bidmartcore.wallet.service;
 
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.TransactionType;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletModel;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.model.WalletTransactionModel;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletRepository;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.repository.WalletTransactionRepository;
-import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.List;
 
@@ -204,7 +204,7 @@ class WalletServiceImplTest {
         UUID newUserId = UUID.randomUUID();
 
         when(walletRepository.findByUserId(newUserId))
-                .thenThrow(new RuntimeException("Wallet not found"));
+                .thenThrow(new NoSuchElementException("Wallet not found for userId: " + newUserId));
 
         WalletModel result = walletService.getWalletByUserId(newUserId);
 

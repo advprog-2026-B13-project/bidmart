@@ -4,6 +4,7 @@ import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.OrderStatus;
 import id.ac.ui.cs.advprog.bidmartcore.order.repository.OrderRepository;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthProvider } from "@/components/auth-provider";
+import { UserProfileProvider } from "@/lib/stores/user-profile";
 import { AuthNavActions } from "@/components/auth-nav-actions";
 import { NotificationBell } from "@/components/notification-bell";
 import { Search } from "lucide-react";
@@ -156,15 +157,16 @@ export default function RootLayout({
           `}</Script>
         )}
         <AuthProvider>
-
-          <ToastProvider>
+          <UserProfileProvider>
+            <ToastProvider>
             <div className="min-h-screen flex flex-col bg-white">
               <NavBar />
               <MarqueeStrip />
               <main className="flex-1">{children}</main>
               <Footer />
             </div>
-          </ToastProvider>
+            </ToastProvider>
+          </UserProfileProvider>
         </AuthProvider>
       </body>
     </html>
