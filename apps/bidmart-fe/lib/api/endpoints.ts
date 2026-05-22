@@ -380,3 +380,7 @@ export async function updateNotificationPreferences(
 export async function markNotificationAsRead(id: string): Promise<void> {
   await apiFetch(`/api/notifications/${id}/read`, { method: "POST" }, { auth: true });
 }
+
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  await apiFetch(`/api/notifications/user/${userId}/read-all`, { method: "POST" }, { auth: true });
+}
