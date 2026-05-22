@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { getNotifications, markNotificationAsRead, type NotificationItem } from "@/lib/api/endpoints";
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, type NotificationItem } from "@/lib/api/endpoints";
 import Link from "next/link";
 import { Bell, ArrowLeft } from "lucide-react";
 import { Client } from "@stomp/stompjs";
@@ -11,6 +11,31 @@ export default function NotificationsPage() {
   const { user, isAuthenticated, isHydrating } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  useEffect(() => {
+    const handleReadAll = () => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    };
+
+    const handleReadOne = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id: string }>;
+      const id = customEvent.detail?.id;
+      if (id) {
+        setNotifications((prev) =>
+            prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+      }
+    };
+
+    window.addEventListener("notifications-read-all", handleReadAll);
+    window.addEventListener("notification-marked-read", handleReadOne);
+
+    return () => {
+      window.removeEventListener("notifications-read-all", handleReadAll);
+      window.removeEventListener("notification-marked-read", handleReadOne);
+    };
+  }, []);
 
   useEffect(() => {
     if (isHydrating || !isAuthenticated || !user?.userId) return;
@@ -26,7 +51,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
     const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
 
     const client = new Client({
@@ -62,6 +87,19 @@ export default function NotificationsPage() {
     };
   }, [isAuthenticated, user?.userId]);
 
+  const handleMarkAllAsRead = async () => {
+    if (!user?.userId) return;
+    try {
+      await markAllNotificationsAsRead(user.userId);
+      setNotifications((prev) =>
+          prev.map((n) => ({ ...n, isRead: true }))
+      );
+      window.dispatchEvent(new CustomEvent("notifications-read-all"));
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+    }
+  };
+
   if (isHydrating || loading) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-white">
@@ -80,18 +118,30 @@ export default function NotificationsPage() {
     );
   }
 
+  const hasUnread = notifications.some((n) => !n.isRead);
+
   return (
       <div className="bg-white min-h-screen pb-20">
         <div className="max-w-3xl mx-auto px-4 py-8">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Link href="/" className="btn btn-sm btn-ghost">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-4xl font-black uppercase tracking-tight flex items-center gap-3">
-              <Bell className="w-8 h-8" />
-              Your Notifications
-            </h1>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="btn btn-sm btn-ghost">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+              <h1 className="text-4xl font-black uppercase tracking-tight flex items-center gap-3">
+                <Bell className="w-8 h-8" />
+                Your Notifications
+              </h1>
+            </div>
+            {hasUnread && (
+                <button
+                    onClick={handleMarkAllAsRead}
+                    className="btn btn-black btn-sm uppercase font-black tracking-wider self-start sm:self-auto"
+                >
+                  Mark All As Read
+                </button>
+            )}
           </div>
 
           {/* Notifications List */}
@@ -101,7 +151,7 @@ export default function NotificationsPage() {
                   <p className="text-gray-500 font-black uppercase tracking-wide">No notifications yet.</p>
                 </div>
             ) : (
-                notifications.map((notification) => {
+                notifications.slice(0, visibleCount).map((notification) => {
                   const handleMarkAsRead = async () => {
                     if (!notification.isRead) {
                       try {
@@ -110,6 +160,11 @@ export default function NotificationsPage() {
                             prev.map((n) =>
                                 n.id === notification.id ? { ...n, isRead: true } : n
                             )
+                        );
+                        window.dispatchEvent(
+                            new CustomEvent("notification-marked-read", {
+                              detail: { id: notification.id },
+                            })
                         );
                       } catch (err) {
                         console.error("Failed to mark notification as read:", err);
@@ -162,6 +217,18 @@ export default function NotificationsPage() {
                 })
             )}
           </div>
+
+          {/* Show More Button */}
+          {notifications.length > visibleCount && (
+              <div className="flex justify-center mt-8">
+                <button
+                    onClick={() => setVisibleCount((prev) => prev + 10)}
+                    className="btn btn-black font-black uppercase tracking-wider px-8 py-3"
+                >
+                  Show More
+                </button>
+              </div>
+          )}
         </div>
       </div>
   );

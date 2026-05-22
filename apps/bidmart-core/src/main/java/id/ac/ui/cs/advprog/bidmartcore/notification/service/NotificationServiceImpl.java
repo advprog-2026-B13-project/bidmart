@@ -50,4 +50,16 @@ public class NotificationServiceImpl implements NotificationService {
             notificationRepository.save(notification);
         });
     }
+
+    @Override
+    @Transactional
+    public void markAllAsRead(UUID userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        for (Notification notification : notifications) {
+            if (!notification.isRead()) {
+                notification.setRead(true);
+                notificationRepository.save(notification);
+            }
+        }
+    }
 }

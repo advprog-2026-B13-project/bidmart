@@ -380,3 +380,65 @@ export async function updateNotificationPreferences(
 export async function markNotificationAsRead(id: string): Promise<void> {
   await apiFetch(`/api/notifications/${id}/read`, { method: "POST" }, { auth: true });
 }
+
+
+export type OrderStatus = "PENDING" | "PACKED" | "SHIPPED" | "COMPLETED" | "DISPUTED";
+
+export interface Order {
+  id: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  totalAmount: number;
+  status: OrderStatus;
+  trackingNumber: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getBuyerOrders(buyerId: string): Promise<Order[]> {
+  const raw = await apiFetch(`/api/orders/buyer/${buyerId}`, { method: "GET" }, { auth: true }) as Order[];
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function getSellerOrders(sellerId: string): Promise<Order[]> {
+  const raw = await apiFetch(`/api/orders/seller/${sellerId}`, { method: "GET" }, { auth: true }) as Order[];
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function getOrderById(orderId: string): Promise<Order> {
+  const raw = await apiFetch(`/api/orders/${orderId}`, { method: "GET" }, { auth: true }) as Order;
+  return raw;
+}
+
+export async function updateShipmentStatus(
+    orderId: string,
+    status: OrderStatus,
+    trackingNumber?: string
+): Promise<Order> {
+  const params = new URLSearchParams({ status });
+  if (trackingNumber) {
+    params.append("trackingNumber", trackingNumber);
+  }
+  const raw = await apiFetch(`/api/orders/${orderId}/shipment?${params.toString()}`, {
+    method: "PUT"
+  }, { auth: true }) as Order;
+  return raw;
+}
+
+export async function confirmDelivery(orderId: string): Promise<Order> {
+  const raw = await apiFetch(`/api/orders/${orderId}/confirm`, {
+    method: "PUT"
+  }, { auth: true }) as Order;
+  return raw;
+}
+
+export async function disputeOrder(orderId: string): Promise<Order> {
+  const raw = await apiFetch(`/api/orders/${orderId}/dispute`, {
+    method: "PUT"
+  }, { auth: true }) as Order;
+  return raw;
+}
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  await apiFetch(`/api/notifications/user/${userId}/read-all`, { method: "POST" }, { auth: true });
+}

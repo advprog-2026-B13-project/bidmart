@@ -1,19 +1,4 @@
 services:
-  redis:
-    image: redis:8
-    container_name: bidmart-redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - bidmart-network
-
   core:
     image: ${CORE_IMAGE:?CORE_IMAGE required}
     container_name: bidmart-core
@@ -23,7 +8,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
       DATABASE_USER: ${DATABASE_USER:?DATABASE_USER required}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD required}
-      REDIS_HOST: redis
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST required}
       REDIS_PORT: 6379
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET required}
       AUTH_REGISTRATION_VERIFICATION_FRONTEND_BASE_URL: ${FRONTEND_URL:?FRONTEND_URL required}
@@ -42,9 +27,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - bidmart-network
 
@@ -98,7 +80,6 @@ services:
       - bidmart-network
 
 volumes:
-  redis_data:
   caddy_data:
   caddy_config:
   prometheus_data:
