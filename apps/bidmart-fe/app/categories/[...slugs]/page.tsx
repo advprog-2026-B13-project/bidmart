@@ -1,0 +1,442 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Clock, Share2, ChevronLeft, ChevronRight, ArrowRight, SlidersHorizontal } from "lucide-react";
+import { getListings, getCategories, getSubCategories, type ParsedListing } from "@/lib/api/endpoints";
+import { formatCurrency, formatTimeRemaining, getTimeUrgency } from "@/lib/utils";
+
+function ListingCard({ listing, index }: { listing: ParsedListing; index: number }) {
+  const urgency = getTimeUrgency(listing.endTime);
+  const imageUrl = typeof listing.imageUrl === "string" && listing.imageUrl.trim().length > 0
+    ? listing.imageUrl
+    : null;
+
+  return (
+    <Link
+      href={`/listing/${listing.id}`}
+      className="card group block overflow-hidden animate-fade-in-up"
+      style={{ animationDelay: `${index * 0.06}s`, animationFillMode: "both" }}
+    >
+      <div className="relative aspect-4/3 overflow-hidden bg-gray-100">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+            NO IMG
+          </div>
+        )}
+        <div className="absolute top-3 left-3">
+          {listing.status === "ending-soon" ? (
+            <span className="badge badge-hot">ENDING SOON</span>
+          ) : (
+            <span className="badge badge-black">{listing.category}</span>
+          )}
+        </div>
+        <div className="absolute top-3 right-3">
+          <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5 shadow-[2px_2px_0_#0A0A0A]">
+            <Clock className={`w-4 h-4 ${urgency === "critical" ? "text-hot" : "text-gray-600"}`} />
+            <span className={`font-black text-sm ${urgency === "critical" ? "text-hot" : urgency === "soon" ? "text-electric" : "text-gray-600"}`}>
+              {formatTimeRemaining(listing.endTime)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <h3 className="font-black text-sm line-clamp-2 leading-snug mb-3 group-hover:text-electric transition-colors uppercase tracking-tight">
+          {listing.title}
+        </h3>
+
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-2xl font-black text-black">
+            {formatCurrency(listing.currentPrice)}
+          </span>
+          {listing.startingPrice !== listing.currentPrice && (
+            <span className="text-xs font-bold text-electric uppercase">
+              +{Math.round((listing.currentPrice / listing.startingPrice - 1) * 100)}%
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t-2 border-black">
+          <div className="flex items-center gap-2">
+            <img
+              src={listing.seller.avatar}
+              alt={listing.seller.name}
+              className="w-6 h-6 rounded-full object-cover border border-black"
+            />
+            <span className="text-xs font-bold text-gray-500 uppercase">{listing.seller.name.split(' ')[0]}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Share2 className="w-4 h-4 text-gray-400" />
+            <span className="text-xs font-black text-gray-600">{listing.bidCount}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export default function NestedCategoryPage({ params }: { params: Promise<{ slugs: string[] }> }) {
+  const [slugs, setSlugs] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState("ending-soon");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [status, setStatus] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [categoryMap, setCategoryMap] = useState<Record<string, { id: number; name: string; parentId: number | null; slug: string }>>({});
+  const [currentCategory, setCurrentCategory] = useState<{ id: number; name: string; slug: string; parentId: number | null } | null>(null);
+  const [listings, setListings] = useState<ParsedListing[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    params.then(async ({ slugs: resolvedSlugs }) => {
+      setSlugs(resolvedSlugs || []);
+
+      if (!resolvedSlugs || resolvedSlugs.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Load categories and build map
+      const [mainCats, ...subCatResults] = await Promise.all([
+        getCategories(),
+      ]);
+
+      const map: Record<string, { id: number; name: string; parentId: number | null; slug: string }> = {};
+      for (const cat of mainCats) {
+        map[cat.slug] = cat;
+        const subs = await getSubCategories(cat.id);
+        for (const sub of subs) {
+          map[sub.slug] = sub;
+        }
+      }
+      setCategoryMap(map);
+
+      // Find current category by slugs
+      const cat = map[resolvedSlugs[resolvedSlugs.length - 1]];
+      setCurrentCategory(cat || null);
+
+      // Fetch listings
+      if (cat) {
+        const result = await getListings({ categoryId: cat.id, size: 100 });
+        setListings(result.listings);
+      }
+      setLoading(false);
+    });
+  }, [params]);
+
+  if (slugs.length === 0) {
+    return <RootCategoriesPage />;
+  }
+
+  if (!currentCategory) {
+    if (loading) return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <h1 className="text-5xl font-black text-black mb-4 uppercase tracking-tighter">404</h1>
+        <p className="text-gray-500 font-bold mb-8">Category not found</p>
+        <Link href="/categories" className="btn btn-black">Browse Categories</Link>
+      </div>
+    );
+  }
+
+  // Apply filters
+  let filtered = [...listings];
+  if (status === "ending-soon") {
+    filtered = filtered.filter(l => l.status === "ending-soon");
+  } else if (status === "active") {
+    filtered = filtered.filter(l => l.status === "active");
+  }
+  if (priceMin) {
+    filtered = filtered.filter(l => l.currentPrice >= Number(priceMin));
+  }
+  if (priceMax) {
+    filtered = filtered.filter(l => l.currentPrice <= Number(priceMax));
+  }
+
+  // Sort
+  if (sortBy === "ending-soon") {
+    filtered.sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
+  } else if (sortBy === "price-low") {
+    filtered.sort((a, b) => a.currentPrice - b.currentPrice);
+  } else if (sortBy === "price-high") {
+    filtered.sort((a, b) => b.currentPrice - a.currentPrice);
+  } else if (sortBy === "most-bids") {
+    filtered.sort((a, b) => b.bidCount - a.bidCount);
+  }
+
+  return (
+    <div>
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden bg-black border-b-3 border-black">
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80"
+            alt={currentCategory.name}
+            className="w-full h-full object-cover opacity-40"
+          />
+          <div className="absolute inset-0 bg-linear-to-r from-black via-black/90 to-transparent" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 py-12">
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-400 mb-6">
+            <Link href="/categories" className="hover:text-white transition-colors">
+              All Categories
+            </Link>
+            <span>/</span>
+            <span className="text-white">{currentCategory.name}</span>
+          </nav>
+
+          <div>
+            <h1 className="text-5xl md:text-6xl font-black text-white mb-3 uppercase tracking-tighter">
+              {currentCategory.name}
+            </h1>
+            <span className="bg-acid text-black text-xs font-black px-4 py-2 uppercase tracking-widest">
+              {listings.length} LISTINGS
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Subcategories Grid */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <h2 className="text-2xl font-black uppercase tracking-tight mb-6">
+          Subcategories
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Object.values(categoryMap)
+            .filter(c => c.parentId === currentCategory.id)
+            .map((child) => (
+              <Link
+                key={child.slug}
+                href={`/categories/${child.slug}`}
+                className="card group overflow-hidden"
+              >
+                <div className="relative aspect-4/3 overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
+                    alt={child.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 className="font-black text-base text-white uppercase tracking-tight mb-1">
+                      {child.name}
+                    </h3>
+                  </div>
+                </div>
+              </Link>
+            ))}
+        </div>
+      </section>
+
+      {/* Filters Bar */}
+      <section className="sticky top-16 z-40 bg-white border-b-3 border-black">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between py-4 gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="lg:hidden btn btn-sm font-bold uppercase gap-2"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                Filters
+              </button>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="input py-2 px-4 text-sm font-bold w-auto min-w-45"
+              >
+                <option value="ending-soon">ENDING SOON</option>
+                <option value="price-low">PRICE: LOW → HIGH</option>
+                <option value="price-high">PRICE: HIGH → LOW</option>
+                <option value="most-bids">MOST BIDS</option>
+              </select>
+
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="input py-2 px-4 text-sm font-bold w-auto min-w-40 hidden md:block"
+              >
+                <option value="all">ALL STATUS</option>
+                <option value="active">ACTIVE ONLY</option>
+                <option value="ending-soon">ENDING SOON</option>
+              </select>
+
+              <div className="hidden lg:block ml-4">
+                <span className="text-sm font-bold text-gray-500">
+                  <span className="text-black font-black">{filtered.length}</span> items
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Listings Grid */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        {filtered.length === 0 ? (
+          <div className="text-center py-24 border-3 border-dashed border-gray-300">
+            <div className="text-6xl mb-6">📦</div>
+            <h2 className="text-3xl font-black text-black mb-3 uppercase tracking-tight">No Listings Found</h2>
+            <p className="text-gray-500 font-medium mb-8">Try adjusting your filters or check back later</p>
+            <button
+              onClick={() => { setPriceMin(""); setPriceMax(""); setStatus("all"); }}
+              className="btn btn-black font-bold uppercase"
+            >
+              Clear Filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filtered.map((listing, i) => (
+              <ListingCard key={listing.id} listing={listing} index={i} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function RootCategoriesPage() {
+  const [allCategories, setAllCategories] = useState<{ slug: string; name: string }[]>([]);
+
+  useEffect(() => {
+    getCategories().then(setAllCategories);
+  }, []);
+
+  if (allCategories.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
+
+  const featured = allCategories.slice(0, 3);
+
+  return (
+    <div>
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b-3 border-black bg-white">
+        <div className="absolute inset-0 grid-bg opacity-100"></div>
+        <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-24">
+          <div className="max-w-2xl animate-fade-in-up">
+            <div className="inline-block bg-electric text-white text-xs font-black uppercase tracking-widest px-4 py-2 mb-6">
+              BROWSE BY CATEGORY
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black mb-6 leading-[0.9] tracking-tighter uppercase">
+              Find Your
+              <br />
+              <span className="text-electric">Next Obsession</span>
+            </h1>
+            <p className="text-xl text-gray-600 max-w-lg leading-relaxed">
+              Ten curated categories. Thousands of verified listings. New items added daily.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Categories - Asymmetric hero grid */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {featured.map((cat, i) => (
+            <Link
+              key={cat.slug}
+              href={`/categories/${cat.slug}`}
+              className={`group relative overflow-hidden border-3 border-black animate-fade-in-up ${
+                i === 0 ? "md:row-span-2 md:aspect-auto aspect-4/3" : "aspect-4/3"
+              }`}
+              style={{ animationDelay: `${i * 0.1}s`, animationFillMode: "both" }}
+            >
+              <div className="absolute inset-0">
+                <img
+                  src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80"
+                  alt={cat.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end p-6 md:p-8">
+                <div>
+                  <h2 className={`font-black text-white uppercase tracking-tight mb-2 ${
+                    i === 0 ? "text-4xl md:text-5xl" : "text-2xl"
+                  }`}>
+                    {cat.name}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <ArrowRight className="w-5 h-5 text-white transform group-hover:translate-x-2 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* All Categories - Grid with subcategories preview */}
+      <section className="bg-gray-100 border-y-3 border-black py-16">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-10">
+            <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">
+              All Categories
+            </h2>
+            <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">{allCategories.length} Categories</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {allCategories.map((cat, i) => (
+              <Link
+                key={cat.slug}
+                href={`/categories/${cat.slug}`}
+                className="card group overflow-hidden animate-fade-in-up"
+                style={{ animationDelay: `${i * 0.05}s`, animationFillMode: "both" }}
+              >
+                <div className="relative aspect-4/3 overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
+                    alt={cat.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 className="font-black text-lg text-white uppercase tracking-tight mb-1">
+                      {cat.name}
+                    </h3>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Ticker strip */}
+      <section className="max-w-7xl mx-auto px-4 py-16">
+        <div className="marquee-strip mb-10">
+          <div className="marquee-strip-inner">
+            {["HOTTEST BIDS", "ENDING SOON", "NEW LISTINGS", "VERIFIED SELLERS", "FREE SHIPPING", "BUYER PROTECTED", "ANTI-SNIPE"].map((item, i) => (
+              <span key={i} className="marquee-strip-item">{item}</span>
+            ))}
+            {["HOTTEST BIDS", "ENDING SOON", "NEW LISTINGS", "VERIFIED SELLERS", "FREE SHIPPING", "BUYER PROTECTED", "ANTI-SNIPE"].map((item, i) => (
+              <span key={`dup-${i}`} className="marquee-strip-item">{item}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

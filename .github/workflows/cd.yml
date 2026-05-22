@@ -2,26 +2,147 @@ name: CD
 
 on:
   workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: cd-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy-staging:
-    name: Deploy to Staging
-    if: github.ref == 'refs/heads/staging'
+  deploy-core-main:
+    name: Build and Deploy Core API to Production VM
+    # TODO: restore guard after first successful deploy from cd/main-deployment branch
+    # if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Staging Deployment
-        run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to STAGING server..."
-          echo "✅ Staging is up to date!"
+      - uses: actions/checkout@v4
 
-  deploy-main:
-    name: Deploy to Production
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Production Deployment
+      - name: Validate required secrets
+        env:
+          PROD_SSH_KEY:          ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_HOST:         ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER:         ${{ secrets.PROD_SSH_USER }}
+          PROD_DB_URL:           ${{ secrets.PROD_DB_URL }}
+          PROD_DB_USER:          ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD:      ${{ secrets.PROD_DB_PASSWORD }}
+          PROD_JWT_SECRET:       ${{ secrets.PROD_JWT_SECRET }}
+          PROD_FRONTEND_URL:     ${{ secrets.PROD_FRONTEND_URL }}
+          PROD_GRAFANA_PASSWORD: ${{ secrets.PROD_GRAFANA_PASSWORD }}
         run: |
-          echo "CI Quality Gate: PASSED"
-          echo "Deploying to PRODUCTION server..."
-          echo "🚀 Production is live!"
+          [ -n "$PROD_SSH_KEY" ]           || { echo "Missing: PROD_SSH_KEY";           exit 1; }
+          [ -n "$PROD_SSH_HOST" ]          || { echo "Missing: PROD_SSH_HOST";          exit 1; }
+          [ -n "$PROD_SSH_USER" ]          || { echo "Missing: PROD_SSH_USER";          exit 1; }
+          [ -n "$PROD_DB_URL" ]            || { echo "Missing: PROD_DB_URL";            exit 1; }
+          [ -n "$PROD_DB_USER" ]           || { echo "Missing: PROD_DB_USER";           exit 1; }
+          [ -n "$PROD_DB_PASSWORD" ]       || { echo "Missing: PROD_DB_PASSWORD";       exit 1; }
+          [ -n "$PROD_JWT_SECRET" ]        || { echo "Missing: PROD_JWT_SECRET";        exit 1; }
+          [ -n "$PROD_FRONTEND_URL" ]      || { echo "Missing: PROD_FRONTEND_URL";      exit 1; }
+          [ -n "$PROD_GRAFANA_PASSWORD" ]  || { echo "Missing: PROD_GRAFANA_PASSWORD";  exit 1; }
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags
+        id: tags
+        run: |
+          SHA="sha-$(git rev-parse --short HEAD)"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "full=ghcr.io/advprog-2026-b13-project/bidmart-core:${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/bidmart-core
+          file: apps/bidmart-core/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/advprog-2026-b13-project/bidmart-core:main
+            ghcr.io/advprog-2026-b13-project/bidmart-core:${{ steps.tags.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync infra files to VM
+        env:
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
+        run: |
+          rsync -az --mkpath -e "ssh -i ~/.ssh/id_ed25519" \
+            infra/prod/ \
+            "$SSH_DEST":/opt/bidmart/
+
+      - name: Write .env to VM
+        env:
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
+        run: |
+          printf 'CORE_IMAGE=%s\nDATABASE_URL=%s\nDATABASE_USER=%s\nDATABASE_PASSWORD=%s\nAUTH_JWT_SECRET=%s\nFRONTEND_URL=%s\nRESEND_API_KEY=%s\nMIDTRANS_SERVER_KEY=%s\nMIDTRANS_CLIENT_KEY=%s\nGRAFANA_PASSWORD=%s\n' \
+            "${{ steps.tags.outputs.full }}" \
+            "${{ secrets.PROD_DB_URL }}" \
+            "${{ secrets.PROD_DB_USER }}" \
+            "${{ secrets.PROD_DB_PASSWORD }}" \
+            "${{ secrets.PROD_JWT_SECRET }}" \
+            "${{ secrets.PROD_FRONTEND_URL }}" \
+            "${{ secrets.PROD_RESEND_API_KEY }}" \
+            "${{ secrets.PROD_MIDTRANS_SERVER_KEY }}" \
+            "${{ secrets.PROD_MIDTRANS_CLIENT_KEY }}" \
+            "${{ secrets.PROD_GRAFANA_PASSWORD }}" \
+            > /tmp/prod.env
+          scp -i ~/.ssh/id_ed25519 /tmp/prod.env "$SSH_DEST":/opt/bidmart/.env
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: GITHUB_TOKEN,GITHUB_ACTOR,NEW_IMAGE
+          script: |
+            set -e
+            cd /opt/bidmart
+            chmod 600 .env
+
+            CURRENT=$(grep "^CORE_IMAGE=" .env 2>/dev/null | cut -d= -f2 || true)
+            [ -n "$CURRENT" ] && echo "$CURRENT" > previous_image_tag
+
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$NEW_IMAGE"
+            docker compose --env-file .env up -d --no-deps --force-recreate core
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          NEW_IMAGE: ${{ steps.tags.outputs.full }}
+
+      - name: Wait for health check
+        run: |
+          for i in {1..18}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.bidmart.store/api/health/status || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Production is healthy"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production did not become healthy — consider running rollback"
+          exit 1
+
+      - name: Publish deployment summary
+        if: always()
+        run: |
+          echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: ${{ steps.tags.outputs.full }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "By: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"

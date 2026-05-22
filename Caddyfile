@@ -1,0 +1,9 @@
+api.staging.bidmart.store {
+    reverse_proxy core:8080 {
+        flush_interval -1
+    }
+}
+
+grafana.staging.bidmart.store {
+    reverse_proxy grafana:3000
+}

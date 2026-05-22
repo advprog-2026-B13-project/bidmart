@@ -1,0 +1,1082 @@
+{
+	"info": {
+		"name": "BidMart API",
+		"description": "Postman collection for testing BidMart auction platform APIs. Base URL: http://localhost:8080",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "listingId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "orderId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/health/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "health", "status"]
+						},
+						"description": "Check if the service is up and DB is connected"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var body = pm.response.json();",
+									"    if (body.data && body.data.userId) {",
+									"        pm.collectionVariables.set('userId', body.data.userId);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"secureP@ss123\",\n    \"displayName\": \"Test User\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Register a new user account. After registration, login to get tokens."
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var body = pm.response.json();",
+									"if (body.data) {",
+									"    if (body.data.accessToken) pm.collectionVariables.set('accessToken', body.data.accessToken);",
+									"    if (body.data.refreshToken) pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+									"    if (body.data.userId) pm.collectionVariables.set('userId', body.data.userId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"secureP@ss123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login with email and password. Returns accessToken and refreshToken directly if 2FA is disabled, or preAuthToken and mfaType if 2FA is enabled."
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var body = pm.response.json();",
+									"if (body.data) {",
+									"    if (body.data.accessToken) pm.collectionVariables.set('accessToken', body.data.accessToken);",
+									"    if (body.data.refreshToken) pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+									"    if (body.data.userId) pm.collectionVariables.set('userId', body.data.userId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "refresh"]
+						},
+						"description": "Exchange a valid refresh token for a new access token and refresh token pair."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "logout"]
+						},
+						"description": "Logout current session. Invalidates the current session from Redis cache."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "MFA",
+			"item": [
+				{
+					"name": "Setup TOTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/setup-totp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "setup-totp"]
+						},
+						"description": "Initiate TOTP setup. Returns secret and otpAuthUrl. Confirm with /confirm-totp."
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm TOTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/confirm-totp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "confirm-totp"]
+						},
+						"description": "Verify 6-digit TOTP code from authenticator app to activate TOTP 2FA."
+					},
+					"response": []
+				},
+				{
+					"name": "Enable Email MFA",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/enable-email",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "enable-email"]
+						},
+						"description": "Enable Email OTP 2FA. On next login, a 6-digit OTP will be sent to the registered email."
+					},
+					"response": []
+				},
+				{
+					"name": "Request Email OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"preAuthToken\": \"{{preAuthToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/request-email-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "request-email-otp"]
+						},
+						"description": "Send 6-digit OTP to user's email. Requires preAuthToken from login when 2FA is enabled."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify MFA",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var body = pm.response.json();",
+									"if (body.data) {",
+									"    if (body.data.accessToken) pm.collectionVariables.set('accessToken', body.data.accessToken);",
+									"    if (body.data.refreshToken) pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+									"    if (body.data.userId) pm.collectionVariables.set('userId', body.data.userId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"preAuthToken\": \"{{preAuthToken}}\",\n    \"code\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "verify"]
+						},
+						"description": "Verify TOTP or Email OTP code to complete login. Returns accessToken and refreshToken."
+					},
+					"response": []
+				},
+				{
+					"name": "Disable MFA",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/mfa/disable",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "mfa", "disable"]
+						},
+						"description": "Disable all 2FA on the account."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profile",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Get current authenticated user's profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"displayName\": \"Updated Name\",\n    \"photoUrl\": \"https://example.com/photo.jpg\",\n    \"shippingAddress\": \"123 Main St, City, Country\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Update current user's profile. Only non-null fields are updated."
+					},
+					"response": []
+				},
+				{
+					"name": "Deactivate Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/profile/deactivate/{{targetUserId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "profile", "deactivate", "{{targetUserId}}"]
+						},
+						"description": "Deactivate a user account. Requires account:deactivate permission."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sessions",
+			"item": [
+				{
+					"name": "List Sessions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/sessions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "sessions"]
+						},
+						"description": "List all sessions for the current user."
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke Session",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/sessions/{{sessionId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "sessions", "{{sessionId}}"]
+						},
+						"description": "Revoke a specific session by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke All Other Sessions",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/sessions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "sessions"]
+						},
+						"description": "Revoke all sessions except the current one."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "Get Main Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories/main",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories", "main"]
+						},
+						"description": "Get all top-level (main) categories."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sub Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories/sub/{{parentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories", "sub", "{{parentId}}"]
+						},
+						"description": "Get sub-categories under a parent category."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories/{{categoryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories", "{{categoryId}}"]
+						},
+						"description": "Get a specific category by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-User-Role",
+								"value": "ADMIN",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Electronics\",\n    \"parentId\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories"]
+						},
+						"description": "Create a new category. Requires ADMIN role via X-User-Role header."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Role",
+								"value": "ADMIN",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Category Name\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories/{{categoryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories", "{{categoryId}}"]
+						},
+						"description": "Update a category. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-User-Role",
+								"value": "ADMIN",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/categories/{{categoryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "categories", "{{categoryId}}"]
+						},
+						"description": "Delete a category. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Listings",
+			"item": [
+				{
+					"name": "Search Listings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/search?keyword=&minPrice=&maxPrice=&categoryId=&page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "search"],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "",
+									"description": "Search keyword"
+								},
+								{
+									"key": "minPrice",
+									"value": "",
+									"description": "Minimum price filter"
+								},
+								{
+									"key": "maxPrice",
+									"value": "",
+									"description": "Maximum price filter"
+								},
+								{
+									"key": "categoryId",
+									"value": "",
+									"description": "Category ID filter"
+								},
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Search listings with optional filters. Results are paginated and sorted by endTime ascending."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Listing By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/detail/{{listingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "detail", "{{listingId}}"]
+						},
+						"description": "Get full listing details by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Listing",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var body = pm.response.json();",
+									"    if (body.id) {",
+									"        pm.collectionVariables.set('listingId', body.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sellerId\": \"{{userId}}\",\n    \"categoryId\": 1,\n    \"title\": \"Vintage Watch\",\n    \"description\": \"A beautiful vintage watch from the 1970s\",\n    \"imageUrl\": \"https://example.com/watch.jpg\",\n    \"startingPrice\": 100.00,\n    \"reservePrice\": 500.00,\n    \"minBidIncrement\": 10.00,\n    \"startTime\": \"2026-05-01T10:00:00\",\n    \"endTime\": \"2026-06-01T10:00:00\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/create",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "create"]
+						},
+						"description": "Create a new auction listing."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Listing",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "{{userId}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Updated Title\",\n    \"description\": \"Updated description\",\n    \"reservePrice\": 600.00,\n    \"endTime\": \"2026-07-01T10:00:00\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/update/{{listingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "update", "{{listingId}}"]
+						},
+						"description": "Update a listing. Requires X-User-Id header matching the seller."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Listing",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "{{userId}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/delete/{{listingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "delete", "{{listingId}}"]
+						},
+						"description": "Delete a listing. Requires X-User-Id header matching the seller."
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Listing for Bid",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/catalog/listings/{{listingId}}/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "catalog", "listings", "{{listingId}}", "validate"]
+						},
+						"description": "Check if a listing is valid for placing a bid."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Bidding",
+			"item": [
+				{
+					"name": "Place Bid",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var body = pm.response.json();",
+									"if (body.data && body.data.listingId) {",
+									"    pm.collectionVariables.set('listingId', body.data.listingId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"listingId\": \"{{listingId}}\",\n    \"amount\": 150.00,\n    \"bidType\": \"MANUAL\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bidding/bids",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bidding", "bids"]
+						},
+						"description": "Place a bid on a listing. BidType can be MANUAL or PROXY."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Bids for Listing",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bidding/listings/{{listingId}}/bids",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bidding", "listings", "{{listingId}}", "bids"]
+						},
+						"description": "Get all bids for a specific listing."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Bids",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/bidding/my-bids",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bidding", "my-bids"]
+						},
+						"description": "Get all bids placed by the current authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Auction Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bidding/listings/{{listingId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bidding", "listings", "{{listingId}}", "status"]
+						},
+						"description": "Get current auction status for a listing."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Get Buyer Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/buyer/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "buyer", "{{userId}}"]
+						},
+						"description": "Get all orders for a specific buyer."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Shipment Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/{{orderId}}/shipment?status=SHIPPED&trackingNumber=TRACK123",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "{{orderId}}", "shipment"],
+							"query": [
+								{
+									"key": "status",
+									"value": "SHIPPED",
+									"description": "OrderStatus: PACKED, SHIPPED, COMPLETED, DISPUTED"
+								},
+								{
+									"key": "trackingNumber",
+									"value": "TRACK123",
+									"description": "Optional tracking number"
+								}
+							]
+						},
+						"description": "Update shipment status. Requires authenticated seller."
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Delivery",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/{{orderId}}/confirm",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "{{orderId}}", "confirm"]
+						},
+						"description": "Buyer confirms delivery receipt."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get User Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/user/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "user", "{{userId}}"]
+						},
+						"description": "Get all notifications for a user."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Notification Preferences",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/preferences/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "preferences", "{{userId}}"]
+						},
+						"description": "Get notification preferences for a user."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Notification Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/preferences/{{userId}}?emailEnabled=true&pushEnabled=false",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "preferences", "{{userId}}"],
+							"query": [
+								{
+									"key": "emailEnabled",
+									"value": "true"
+								},
+								{
+									"key": "pushEnabled",
+									"value": "false"
+								}
+							]
+						},
+						"description": "Update notification preferences for a user."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Wallet",
+			"item": [
+				{
+					"name": "Get All Wallets",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/wallet/all",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "wallet", "all"]
+						},
+						"description": "Get all wallet records (placeholder endpoint)."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
