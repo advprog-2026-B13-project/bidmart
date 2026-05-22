@@ -1,5 +1,7 @@
-/*package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
+package id.ac.ui.cs.advprog.bidmartcore.catalog.service;
 
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryCreateRequest;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryResponse;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +45,8 @@ class CategoryServiceImplTest {
     @DisplayName("Positive Case [getCategoryById]: Sukses menemukan kategori berdasarkan ID")
     void testGetCategoryByIdSuccess() {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
-        Category result = categoryService.getCategoryById(categoryId);
+        CategoryResponse result = categoryService.getCategoryById(categoryId);
+
         assertNotNull(result);
         assertEquals(categoryId, result.getId());
         assertEquals("Elektronik", result.getName());
@@ -81,32 +84,20 @@ class CategoryServiceImplTest {
         Category parentCategory = new Category();
         parentCategory.setId(20);
         parentCategory.setName("Perabotan");
-        Category updateDetails = new Category();
-        updateDetails.setName("Gadget");
-        updateDetails.setParentCategory(parentCategory);
+
+        CategoryCreateRequest request = new CategoryCreateRequest();
+        request.setName("Gadget");
+        request.setParentId(20);
+
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
+        when(categoryRepository.findById(20)).thenReturn(Optional.of(parentCategory));
         when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Category result = categoryService.updateCategory(categoryId, updateDetails);
+
+        CategoryResponse result = categoryService.updateCategory(categoryId, request);
+
         assertNotNull(result);
         assertEquals("Gadget", result.getName(), "Nama kategori harus berhasil diperbarui");
-        assertEquals(parentCategory, result.getParentCategory(), "Hubungan parent category harus berhasil ditautkan");
         verify(categoryRepository, times(1)).save(sampleCategory);
-    }
-
-    @Test
-    @DisplayName("Negative Case [updateCategory]: Menolak update jika kategori mencoba menjadi parent dirinya sendiri")
-    void testUpdateCategorySameParentThrowsException() {
-        Category invalidParent = new Category();
-        invalidParent.setId(categoryId);
-        Category updateDetails = new Category();
-        updateDetails.setName("Elektronik Rusak");
-        updateDetails.setParentCategory(invalidParent);
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            categoryService.updateCategory(categoryId, updateDetails);
-        });
-        assertEquals("Validasi Gagal: Kategori tidak boleh menjadi parent dari dirinya sendiri.", exception.getMessage());
-        verify(categoryRepository, never()).save(any(Category.class));
     }
 
     @Test
@@ -116,14 +107,16 @@ class CategoryServiceImplTest {
         initialParent.setId(50);
         sampleCategory.setParentCategory(initialParent);
 
-        Category updateDetails = new Category();
-        updateDetails.setName("Elektronik Mandiri");
-        updateDetails.setParentCategory(null);
+        CategoryCreateRequest request = new CategoryCreateRequest();
+        request.setName("Elektronik Mandiri");
+        request.setParentId(null);
+
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
         when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Category result = categoryService.updateCategory(categoryId, updateDetails);
+
+        CategoryResponse result = categoryService.updateCategory(categoryId, request);
+
         assertNotNull(result);
-        assertNull(result.getParentCategory(), "Parent category harus berhasil dibersihkan menjadi null");
         verify(categoryRepository, times(1)).save(sampleCategory);
     }
 
@@ -141,10 +134,13 @@ class CategoryServiceImplTest {
         Category childCategory = new Category();
         childCategory.setId(11);
         sampleCategory.getSubCategories().add(childCategory);
+
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
+
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
             categoryService.deleteCategory(categoryId);
         });
+
         assertEquals("Kategori tidak bisa dihapus karena masih memiliki sub-kategori.", exception.getMessage());
         verify(categoryRepository, never()).delete(any(Category.class));
     }
@@ -154,33 +150,45 @@ class CategoryServiceImplTest {
     void testDeleteCategoryWithNullSubCategoriesListSuccess() {
         sampleCategory.setSubCategories(null);
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sampleCategory));
+
         categoryService.deleteCategory(categoryId);
+
         verify(categoryRepository, times(1)).delete(sampleCategory);
     }
 
     @Test
     @DisplayName("Positive Case [createCategory]: Sukses menyimpan kategori baru tingkat akar (root)")
     void testCreateCategorySuccess() {
-        Category newCategory = new Category();
-        newCategory.setName("Buku");
-        when(categoryRepository.save(any(Category.class))).thenReturn(newCategory);
-        Category result = categoryService.createCategory(newCategory);
+        CategoryCreateRequest request = new CategoryCreateRequest();
+        request.setName("Buku");
+
+        Category savedCategory = new Category();
+        savedCategory.setId(1);
+        savedCategory.setName("Buku");
+
+        when(categoryRepository.save(any(Category.class))).thenReturn(savedCategory);
+
+        CategoryResponse result = categoryService.createCategory(request);
+
         assertNotNull(result);
         assertEquals("Buku", result.getName());
-        verify(categoryRepository, times(1)).save(newCategory);
+        verify(categoryRepository, times(1)).save(any(Category.class));
     }
 
     @Test
     @DisplayName("Negative Case [createCategory]: Meneruskan exception jika database gagal melakukan persist data")
     void testCreateCategoryThrowsExceptionOnRepositoryError() {
-        Category invalidCategory = new Category();
+        CategoryCreateRequest request = new CategoryCreateRequest();
+        request.setName("Data Invalid");
+
         when(categoryRepository.save(any(Category.class)))
-                .thenThrow(new IllegalArgumentException("Data kategori tidak valid"));
-        assertThrows(IllegalArgumentException.class, () -> {
-            categoryService.createCategory(invalidCategory);
+                .thenThrow(new RuntimeException("Database error"));
+
+        assertThrows(RuntimeException.class, () -> {
+            categoryService.createCategory(request);
         });
 
-        verify(categoryRepository, times(1)).save(invalidCategory);
+        verify(categoryRepository, times(1)).save(any(Category.class));
     }
 
     @Test
@@ -189,16 +197,24 @@ class CategoryServiceImplTest {
         Category parent = new Category();
         parent.setId(1);
 
-        Category child = new Category();
-        child.setName("Kemeja");
-        child.setParentCategory(parent);
+        CategoryCreateRequest request = new CategoryCreateRequest();
+        request.setName("Kemeja");
+        request.setParentId(1);
 
-        when(categoryRepository.save(any(Category.class))).thenReturn(child);
-        Category result = categoryService.createCategory(child);
+        Category savedCategory = new Category();
+        savedCategory.setId(2);
+        savedCategory.setName("Kemeja");
+        savedCategory.setParentCategory(parent);
+
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(parent));
+        when(categoryRepository.save(any(Category.class))).thenReturn(savedCategory);
+
+        CategoryResponse result = categoryService.createCategory(request);
+
         assertNotNull(result);
-        assertNotNull(result.getParentCategory());
-        assertEquals(1, result.getParentCategory().getId());
-        verify(categoryRepository, times(1)).save(child);
+        assertEquals("Kemeja", result.getName());
+        verify(categoryRepository, times(1)).findById(1);
+        verify(categoryRepository, times(1)).save(any(Category.class));
     }
 
     @Test
@@ -206,7 +222,9 @@ class CategoryServiceImplTest {
     void testGetMainCategoriesSuccess() {
         List<Category> mockRoots = List.of(sampleCategory);
         when(categoryRepository.findByParentCategoryIsNull()).thenReturn(mockRoots);
-        List<Category> results = categoryService.getMainCategories();
+
+        List<CategoryResponse> results = categoryService.getMainCategories();
+
         assertNotNull(results);
         assertEquals(1, results.size());
         assertEquals("Elektronik", results.get(0).getName());
@@ -217,18 +235,24 @@ class CategoryServiceImplTest {
     @DisplayName("Negative Case [getMainCategories]: Mengembalikan list kosong jika belum ada kategori utama di database")
     void testGetMainCategoriesEmpty() {
         when(categoryRepository.findByParentCategoryIsNull()).thenReturn(List.of());
-        List<Category> results = categoryService.getMainCategories();
+
+        List<CategoryResponse> results = categoryService.getMainCategories();
+
         assertNotNull(results);
         assertTrue(results.isEmpty(), "Harus mengembalikan koleksi list kosong, bukan null");
         verify(categoryRepository, times(1)).findByParentCategoryIsNull();
     }
 
     @Test
-    @DisplayName("Edge Case [getMainCategories]: Menangani situasi batas secara aman jika repository memulangkan objek null")
+    @DisplayName("Edge Case [getMainCategories]: Menangani situasi aman saat terjadi null pointer pada stream data database")
     void testGetMainCategoriesReturnsNullSafety() {
         when(categoryRepository.findByParentCategoryIsNull()).thenReturn(null);
-        List<Category> results = categoryService.getMainCategories();
-        assertNull(results, "Service harus meneruskan nilai dari repo secara transparan tanpa crash");
+
+        // Memastikan sistem meneruskan NullPointerException secara natif karena stream tidak bisa handle null List dari DB
+        assertThrows(NullPointerException.class, () -> {
+            categoryService.getMainCategories();
+        });
+
         verify(categoryRepository, times(1)).findByParentCategoryIsNull();
     }
 
@@ -238,8 +262,11 @@ class CategoryServiceImplTest {
         Category subCategory = new Category();
         subCategory.setId(11);
         subCategory.setName("Laptop");
+
         when(categoryRepository.findByParentCategoryId(categoryId)).thenReturn(List.of(subCategory));
-        List<Category> results = categoryService.getSubCategories(categoryId);
+
+        List<CategoryResponse> results = categoryService.getSubCategories(categoryId);
+
         assertNotNull(results);
         assertEquals(1, results.size());
         assertEquals("Laptop", results.get(0).getName());
@@ -250,7 +277,9 @@ class CategoryServiceImplTest {
     @DisplayName("Negative Case [getSubCategories]: Mengembalikan list kosong jika parent ID tersebut tidak memiliki anak kategori")
     void testGetSubCategoriesEmpty() {
         when(categoryRepository.findByParentCategoryId(categoryId)).thenReturn(List.of());
-        List<Category> results = categoryService.getSubCategories(categoryId);
+
+        List<CategoryResponse> results = categoryService.getSubCategories(categoryId);
+
         assertNotNull(results);
         assertTrue(results.isEmpty());
         verify(categoryRepository, times(1)).findByParentCategoryId(categoryId);
@@ -261,9 +290,11 @@ class CategoryServiceImplTest {
     void testGetSubCategoriesWithNegativeId() {
         Integer negativeId = -100;
         when(categoryRepository.findByParentCategoryId(negativeId)).thenReturn(List.of());
-        List<Category> results = categoryService.getSubCategories(negativeId);
+
+        List<CategoryResponse> results = categoryService.getSubCategories(negativeId);
+
         assertNotNull(results);
         assertTrue(results.isEmpty());
         verify(categoryRepository, times(1)).findByParentCategoryId(negativeId);
     }
-}*/
+}

@@ -161,11 +161,11 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         log.info("Payment notification received: orderId={} status={} grossAmount={}",
-                payload.getOrderId(), payload.getTransactionStatus(), payload.getGrossAmount());
+                forLog(payload.getOrderId()), forLog(payload.getTransactionStatus()), forLog(payload.getGrossAmount()));
 
         if (!isValidSignature(payload)) {
-            log.error("Payment notification INVALID SIGNATURE: orderId={}", payload.getOrderId());
-            AUDIT.error("PAYMENT_SIGNATURE_INVALID orderId={}", payload.getOrderId());
+            log.error("Payment notification INVALID SIGNATURE: orderId={}", forLog(payload.getOrderId()));
+            AUDIT.error("PAYMENT_SIGNATURE_INVALID orderId={}", forLog(payload.getOrderId()));
             return new PaymentNotificationResponse(payload.getOrderId(), PaymentStatus.FAILED.name(), "invalid signature");
         }
 

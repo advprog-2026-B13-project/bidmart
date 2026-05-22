@@ -37,6 +37,7 @@ services:
     container_name: bidmart-core
     restart: unless-stopped
     environment:
+      TZ: Asia/Jakarta
       SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/bidmart_db
       DATABASE_USER: admin
