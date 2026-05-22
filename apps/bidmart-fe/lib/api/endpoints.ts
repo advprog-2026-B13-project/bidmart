@@ -262,15 +262,25 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+interface RawNotification {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  read?: boolean;
+  isRead?: boolean;
+  referenceId: string;
+  createdAt: string;
+}
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {
-  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as any[];
+  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as RawNotification[];
   if (!Array.isArray(raw)) return [];
   return raw.map(n => ({
     id: n.id,
     userId: n.userId,
     type: n.type,
     message: n.message,
-    isRead: n.read !== undefined ? n.read : n.isRead,
+    isRead: n.read !== undefined ? n.read : (n.isRead ?? false),
     referenceId: n.referenceId,
     createdAt: n.createdAt,
   }));
