@@ -209,7 +209,7 @@ export default function NotificationsPage() {
                   }
 
                   return (
-                      <div
+                      <button
                           key={notification.id}
                           onClick={handleMarkAsRead}
                           className={`p-6 transition-colors flex items-start gap-4 cursor-pointer hover:bg-gray-50/50 ${
@@ -217,7 +217,7 @@ export default function NotificationsPage() {
                           }`}
                       >
                         {content}
-                      </div>
+                      </button>
                   );
                 })
             )}

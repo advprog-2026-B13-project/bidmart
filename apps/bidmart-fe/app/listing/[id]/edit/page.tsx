@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { SubmitEventHandler, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
@@ -32,7 +32,7 @@ function toLocalInputValue(value: string) {
 export default function EditListingPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  readonly params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
   const { isAuthenticated, isHydrating } = useAuth();
@@ -110,7 +110,7 @@ export default function EditListingPage({
 
   const canEdit = listing?.status === "DRAFT";
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
     if (!listing || !canEdit) {
@@ -165,7 +165,7 @@ export default function EditListingPage({
   };
 
   const handleActivate = async () => {
-    if (!listing || listing.status !== "DRAFT") {
+    if (listing?.status !== "DRAFT") {
       return;
     }
 
@@ -223,7 +223,88 @@ export default function EditListingPage({
           <div className="border-3 border-black bg-white p-8 shadow-[8px_8px_0_#0A0A0A]">
             <p className="text-sm font-bold uppercase tracking-wide text-gray-600">Loading listing...</p>
           </div>
-        ) : listing ? (
+        ) : (
+          <ListingEditForm
+            listing={listing}
+            canEdit={canEdit}
+            handleSubmit={handleSubmit}
+            description={description}
+            setDescription={setDescription}
+            imageUrl={imageUrl}
+            setImageUrl={setImageUrl}
+            startingPrice={startingPrice}
+            setStartingPrice={setStartingPrice}
+            reservePrice={reservePrice}
+            setReservePrice={setReservePrice}
+            minBidIncrement={minBidIncrement}
+            setMinBidIncrement={setMinBidIncrement}
+            startTime={startTime}
+            setStartTime={setStartTime}
+            endTime={endTime}
+            setEndTime={setEndTime}
+            isSaving={isSaving}
+            isActivating={isActivating}
+            setShowActivateModal={setShowActivateModal}
+          />
+        )}
+      </div>
+
+      {showActivateModal && listing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="max-w-md w-full border-3 border-black bg-white p-6 shadow-[8px_8px_0_#0A0A0A]">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-500">Activate Listing</p>
+            <h3 className="text-2xl font-black uppercase tracking-tight mt-2">{listing.title}</h3>
+            <p className="text-sm text-gray-600 mt-3">
+              This action is irreversible. Once activated, the listing can no longer be edited as a draft.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-6">
+              <button
+                type="button"
+                onClick={handleActivate}
+                disabled={isActivating}
+                className="btn btn-acid text-xs font-bold uppercase tracking-wide"
+              >
+                {isActivating ? "Activating..." : "Activate"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowActivateModal(false)}
+                className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListingEditForm({ listing, canEdit, handleSubmit, description, setDescription, imageUrl, setImageUrl, startingPrice, setStartingPrice, reservePrice, setReservePrice, minBidIncrement, setMinBidIncrement, startTime, setStartTime, endTime, setEndTime, isSaving, isActivating, setShowActivateModal }: {
+  listing: ListingDetail | null;
+  canEdit: boolean;
+  handleSubmit: SubmitEventHandler<HTMLFormElement>;
+  description: string;
+  setDescription: (value: string) => void;
+  imageUrl: string;
+  setImageUrl: (value: string) => void;
+  startingPrice: string;
+  setStartingPrice: (value: string) => void;
+  reservePrice: string;
+  setReservePrice: (value: string) => void;
+  minBidIncrement: string;
+  setMinBidIncrement: (value: string) => void;
+  startTime: string;
+  setStartTime: (value: string) => void;
+  endTime: string;
+  setEndTime: (value: string) => void;
+  isSaving: boolean;
+  isActivating: boolean;
+  setShowActivateModal: (value: boolean) => void;
+}) {
+  return (
+    listing ? (
           <div className="space-y-6">
             {!canEdit && (
               <div className="p-4 border-2 border-black bg-gray-50 text-sm font-bold">
@@ -242,10 +323,11 @@ export default function EditListingPage({
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4">Pricing</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    <label htmlFor="startingPrice" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                       Starting Price (IDR) <span className="text-hot">*</span>
                     </label>
                     <input
+                      id="startingPrice"
                       type="number"
                       min="0"
                       value={startingPrice}
@@ -255,10 +337,11 @@ export default function EditListingPage({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    <label htmlFor="reservePrice" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                       Reserve Price (IDR) <span className="text-hot">*</span>
                     </label>
                     <input
+                      id="reservePrice"
                       type="number"
                       min="0"
                       value={reservePrice}
@@ -268,10 +351,11 @@ export default function EditListingPage({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    <label htmlFor="minBidIncrement" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                       Min Bid Increment (IDR) <span className="text-hot">*</span>
                     </label>
                     <input
+                      id="minBidIncrement"
                       type="number"
                       min="1"
                       value={minBidIncrement}
@@ -287,10 +371,11 @@ export default function EditListingPage({
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4">Schedule</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    <label htmlFor="startTime" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                       Start Time <span className="text-hot">*</span>
                     </label>
                     <input
+                      id="startTime"
                       type="datetime-local"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
@@ -299,10 +384,11 @@ export default function EditListingPage({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    <label htmlFor="endTime" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                       End Time <span className="text-hot">*</span>
                     </label>
                     <input
+                      id="endTime"
                       type="datetime-local"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
@@ -314,10 +400,11 @@ export default function EditListingPage({
               </div>
 
               <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="description" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Description <span className="text-hot">*</span>
                 </label>
                 <textarea
+                  id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={6}
@@ -327,10 +414,11 @@ export default function EditListingPage({
               </div>
 
               <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="imageUrl" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Image URL
                 </label>
                 <input
+                  id="imageUrl"
                   type="url"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
@@ -368,37 +456,6 @@ export default function EditListingPage({
           <div className="border-3 border-black bg-white p-8 shadow-[8px_8px_0_#0A0A0A]">
             <p className="text-sm font-bold uppercase tracking-wide text-gray-600">Listing not found.</p>
           </div>
-        )}
-      </div>
-
-      {showActivateModal && listing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="max-w-md w-full border-3 border-black bg-white p-6 shadow-[8px_8px_0_#0A0A0A]">
-            <p className="text-xs font-black uppercase tracking-widest text-gray-500">Activate Listing</p>
-            <h3 className="text-2xl font-black uppercase tracking-tight mt-2">{listing.title}</h3>
-            <p className="text-sm text-gray-600 mt-3">
-              This action is irreversible. Once activated, the listing can no longer be edited as a draft.
-            </p>
-            <div className="flex flex-wrap gap-3 mt-6">
-              <button
-                type="button"
-                onClick={handleActivate}
-                disabled={isActivating}
-                className="btn btn-acid text-xs font-bold uppercase tracking-wide"
-              >
-                {isActivating ? "Activating..." : "Activate"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowActivateModal(false)}
-                className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+        )
+  )
 }
