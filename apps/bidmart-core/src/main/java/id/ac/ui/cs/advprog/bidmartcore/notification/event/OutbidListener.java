@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmartcore.notification.event;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.OutbidEvent;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ import java.math.BigDecimal;
 public class OutbidListener {
 
     private final NotificationService notificationService;
+    private final ListingRepository listingRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -26,14 +29,21 @@ public class OutbidListener {
                 event.getOutbidBidderId(), event.getListingId(),
                 event.getPreviousBidAmount(), event.getNewAmount());
 
+        String listingTitle = listingRepository.findById(event.getListingId())
+                .map(Listing::getTitle)
+                .orElse("Item");
+
         String message = String.format(
-                "You've been outbid! New highest bid is Rp %s. Bid again to stay in the lead.",
+                "You've been outbid on '%s'! New highest bid is Rp %s. Bid again to stay in the lead.",
+                listingTitle,
                 formatAmount(event.getNewAmount())
         );
+
         notificationService.createNotification(
                 event.getOutbidBidderId(),
                 "OUTBID",
-                message
+                message,
+                event.getListingId()
         );
     }
 

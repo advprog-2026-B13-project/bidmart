@@ -219,7 +219,7 @@ export async function getAuctionStatus(listingId: string) {
 }
 
 export async function getBidsForListing(listingId: string) {
-  const raw = await apiFetch(`/api/bidding/listings/${listingId}/bids`, { method: "GET" }, { auth: false }) as { data: BidResult[] };
+  const raw = await apiFetch(`/api/bidding/listings/${listingId}/bids`, { method: "GET" }) as { data: BidResult[] };
   return raw.data || [];
 }
 
@@ -258,12 +258,32 @@ export interface NotificationItem {
   type: string;
   message: string;
   isRead: boolean;
+  referenceId?: string;
   createdAt: string;
 }
 
-export async function getNotifications(userId: string) {
-  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as NotificationItem[];
-  return Array.isArray(raw) ? raw : [];
+interface RawNotification {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  read?: boolean;
+  isRead?: boolean;
+  referenceId: string;
+  createdAt: string;
+}
+export async function getNotifications(userId: string): Promise<NotificationItem[]> {
+  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as RawNotification[];
+  if (!Array.isArray(raw)) return [];
+  return raw.map(n => ({
+    id: n.id,
+    userId: n.userId,
+    type: n.type,
+    message: n.message,
+    isRead: n.read !== undefined ? n.read : (n.isRead ?? false),
+    referenceId: n.referenceId,
+    createdAt: n.createdAt,
+  }));
 }
 
 export async function getCategoryById(id: number) {
@@ -356,6 +376,11 @@ export async function updateNotificationPreferences(
     body: JSON.stringify(data),
   }, { auth: true });
 }
+
+export async function markNotificationAsRead(id: string): Promise<void> {
+  await apiFetch(`/api/notifications/${id}/read`, { method: "POST" }, { auth: true });
+}
+
 
 export type OrderStatus = "PENDING" | "PACKED" | "SHIPPED" | "COMPLETED" | "DISPUTED";
 

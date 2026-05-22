@@ -80,18 +80,20 @@ class NotificationServiceImplTest {
     void createNotification_shouldSaveAndBroadcastNotification() {
         String type = "OUTBID";
         String message = "You have been outbid!";
+        UUID referenceId = UUID.randomUUID();
 
         Notification mockSaved = new Notification();
         mockSaved.setId(UUID.randomUUID());
         mockSaved.setUserId(userId);
         mockSaved.setType(type);
         mockSaved.setMessage(message);
+        mockSaved.setReferenceId(referenceId);
         mockSaved.setRead(false);
         mockSaved.setCreatedAt(LocalDateTime.now());
 
         when(notificationRepository.save(any(Notification.class))).thenReturn(mockSaved);
 
-        notificationService.createNotification(userId, type, message);
+        notificationService.createNotification(userId, type, message, referenceId);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(1)).save(notificationCaptor.capture());
@@ -100,6 +102,7 @@ class NotificationServiceImplTest {
         assertEquals(userId, savedInput.getUserId());
         assertEquals(type, savedInput.getType());
         assertEquals(message, savedInput.getMessage());
+        assertEquals(referenceId, savedInput.getReferenceId());
         assertFalse(savedInput.isRead());
 
         verify(messagingTemplate, times(1)).convertAndSend(
