@@ -38,7 +38,7 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setMessage(message);
         notification.setReferenceId(referenceId);
         notification.setRead(false);
-        Notification savedNotification = notificationRepository.save(notification);
+        Notification savedNotification = notificationRepository.saveAndFlush(notification);
 
         List<SseEmitter> userEmitters = emitters.get(userId);
         if (userEmitters != null) {
