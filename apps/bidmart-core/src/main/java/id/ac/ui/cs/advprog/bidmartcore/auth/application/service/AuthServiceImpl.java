@@ -47,6 +47,10 @@ public class AuthServiceImpl implements AuthUseCase {
     private static final String REQUIRES_MFA = "requiresMfa";
     private static final org.slf4j.Logger AUDIT = org.slf4j.LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
+    private static String forLog(String value) {
+        return value == null ? null : value.replaceAll("[\\r\\n]", "_");
+    }
+
     private final UserRepositoryPort userRepository;
     private final RoleRepositoryPort roleRepository;
     private final SessionRepositoryPort sessionRepository;
@@ -155,7 +159,7 @@ public class AuthServiceImpl implements AuthUseCase {
 
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
-        AUDIT.info("EMAIL_VERIFIED userId={} email={}", user.getId(), email);
+        AUDIT.info("EMAIL_VERIFIED userId={} email={}", user.getId(), forLog(email));
         log.info("Email verified successfully: email={}", email);
     }
 
@@ -209,7 +213,7 @@ public class AuthServiceImpl implements AuthUseCase {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
-        AUDIT.info("LOGIN_SUCCESS userId={} email={} ip={}", user.getId(), email,
+        AUDIT.info("LOGIN_SUCCESS userId={} email={} ip={}", user.getId(), forLog(email),
                 clientInfo != null ? clientInfo.ipAddress() : "unknown");
         log.info("Login successful: userId={} email={}", user.getId(), email);
 

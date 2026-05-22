@@ -57,6 +57,7 @@ import org.springframework.stereotype.Service;
         }
 
         @Override
+        @Transactional
         public WalletModel topUp(UUID userId, BigDecimal amount) {
                         return deposit(userId, amount);
         }

@@ -46,9 +46,13 @@ public class PaymentServiceImpl implements PaymentService {
 
     private static final Logger AUDIT = LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
 
+    private static String forLog(String value) {
+        return value == null ? null : value.replaceAll("[\\r\\n]", "_");
+    }
+
     @Override
     public TopUpResponse createTopUpTransaction(UUID userId, BigDecimal amount, String paymentType, String bank) {
-        log.info("Top-up requested: userId={} amount={} paymentType={} bank={}", userId, amount, paymentType, bank);
+        log.info("Top-up requested: userId={} amount={} paymentType={} bank={}", userId, amount, forLog(paymentType), forLog(bank));
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Top up amount must be greater than zero");
         }
