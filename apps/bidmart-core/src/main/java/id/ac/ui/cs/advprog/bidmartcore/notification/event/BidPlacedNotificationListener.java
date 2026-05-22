@@ -28,7 +28,6 @@ public class BidPlacedNotificationListener {
         log.debug("Bid placed event for listing {}, bidder {}: amount {}",
                 event.getListingId(), event.getBidderId(), event.getAmount());
 
-        // Notify seller only — bidder gets a toast confirmation on the frontend
         listingRepository.findById(event.getListingId()).ifPresent(listing -> {
             String sellerMessage = String.format(
                     "New bid of Rp %s on your listing \"%s\"!",
@@ -38,7 +37,8 @@ public class BidPlacedNotificationListener {
             notificationService.createNotification(
                     listing.getSellerId(),
                     "NEW_BID",
-                    sellerMessage
+                    sellerMessage,
+                    listing.getId()
             );
         });
     }

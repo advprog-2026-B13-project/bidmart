@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import id.ac.ui.cs.advprog.bidmartcore.notification.model.Notification;
 import id.ac.ui.cs.advprog.bidmartcore.notification.repository.NotificationRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NotificationServiceImpl implements NotificationService {
@@ -29,14 +30,24 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void createNotification(UUID userId, String type, String message) {
+    public void createNotification(UUID userId, String type, String message, UUID referenceId) {
         Notification notification = new Notification();
         notification.setUserId(userId);
         notification.setType(type);
         notification.setMessage(message);
+        notification.setReferenceId(referenceId);
         notification.setRead(false);
         Notification savedNotification = notificationRepository.save(notification);
-        
+
         messagingTemplate.convertAndSend("/topic/notifications/" + userId, savedNotification);
+    }
+
+    @Override
+    @Transactional
+    public void markAsRead(UUID notificationId) {
+        notificationRepository.findById(notificationId).ifPresent(notification -> {
+            notification.setRead(true);
+            notificationRepository.save(notification);
+        });
     }
 }

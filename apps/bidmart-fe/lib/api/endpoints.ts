@@ -258,12 +258,22 @@ export interface NotificationItem {
   type: string;
   message: string;
   isRead: boolean;
+  referenceId: string;
   createdAt: string;
 }
 
-export async function getNotifications(userId: string) {
-  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as NotificationItem[];
-  return Array.isArray(raw) ? raw : [];
+export async function getNotifications(userId: string): Promise<NotificationItem[]> {
+  const raw = await apiFetch(`/api/notifications/user/${userId}`, { method: "GET" }, { auth: true }) as any[];
+  if (!Array.isArray(raw)) return [];
+  return raw.map(n => ({
+    id: n.id,
+    userId: n.userId,
+    type: n.type,
+    message: n.message,
+    isRead: n.read !== undefined ? n.read : n.isRead,
+    referenceId: n.referenceId,
+    createdAt: n.createdAt,
+  }));
 }
 
 export async function getCategoryById(id: number) {
@@ -355,4 +365,8 @@ export async function updateNotificationPreferences(
     method: "PUT",
     body: JSON.stringify(data),
   }, { auth: true });
+}
+
+export async function markNotificationAsRead(id: string): Promise<void> {
+  await apiFetch(`/api/notifications/${id}/read`, { method: "POST" }, { auth: true });
 }
