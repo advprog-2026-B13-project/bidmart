@@ -176,4 +176,316 @@ class ListingServiceImplTest {
         boolean isValid = listingService.isListingValidForBid(listingId);
         assertFalse(isValid, "Harus mengembalikan false jika waktu penutupan lelang sudah terlampaui");
     }
+
+    @Test
+    @DisplayName("Positive Case [createListing]: Sukses membuat listing baru dalam status DRAFT")
+    void testCreateListingSuccess() {
+        id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest req = new id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest();
+        req.setCategoryId(1);
+        req.setStartTime(LocalDateTime.now().plusDays(1));
+        req.setEndTime(LocalDateTime.now().plusDays(3));
+        req.setTitle("iPhone 15 Pro");
+
+        Category mockCategory = new Category();
+        mockCategory.setId(1);
+
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(mockCategory));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Listing result = listingService.createListing(req, userId);
+
+        assertNotNull(result);
+        assertEquals(ListingStatus.DRAFT, result.getStatus(), "Listing baru wajib berstatus DRAFT");
+        assertEquals("iPhone 15 Pro", result.getTitle());
+    }
+
+    @Test
+    @DisplayName("Negative Case [createListing]: Melempar IllegalArgumentException jika kategori tidak ditemukan")
+    void testCreateListingCategoryNotFound() {
+        id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest req = new id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest();
+        req.setCategoryId(404);
+
+        when(categoryRepository.findById(404)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> listingService.createListing(req, userId));
+        verify(listingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Edge Case [createListing]: Menolak pembuatan jika waktu selesai mendahului waktu mulai")
+    void testCreateListingTimeInvalid() {
+        id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest req = new id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest();
+        req.setCategoryId(1);
+        req.setStartTime(LocalDateTime.now().plusDays(5));
+        req.setEndTime(LocalDateTime.now().plusDays(2));
+
+        Category mockCategory = new Category();
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(mockCategory));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> listingService.createListing(req, userId));
+        assertEquals("Waktu selesai lelang harus setelah waktu mulai", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Positive Case [updateListing]: Pemilik sukses memperbarui detail listing DRAFT yang belum ada bid")
+    void testUpdateListingSuccess() {
+        id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest req = new id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest();
+        req.setDescription("Deskripsi Baru");
+        req.setStartingPrice(new BigDecimal("15000000"));
+
+        sampleListing.setStatus(ListingStatus.DRAFT);
+        sampleListing.setBidCount(0);
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Listing result = listingService.updateListing(listingId, userId, req);
+
+        assertNotNull(result);
+        assertEquals("Deskripsi Baru", result.getDescription());
+    }
+
+    @Test
+    @DisplayName("Negative Case [updateListing]: Melempar ralat jika ID listing tidak ditemukan")
+    void testUpdateListingNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, userId, null));
+    }
+
+    @Test
+    @DisplayName("Edge Case [updateListing]: Menolak update jika listing sudah memiliki penawaran (bidCount > 0)")
+    void testUpdateListingHasBidsConflict() {
+        id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest req = new id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingUpdateRequest();
+        sampleListing.setStatus(ListingStatus.DRAFT);
+        sampleListing.setBidCount(3); // Ada bid masuk!
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> listingService.updateListing(listingId, userId, req));
+        assertTrue(ex.getMessage().contains("sudah memiliki penawaran"));
+    }
+
+    @Test
+    @DisplayName("Positive Case [getListingForOwner]: Sukses mengambil data jika requester adalah owner asli")
+    void testGetListingForOwnerSuccess() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        Listing result = listingService.getListingForOwner(listingId, userId);
+        assertNotNull(result);
+    }
+
+    @Test
+    @DisplayName("Negative Case [getListingForOwner]: Melempar IllegalArgumentException jika listing gaib")
+    void testGetListingForOwnerNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.getListingForOwner(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Edge Case [getListingForOwner]: Melempar SecurityException jika diintip oleh user lain")
+    void testGetListingForOwnerAccessDenied() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        assertThrows(SecurityException.class, () -> listingService.getListingForOwner(listingId, UUID.randomUUID()));
+    }
+
+    @Test
+    @DisplayName("Positive Case [activateListing]: Pemilik sukses mengaktifkan listing dari DRAFT ke ACTIVE")
+    void testActivateListingSuccess() {
+        sampleListing.setStatus(ListingStatus.DRAFT);
+        sampleListing.setBidCount(0);
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Listing result = listingService.activateListing(listingId, userId);
+        assertEquals(ListingStatus.ACTIVE, result.getStatus());
+    }
+
+    @Test
+    @DisplayName("Negative Case [activateListing]: Gagal aktivasi jika listing tidak eksis")
+    void testActivateListingNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.activateListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Edge Case [activateListing]: Menolak aktivasi ganda jika status sudah bukan DRAFT")
+    void testActivateListingAlreadyActive() {
+        sampleListing.setStatus(ListingStatus.ACTIVE);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+
+        assertThrows(IllegalStateException.class, () -> listingService.activateListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Positive Case [closeListing]: Pemilik sukses menutup listing ACTIVE sebelum waktu mulai")
+    void testCloseListingSuccess() {
+        sampleListing.setStatus(ListingStatus.ACTIVE);
+        sampleListing.setStartTime(LocalDateTime.now().plusDays(1)); // Belum mulai
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Listing result = listingService.closeListing(listingId, userId);
+        assertEquals(ListingStatus.CLOSED, result.getStatus());
+    }
+
+    @Test
+    @DisplayName("Negative Case [closeListing]: Gagal menutup jika entitas tidak terdaftar")
+    void testCloseListingNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.closeListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Edge Case [closeListing]: Menolak penutupan paksa jika waktu lelang sudah terlanjur berjalan")
+    void testCloseListingAlreadyStarted() {
+        sampleListing.setStatus(ListingStatus.ACTIVE);
+        sampleListing.setStartTime(LocalDateTime.now().minusHours(1)); // Sudah mulai!
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+
+        assertThrows(IllegalStateException.class, () -> listingService.closeListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Positive Case [deleteListing]: Sukses menghapus listing DRAFT yang bersih dari penawaran")
+    void testDeleteListingSuccess() {
+        sampleListing.setStatus(ListingStatus.DRAFT);
+        sampleListing.setBidCount(0);
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        doNothing().when(listingRepository).deleteById(listingId);
+
+        assertDoesNotThrow(() -> listingService.deleteListing(listingId, userId));
+        verify(listingRepository, times(1)).deleteById(listingId);
+    }
+
+    @Test
+    @DisplayName("Negative Case [deleteListing]: Gagal hapus jika ID listing salah")
+    void testDeleteListingNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.deleteListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Edge Case [deleteListing]: Menolak penghapusan jika status sudah bukan DRAFT")
+    void testDeleteListingInvalidStatus() {
+        sampleListing.setStatus(ListingStatus.ACTIVE);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+
+        assertThrows(IllegalStateException.class, () -> listingService.deleteListing(listingId, userId));
+    }
+
+    @Test
+    @DisplayName("Positive Case [updateEndTime]: Sukses memperbarui batas waktu penutupan lelang")
+    void testUpdateEndTimeSuccess() {
+        LocalDateTime nextWeek = LocalDateTime.now().plusDays(7);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertDoesNotThrow(() -> listingService.updateEndTime(listingId, nextWeek));
+        assertEquals(nextWeek, sampleListing.getEndTime());
+    }
+
+    @Test
+    @DisplayName("Negative Case [updateEndTime]: Melempar exception jika ID produk salah")
+    void testUpdateEndTimeNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateEndTime(listingId, LocalDateTime.now()));
+    }
+
+    @Test
+    @DisplayName("Edge Case [updateFinalResult]: Sukses menyimpan harga final pemenang tanpa merusak data lain")
+    void testUpdateFinalResultSuccess() {
+        BigDecimal finalPrice = new BigDecimal("50000000");
+        UUID winner = UUID.randomUUID();
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        listingService.updateFinalResult(listingId, finalPrice, winner);
+
+        assertEquals(finalPrice, sampleListing.getCurrentPrice());
+        assertEquals(winner, sampleListing.getWinnerId());
+    }
+
+    @Test
+    @DisplayName("Positive Case [getListingById]: Sukses menemukan dan mengambil detail produk lelang berdasarkan ID yang valid")
+    void testGetListingByIdSuccess() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(sampleListing));
+        Listing result = listingService.getListingById(listingId);
+        assertNotNull(result);
+        assertEquals(listingId, result.getId());
+        assertEquals("PlayStation 5 Pro", result.getTitle());
+        verify(listingRepository, times(1)).findById(listingId);
+    }
+
+    @Test
+    @DisplayName("Negative Case [getListingById]: Melempar IllegalArgumentException dengan pesan khusus jika ID tidak terdaftar")
+    void testGetListingByIdNotFoundThrowsException() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            listingService.getListingById(listingId);
+        });
+
+        assertEquals("Listing dengan ID tersebut tidak ditemukan", exception.getMessage());
+        verify(listingRepository, times(1)).findById(listingId);
+    }
+
+    @Test
+    @DisplayName("Edge Case [getListingById]: Menangani request pencarian dengan parameter ID bernilai null secara aman")
+    void testGetListingByIdWithNullIdThrowsException() {
+        when(listingRepository.findById(null)).thenReturn(Optional.empty());
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            listingService.getListingById(null);
+        });
+
+        assertEquals("Listing dengan ID tersebut tidak ditemukan", exception.getMessage());
+        verify(listingRepository, times(1)).findById(null);
+    }
+
+    @Test
+    @DisplayName("Positive Case [searchListings]: Sukses mencari produk lelang menggunakan kombinasi kata kunci dan batas harga")
+    void testSearchListingsSuccess() {
+        // Arrange
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Listing> expectedPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(sampleListing));
+
+        when(listingRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(expectedPage);
+        org.springframework.data.domain.Page<Listing> result = listingService.searchListings(
+                "PlayStation", new BigDecimal("1000000"), new BigDecimal("20000000"), null, pageable);
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals("PlayStation 5 Pro", result.getContent().get(0).getTitle());
+        verify(listingRepository, times(1)).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Negative Case [searchListings]: Sukses memulangkan halaman (Page) kosong jika tidak ada produk yang cocok dengan kriteria")
+    void testSearchListingsEmptyResult() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(listingRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+        org.springframework.data.domain.Page<Listing> result = listingService.searchListings(
+                "BarangAnehGaibPastiKosong", null, null, null, pageable);
+        assertNotNull(result);
+        assertTrue(result.isEmpty(), "Harus memulangkan kontainer Page kosong, bukan bernilai null");
+        verify(listingRepository, times(1)).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Edge Case [searchListings]: Sukses mengeksekusi pencarian rekursif hierarki sub-kategori saat parameter categoryId disuplai")
+    void testSearchListingsWithCategoryIdRecursionSuccess() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        Integer inputCategoryId = 1;
+        when(categoryRepository.findByParentCategoryId(inputCategoryId)).thenReturn(java.util.List.of());
+        when(listingRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+        org.springframework.data.domain.Page<Listing> result = listingService.searchListings(
+                null, null, null, inputCategoryId, pageable);
+        assertNotNull(result);
+        verify(categoryRepository, times(1)).findByParentCategoryId(inputCategoryId);
+        verify(listingRepository, times(1)).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+    }
 }

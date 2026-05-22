@@ -54,7 +54,7 @@ class AuctionTimeExtendedListenerTest {
     @Test
     @DisplayName("Negative Case: Meneruskan IllegalArgumentException jika target ID produk lelang tidak ditemukan di katalog")
     void testOnAuctionTimeExtendedListingNotFoundThrowsException() {
-        when(auctionExtendedEvent.getNewEndTime()).thenReturn(newEndTime);
+        when(auctionTimeExtendedEvent.getNewEndTime()).thenReturn(newEndTime);
         doThrow(new IllegalArgumentException("Listing tidak ditemukan"))
                 .when(listingService).updateEndTime(listingId, newEndTime);
         assertThrows(IllegalArgumentException.class, () -> {
@@ -71,7 +71,7 @@ class AuctionTimeExtendedListenerTest {
                 .when(listingService).updateEndTime(listingId, newEndTime);
         assertThrows(RuntimeException.class, () -> {
             auctionTimeExtendedListener.onAuctionTimeExtended(auctionTimeExtendedEvent);
-        }, "Listener wajib membiarkan runtime exception lolos demi keselamatan rollback @Transactional");
+        }, "Listener wajib membiarkan runtime exception lolos demi keselamatan rollback transaksi");
 
         verify(listingService, times(1)).updateEndTime(listingId, newEndTime);
     }
