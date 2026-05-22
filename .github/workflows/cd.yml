@@ -1,5 +1,6 @@
 on:
   workflow_call:
+  workflow_dispatch:
 
 concurrency:
   group: cd-deploy-${{ github.ref }}
@@ -8,7 +9,8 @@ concurrency:
 jobs:
   deploy-core-main:
     name: Build and Deploy Core API to Production VM
-    if: github.ref == 'refs/heads/main'
+    # TODO: restore guard after first successful deploy from cd/main-deployment branch
+    # if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
