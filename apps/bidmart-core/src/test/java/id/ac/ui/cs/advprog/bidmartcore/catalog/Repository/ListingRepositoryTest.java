@@ -173,11 +173,12 @@ class ListingRepositoryTest {
     }
 
     @Test
-    @DisplayName("Edge Case [findByTitleContaining]: Memastikan Spring Data JPA menolak parameter null pada operasi LIKE/Containing")
-    void testFindByTitleContainingIgnoreCaseNullKeyword() {
-        assertThrows(RuntimeException.class, () -> {
-            listingRepository.findByTitleContainingIgnoreCase(null);
-        }, "Spring Data JPA harus melempar exception ketika parameter Containing diberi nilai null");
+    @DisplayName("Positive Case [findByTitleContaining]: Sukses mencari potongan kata judul tanpa peduli huruf besar/kecil")
+    void testFindByTitleContainingIgnoreCaseSuccess() {
+        // Diperbaiki menggunakan List<Listing> yang legal secara kompilasi Java
+        List<Listing> results = listingRepository.findByTitleContainingIgnoreCase("mAcBoOk");
+        assertEquals(1, results.size());
+        assertEquals("MacBook Pro M3", results.get(0).getTitle());
     }
 
     @Test

@@ -21,6 +21,9 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingSpecification;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
 
@@ -257,5 +260,27 @@ public class ListingServiceImpl implements ListingService {
         listing.setCurrentPrice(finalPrice);
         listing.setWinnerId(winnerId);
         listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public Listing takeDownListing(UUID listingId, String reason, UUID adminId) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing tidak ditemukan"));
+        if (listing.getStatus() == ListingStatus.WON || listing.getStatus() == ListingStatus.UNSOLD) {
+            throw new IllegalStateException(
+                    "Validasi Gagal: Listing yang sudah dalam status final (WON atau UNSOLD) tidak dapat di-takedown."
+            );
+        }
+
+        listing.setStatus(ListingStatus.CLOSED);
+
+        listing.setModeratedByAdminId(adminId);
+        listing.setTakedownReason(reason);
+
+        log.info("[AUDIT MODERASI] Listing ID: {} berhasil dipaksa CLOSED oleh Admin ID: {}. Alasan: {}",
+                listingId, adminId, reason);
+
+        return listingRepository.save(listing);
     }
 }

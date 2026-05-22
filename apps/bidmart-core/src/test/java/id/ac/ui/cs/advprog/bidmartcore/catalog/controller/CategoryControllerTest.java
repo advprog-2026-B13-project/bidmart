@@ -65,7 +65,11 @@ class CategoryControllerTest {
                         .header("X-User-Role", "USER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
 
         verify(categoryService, never()).createCategory(any());
     }
@@ -80,7 +84,11 @@ class CategoryControllerTest {
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -107,7 +115,11 @@ class CategoryControllerTest {
                         .header("X-User-Role", "USER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -121,7 +133,11 @@ class CategoryControllerTest {
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -141,7 +157,11 @@ class CategoryControllerTest {
     void testDeleteCategoryAccessDenied() throws Exception {
         mockMvc.perform(delete("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "USER"))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -152,7 +172,11 @@ class CategoryControllerTest {
 
         mockMvc.perform(delete("/api/catalog/categories/{id}", 1)
                         .header("X-User-Role", "ADMIN"))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -166,12 +190,20 @@ class CategoryControllerTest {
     }
 
     @Test
+<<<<<<< HEAD
     @DisplayName("Negative Case [getCategoryById]: Mengembalikan ralat status 5xx jika ID tidak ditemukan")
+=======
+    @DisplayName("Negative Case [getCategoryById]: Mengembalikan ralat status 4xx jika ID tidak ditemukan")
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     void testGetCategoryByIdNotFound() throws Exception {
         when(categoryService.getCategoryById(404)).thenThrow(new IllegalArgumentException("Kategori tidak ditemukan"));
 
         mockMvc.perform(get("/api/catalog/categories/{id}", 404))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -180,7 +212,11 @@ class CategoryControllerTest {
         when(categoryService.getCategoryById(-1)).thenThrow(new IllegalArgumentException("Kategori tidak ditemukan"));
 
         mockMvc.perform(get("/api/catalog/categories/{id}", -1))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test

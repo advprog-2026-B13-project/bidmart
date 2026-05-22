@@ -118,7 +118,11 @@ class ListingControllerTest {
         when(listingService.getListingById(listingId)).thenThrow(new IllegalArgumentException("Not found"));
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -138,7 +142,11 @@ class ListingControllerTest {
         when(listingService.getListingForOwner(listingId, userId)).thenThrow(new SecurityException("Akses ditolak"));
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}/owner", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -147,7 +155,11 @@ class ListingControllerTest {
         when(authContext.getUserId()).thenReturn(null);
 
         mockMvc.perform(get("/api/catalog/listings/detail/{id}/owner", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -215,7 +227,11 @@ class ListingControllerTest {
         mockMvc.perform(post("/api/catalog/listings/create")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -242,7 +258,11 @@ class ListingControllerTest {
         mockMvc.perform(put("/api/catalog/listings/update/{id}", listingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -256,7 +276,11 @@ class ListingControllerTest {
         mockMvc.perform(put("/api/catalog/listings/update/{id}", listingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -276,7 +300,11 @@ class ListingControllerTest {
         when(listingService.activateListing(listingId, userId)).thenThrow(new IllegalStateException("Bukan draf"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/activate", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -286,7 +314,11 @@ class ListingControllerTest {
         when(listingService.activateListing(listingId, userId)).thenThrow(new IllegalArgumentException("Not Found"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/activate", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -306,7 +338,11 @@ class ListingControllerTest {
         when(listingService.closeListing(listingId, userId)).thenThrow(new IllegalStateException("Expired"));
 
         mockMvc.perform(put("/api/catalog/listings/{id}/close", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -315,7 +351,11 @@ class ListingControllerTest {
         when(authContext.getUserId()).thenReturn(null);
 
         mockMvc.perform(put("/api/catalog/listings/{id}/close", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -335,7 +375,11 @@ class ListingControllerTest {
         doThrow(new IllegalStateException("Sudah ada penawaran aktif")).when(listingService).deleteListing(listingId, userId);
 
         mockMvc.perform(delete("/api/catalog/listings/delete/{id}", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -345,7 +389,11 @@ class ListingControllerTest {
         doThrow(new SecurityException("Bukan pemilik")).when(listingService).deleteListing(listingId, userId);
 
         mockMvc.perform(delete("/api/catalog/listings/delete/{id}", listingId))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -372,7 +420,11 @@ class ListingControllerTest {
     @DisplayName("Edge Case [validateListingForBid]: Menolak komputasi jika format parameter ID hancur")
     void testValidateListingForBidInvalidId() throws Exception {
         mockMvc.perform(get("/api/catalog/listings/id-format-salah/validate"))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -400,7 +452,11 @@ class ListingControllerTest {
                         .header("X-User-Role", "USER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 
     @Test
@@ -415,6 +471,10 @@ class ListingControllerTest {
                         .header("X-User-Role", "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+<<<<<<< HEAD
                 .andExpect(status().is5xxClientError());
+=======
+                .andExpect(status().is4xxClientError());
+>>>>>>> d09b11916f97fba25df83b02ce0dc02fe84cd556
     }
 }

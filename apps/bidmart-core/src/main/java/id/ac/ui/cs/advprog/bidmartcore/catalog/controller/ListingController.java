@@ -30,6 +30,10 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.web.bind.annotation.PatchMapping;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingTakedownRequest;
+import org.springframework.web.bind.annotation.RequestHeader;
+
 @RestController("catalogListingController")
 @RequestMapping("/api/catalog/listings")
 @RequiredArgsConstructor
@@ -121,5 +125,23 @@ public class ListingController {
     public ResponseEntity<Boolean> validateListingForBid(@PathVariable UUID id) {
         boolean isValid = listingService.isListingValidForBid(id);
         return ResponseEntity.ok(isValid);
+    }
+
+    @PatchMapping("/{id}/takedown")
+    @RequireLogin
+    public ResponseEntity<Listing> takeDownListing(
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role,
+            @RequestBody(required = false) ListingTakedownRequest requestBody) {
+
+        if (!"ADMIN".equalsIgnoreCase(role)) {
+            throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat melakukan take down listing.");
+        }
+
+        String reason = (requestBody != null) ? requestBody.getTakedownReason() : "Tidak ada alasan yang dicantumkan.";
+        UUID adminId = authContext.getUserId();
+
+        Listing updatedListing = listingService.takeDownListing(id, reason, adminId);
+        return ResponseEntity.ok(updatedListing);
     }
 }

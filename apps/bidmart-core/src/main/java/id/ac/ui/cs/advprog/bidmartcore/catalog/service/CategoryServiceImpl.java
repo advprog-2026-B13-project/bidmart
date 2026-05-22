@@ -41,6 +41,9 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public Category updateCategory(Integer id, Category categoryDetails) {
         Category category = getCategoryById(id);
+        if (categoryDetails.getParentCategory() != null && id.equals(categoryDetails.getParentCategory().getId())) {
+            throw new IllegalArgumentException("Validasi Gagal: Kategori tidak boleh menjadi parent dari dirinya sendiri.");
+        }
         category.setName(categoryDetails.getName());
         category.setParentCategory(categoryDetails.getParentCategory());
         return categoryRepository.save(category);
