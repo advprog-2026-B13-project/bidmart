@@ -43,7 +43,7 @@ export default function NotificationsPage() {
             type: newNotif.type,
             message: newNotif.message,
             isRead: newNotif.read !== undefined ? newNotif.read : newNotif.isRead,
-            createdAt: newNotif.createdAt,
+            createdAt: newNotif.createdAt || new Date().toISOString(),
           };
 
           setNotifications((prev) => [mappedNotif, ...prev]);
