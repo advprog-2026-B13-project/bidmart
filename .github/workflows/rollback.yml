@@ -1,0 +1,84 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Full image tag to roll back to (e.g. ghcr.io/.../bidmart-core:sha-abc1234). Leave empty to use the previous deploy.'
+        required: false
+        default: ''
+
+jobs:
+  rollback:
+    name: Roll back production to previous image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          PROD_SSH_KEY:  ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          [ -n "$PROD_SSH_KEY" ]  || { echo "Missing secret: PROD_SSH_KEY";  exit 1; }
+          [ -n "$PROD_SSH_HOST" ] || { echo "Missing secret: PROD_SSH_HOST"; exit 1; }
+          [ -n "$PROD_SSH_USER" ] || { echo "Missing secret: PROD_SSH_USER"; exit 1; }
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Determine rollback target
+        id: target
+        env:
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
+          INPUT: ${{ github.event.inputs.image_tag }}
+        run: |
+          if [ -n "$INPUT" ]; then
+            echo "image=$INPUT" >> "$GITHUB_OUTPUT"
+          else
+            PREV=$(ssh -i ~/.ssh/id_ed25519 "$SSH_DEST" \
+              "cat /opt/bidmart/previous_image_tag 2>/dev/null || echo ''")
+            [ -n "$PREV" ] || { echo "No previous image tag stored. Provide one manually."; exit 1; }
+            echo "Rolling back to stored previous: $PREV"
+            echo "image=$PREV" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute rollback
+        env:
+          TARGET_IMAGE: ${{ steps.target.outputs.image }}
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "$SSH_DEST" bash << EOF
+            set -e
+            cd /opt/bidmart
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            docker pull "${TARGET_IMAGE}"
+            sed -i "s|^CORE_IMAGE=.*|CORE_IMAGE=${TARGET_IMAGE}|" .env
+            docker compose --env-file .env up -d --no-deps --force-recreate core
+            echo "Rollback applied: ${TARGET_IMAGE}"
+          EOF
+
+      - name: Verify health after rollback
+        run: |
+          for i in {1..12}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.bidmart.store/api/health/status || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Rollback successful — service is healthy"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Service did not recover after rollback"
+          exit 1
+
+      - name: Publish rollback summary
+        if: always()
+        run: |
+          echo "### Production rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rolled back to: ${{ steps.target.outputs.image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Triggered by: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
