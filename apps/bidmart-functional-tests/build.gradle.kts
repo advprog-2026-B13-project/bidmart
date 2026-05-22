@@ -1,5 +1,6 @@
 plugins {
     java
+    id("net.serenity-bdd.serenity-gradle-plugin") version "3.6.7"
 }
 
 group = "id.ac.ui.cs.advprog"
@@ -34,4 +35,5 @@ tasks.test {
     useJUnitPlatform()
     systemProperty("cucumber.junit-platform.naming-strategy", "long")
     maxHeapSize = "512m"
+    finalizedBy("aggregate")
 }

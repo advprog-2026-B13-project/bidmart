@@ -1,5 +1,8 @@
+name: CD
+
 on:
   workflow_call:
+  workflow_dispatch:
 
 concurrency:
   group: cd-deploy-${{ github.ref }}
@@ -7,95 +10,139 @@ concurrency:
 
 jobs:
   deploy-core-main:
-    name: Deploy Core API to Cloud Run (Production)
-    if: github.ref == 'refs/heads/main'
+    name: Build and Deploy Core API to Production VM
+    # TODO: restore guard after first successful deploy from cd/main-deployment branch
+    # if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
-    runs-on: ubuntu-latest
-    env:
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ secrets.GCP_REGION }}
-      GAR_REPOSITORY: ${{ secrets.GAR_REPOSITORY }}
-      CLOUD_RUN_SERVICE: ${{ secrets.CLOUD_RUN_SERVICE_PROD }}
-      CLOUD_SQL_INSTANCE: ${{ secrets.CLOUD_SQL_INSTANCE_PROD }}
-      VPC_CONNECTOR: ${{ secrets.VPC_CONNECTOR_PROD }}
-      CLOUD_RUN_RUNTIME_SA: ${{ secrets.CLOUD_RUN_RUNTIME_SA_PROD }}
-      INTERNAL_IP_SQL: ${{ secrets.INTERNAL_IP_SQL }}
-      DATABASE_USER: ${{ secrets.DATABASE_USER_PROD }}
-      REDIS_HOST: ${{ secrets.REDIS_HOST_PROD }}
-      REDIS_PORT: ${{ secrets.REDIS_PORT_PROD }}
-      DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD_SECRET_PROD }}
-      AUTH_JWT_SECRET: ${{ secrets.JWT_SECRET_PROD }}
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate required GCP configuration
+      - name: Validate required secrets
         env:
-          GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
-          GCP_DEPLOYER_SERVICE_ACCOUNT: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          PROD_SSH_KEY:          ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_HOST:         ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER:         ${{ secrets.PROD_SSH_USER }}
+          PROD_DB_URL:           ${{ secrets.PROD_DB_URL }}
+          PROD_DB_USER:          ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD:      ${{ secrets.PROD_DB_PASSWORD }}
+          PROD_JWT_SECRET:       ${{ secrets.PROD_JWT_SECRET }}
+          PROD_FRONTEND_URL:     ${{ secrets.PROD_FRONTEND_URL }}
+          PROD_GRAFANA_PASSWORD: ${{ secrets.PROD_GRAFANA_PASSWORD }}
         run: |
-          [ -n "$GCP_WIF_PROVIDER" ] || { echo "Missing secret: GCP_WIF_PROVIDER"; exit 1; }
-          [ -n "$GCP_DEPLOYER_SERVICE_ACCOUNT" ] || { echo "Missing secret: GCP_DEPLOYER_SERVICE_ACCOUNT"; exit 1; }
-          [ -n "$GCP_PROJECT_ID" ] || { echo "Missing secret: GCP_PROJECT_ID"; exit 1; }
-          [ -n "$GCP_REGION" ] || { echo "Missing secret: GCP_REGION"; exit 1; }
-          [ -n "$GAR_REPOSITORY" ] || { echo "Missing secret: GAR_REPOSITORY"; exit 1; }
-          [ -n "$CLOUD_RUN_SERVICE" ] || { echo "Missing secret: CLOUD_RUN_SERVICE_PROD"; exit 1; }
-          [ -n "$CLOUD_SQL_INSTANCE" ] || { echo "Missing secret: CLOUD_SQL_INSTANCE_PROD"; exit 1; }
-          [ -n "$VPC_CONNECTOR" ] || { echo "Missing secret: VPC_CONNECTOR_PROD"; exit 1; }
-          [ -n "$CLOUD_RUN_RUNTIME_SA" ] || { echo "Missing secret: CLOUD_RUN_RUNTIME_SA_PROD"; exit 1; }
-          [ -n "$INTERNAL_IP_SQL" ] || { echo "Missing secret: INTERNAL_IP_SQL"; exit 1; }
-          [ -n "$DATABASE_USER" ] || { echo "Missing secret: DATABASE_USER_PROD"; exit 1; }
-          [ -n "$REDIS_HOST" ] || { echo "Missing secret: REDIS_HOST_PROD"; exit 1; }
-          [ -n "$REDIS_PORT" ] || { echo "Missing secret: REDIS_PORT_PROD"; exit 1; }
-          [ -n "$DATABASE_PASSWORD" ] || { echo "Missing secret: DB_PASSWORD_SECRET_PROD"; exit 1; }
-          [ -n "$AUTH_JWT_SECRET" ] || { echo "Missing secret: JWT_SECRET_PROD"; exit 1; }
+          [ -n "$PROD_SSH_KEY" ]           || { echo "Missing: PROD_SSH_KEY";           exit 1; }
+          [ -n "$PROD_SSH_HOST" ]          || { echo "Missing: PROD_SSH_HOST";          exit 1; }
+          [ -n "$PROD_SSH_USER" ]          || { echo "Missing: PROD_SSH_USER";          exit 1; }
+          [ -n "$PROD_DB_URL" ]            || { echo "Missing: PROD_DB_URL";            exit 1; }
+          [ -n "$PROD_DB_USER" ]           || { echo "Missing: PROD_DB_USER";           exit 1; }
+          [ -n "$PROD_DB_PASSWORD" ]       || { echo "Missing: PROD_DB_PASSWORD";       exit 1; }
+          [ -n "$PROD_JWT_SECRET" ]        || { echo "Missing: PROD_JWT_SECRET";        exit 1; }
+          [ -n "$PROD_FRONTEND_URL" ]      || { echo "Missing: PROD_FRONTEND_URL";      exit 1; }
+          [ -n "$PROD_GRAFANA_PASSWORD" ]  || { echo "Missing: PROD_GRAFANA_PASSWORD";  exit 1; }
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
+      - name: Resolve image tags
+        id: tags
+        run: |
+          SHA="sha-$(git rev-parse --short HEAD)"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "full=ghcr.io/advprog-2026-b13-project/bidmart-core:${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v6
         with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
+          context: apps/bidmart-core
+          file: apps/bidmart-core/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/advprog-2026-b13-project/bidmart-core:main
+            ghcr.io/advprog-2026-b13-project/bidmart-core:${{ steps.tags.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build and push API image to Artifact Registry
-        id: image
+      - name: Set up SSH
         run: |
-          IMAGE_HOST="${GCP_REGION}-docker.pkg.dev"
-          IMAGE_NAME="${IMAGE_HOST}/${GCP_PROJECT_ID}/${GAR_REPOSITORY}/${CLOUD_RUN_SERVICE}:${GITHUB_SHA}"
-          gcloud auth configure-docker "$IMAGE_HOST" --quiet
-          docker build -t "$IMAGE_NAME" apps/bidmart-core
-          docker push "$IMAGE_NAME"
-          echo "image=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy API to Cloud Run (production)
+      - name: Sync infra files to VM
         env:
-          IMAGE_NAME: ${{ steps.image.outputs.image }}
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
         run: |
-          gcloud run deploy "$CLOUD_RUN_SERVICE" \
-            --image "$IMAGE_NAME" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --platform managed \
-            --port 8080 \
-            --allow-unauthenticated \
-            --service-account "$CLOUD_RUN_RUNTIME_SA" \
-            --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
-            --vpc-connector "$VPC_CONNECTOR" \
-            --vpc-egress private-ranges-only \
-            --set-env-vars "DATABASE_URL=jdbc:postgresql://${INTERNAL_IP_SQL}:5432/bidmart,DATABASE_USER=$DATABASE_USER,DATABASE_PASSWORD=$DATABASE_PASSWORD,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,SPRING_DATA_REDIS_DATABASE=0,AUTH_JWT_SECRET=$AUTH_JWT_SECRET"
+          rsync -az --mkpath -e "ssh -i ~/.ssh/id_ed25519" \
+            infra/prod/ \
+            "$SSH_DEST":/opt/bidmart/
 
-      - name: Publish API production summary
+      - name: Write .env to VM
         env:
-          IMAGE_NAME: ${{ steps.image.outputs.image }}
+          SSH_DEST: ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}
         run: |
-          API_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --region "$GCP_REGION" --format='value(status.url)')"
-          echo "### Core API production deployment" >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch: main" >> "$GITHUB_STEP_SUMMARY"
-          echo "Service: $CLOUD_RUN_SERVICE" >> "$GITHUB_STEP_SUMMARY"
-          echo "Image: $IMAGE_NAME" >> "$GITHUB_STEP_SUMMARY"
-          echo "URL: $API_URL" >> "$GITHUB_STEP_SUMMARY"
+          printf 'CORE_IMAGE=%s\nDATABASE_URL=%s\nDATABASE_USER=%s\nDATABASE_PASSWORD=%s\nAUTH_JWT_SECRET=%s\nFRONTEND_URL=%s\nRESEND_API_KEY=%s\nMIDTRANS_SERVER_KEY=%s\nMIDTRANS_CLIENT_KEY=%s\nGRAFANA_PASSWORD=%s\n' \
+            "${{ steps.tags.outputs.full }}" \
+            "${{ secrets.PROD_DB_URL }}" \
+            "${{ secrets.PROD_DB_USER }}" \
+            "${{ secrets.PROD_DB_PASSWORD }}" \
+            "${{ secrets.PROD_JWT_SECRET }}" \
+            "${{ secrets.PROD_FRONTEND_URL }}" \
+            "${{ secrets.PROD_RESEND_API_KEY }}" \
+            "${{ secrets.PROD_MIDTRANS_SERVER_KEY }}" \
+            "${{ secrets.PROD_MIDTRANS_CLIENT_KEY }}" \
+            "${{ secrets.PROD_GRAFANA_PASSWORD }}" \
+            > /tmp/prod.env
+          scp -i ~/.ssh/id_ed25519 /tmp/prod.env "$SSH_DEST":/opt/bidmart/.env
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: GITHUB_TOKEN,GITHUB_ACTOR,NEW_IMAGE
+          script: |
+            set -e
+            cd /opt/bidmart
+            chmod 600 .env
+
+            CURRENT=$(grep "^CORE_IMAGE=" .env 2>/dev/null | cut -d= -f2 || true)
+            [ -n "$CURRENT" ] && echo "$CURRENT" > previous_image_tag
+
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            docker pull "$NEW_IMAGE"
+            docker compose --env-file .env up -d --no-deps --force-recreate core
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          NEW_IMAGE: ${{ steps.tags.outputs.full }}
+
+      - name: Wait for health check
+        run: |
+          for i in {1..18}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.bidmart.store/api/health/status || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Production is healthy"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production did not become healthy — consider running rollback"
+          exit 1
+
+      - name: Publish deployment summary
+        if: always()
+        run: |
+          echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: ${{ steps.tags.outputs.full }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "By: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
