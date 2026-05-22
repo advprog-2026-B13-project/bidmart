@@ -87,25 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
         requestBody.put("transaction_details", transactionDetails);
         requestBody.put("payment_type", resolvedPaymentType);
 
-        String responseBank = resolvedPaymentType;
-        switch (resolvedPaymentType) {
-            case "bank_transfer" -> {
-                Map<String, Object> bankTransfer = new HashMap<>();
-                bankTransfer.put("bank", bankCode);
-                requestBody.put(BANK_TRANSFER, bankTransfer);
-                responseBank = bankCode;
-            }
-            case "qris" -> {
-                Map<String, Object> qris = new HashMap<>();
-                String acquirer = (bank == null || bank.isBlank()) ? GOPAY : bankCode;
-                qris.put("acquirer", acquirer);
-                requestBody.put("qris", qris);
-                responseBank = acquirer;
-            }
-            case "gopay" -> requestBody.put(GOPAY, new HashMap<>());
-            case "shopeepay" -> requestBody.put("shopeepay", new HashMap<>());
-            default -> throw new IllegalArgumentException("Unsupported payment type: " + paymentType);
-        }
+        String responseBank = applyPaymentTypeToRequest(requestBody, resolvedPaymentType, bank, bankCode);
 
         log.info("Charging Midtrans transaction: orderId={} grossAmount={}", orderId, grossAmount);
         try {
@@ -140,6 +122,34 @@ public class PaymentServiceImpl implements PaymentService {
             paymentRepository.save(payment);
             log.error("Midtrans charge failed: orderId={} userId={} amount={}", orderId, userId, amount, ex);
             throw new IllegalStateException("Failed to create Midtrans transaction", ex);
+        }
+    }
+
+    private String applyPaymentTypeToRequest(Map<String, Object> requestBody, String resolvedPaymentType,
+            String bank, String bankCode) {
+        switch (resolvedPaymentType) {
+            case BANK_TRANSFER -> {
+                Map<String, Object> bankTransfer = new HashMap<>();
+                bankTransfer.put("bank", bankCode);
+                requestBody.put(BANK_TRANSFER, bankTransfer);
+                return bankCode;
+            }
+            case "qris" -> {
+                Map<String, Object> qris = new HashMap<>();
+                String acquirer = (bank == null || bank.isBlank()) ? GOPAY : bankCode;
+                qris.put("acquirer", acquirer);
+                requestBody.put("qris", qris);
+                return acquirer;
+            }
+            case GOPAY -> {
+                requestBody.put(GOPAY, new HashMap<>());
+                return resolvedPaymentType;
+            }
+            case "shopeepay" -> {
+                requestBody.put("shopeepay", new HashMap<>());
+                return resolvedPaymentType;
+            }
+            default -> throw new IllegalArgumentException("Unsupported payment type: " + resolvedPaymentType);
         }
     }
 
