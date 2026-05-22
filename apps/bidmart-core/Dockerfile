@@ -16,5 +16,8 @@ ENV JAVA_OPTS=""
 
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
 
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
