@@ -219,7 +219,7 @@ export async function getAuctionStatus(listingId: string) {
 }
 
 export async function getBidsForListing(listingId: string) {
-  const raw = await apiFetch(`/api/bidding/listings/${listingId}/bids`, { method: "GET" }, { auth: false }) as { data: BidResult[] };
+  const raw = await apiFetch(`/api/bidding/listings/${listingId}/bids`, { method: "GET" }) as { data: BidResult[] };
   return raw.data || [];
 }
 
