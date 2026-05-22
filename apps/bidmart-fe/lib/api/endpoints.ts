@@ -231,12 +231,13 @@ export async function placeBid(request: BidRequest) {
 }
 
 export async function getCategories() {
-  const raw = await apiFetch("/api/catalog/categories/main", { method: "GET" }, { auth: false }) as { id: number; name: string; parentId: number | null }[];
+  const raw = await apiFetch("/api/catalog/categories/main", { method: "GET" }, { auth: false }) as { id: number; name: string; parentId: number | null; imageUrl: string }[];
   const cats = Array.isArray(raw) ? raw : [];
   return cats.map((c) => ({
     id: c.id,
     name: c.name,
     parentId: c.parentId,
+    imageUrl: c.imageUrl,
     slug: toSlug(c.name),
     coverImage: `https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80`,
   }));

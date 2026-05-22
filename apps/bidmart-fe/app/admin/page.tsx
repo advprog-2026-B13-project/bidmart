@@ -40,7 +40,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link href="/admin/roles" className="card p-5 block">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">RBAC</p>
             <h2 className="text-2xl font-black uppercase tracking-tight mt-2">Manage Roles</h2>
@@ -51,6 +51,12 @@ export default function AdminPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">RBAC</p>
             <h2 className="text-2xl font-black uppercase tracking-tight mt-2">Assign Roles</h2>
             <p className="text-sm text-gray-600 mt-2">Assign and unassign roles for users.</p>
+          </Link>
+
+          <Link href="/admin/categories" className="card p-5 block">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Catalog</p>
+            <h2 className="text-2xl font-black uppercase tracking-tight mt-2">Categories</h2>
+            <p className="text-sm text-gray-600 mt-2">Create, edit, and delete product categories.</p>
           </Link>
 
           <Link href="/admin/deactivate" className="card p-5 block">
