@@ -1,127 +1,291 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAuth } from "@/components/auth-provider";
-import { getNotifications, type NotificationItem } from "@/lib/api/endpoints";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bell, ArrowLeft } from "lucide-react";
-import { Client } from "@stomp/stompjs";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
+import {
+  listSessions,
+  revokeOtherSessions,
+  revokeSession,
+} from "@/lib/auth/auth-api";
+import type { SessionSummaryResponse } from "@/lib/auth/types";
 
-export default function NotificationsPage() {
-  const { user, isAuthenticated, isHydrating } = useAuth();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (isHydrating || !isAuthenticated || !user?.userId) return;
-
-    getNotifications(user.userId)
-      .then((data) => {
-        setNotifications(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [isAuthenticated, isHydrating, user?.userId]);
-
-  useEffect(() => {
-    if (!isAuthenticated || !user?.userId) return;
-
-    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
-    const wsUrl = apiBaseUrl.replace(/^http/, "ws") + "/ws";
-
-    const client = new Client({
-      brokerURL: wsUrl,
-      reconnectDelay: 5000,
-      onConnect: () => {
-        console.log("WebSocket connected for notifications!");
-        client.subscribe(`/topic/notifications/${user.userId}`, (message) => {
-          const newNotif = JSON.parse(message.body);
-          
-          const mappedNotif: NotificationItem = {
-            id: newNotif.id,
-            userId: newNotif.userId,
-            type: newNotif.type,
-            message: newNotif.message,
-            isRead: newNotif.read !== undefined ? newNotif.read : newNotif.isRead,
-            createdAt: newNotif.createdAt,
-          };
-
-          setNotifications((prev) => [mappedNotif, ...prev]);
-        });
-      },
-      onWebSocketError: (error) => {
-        console.error("WebSocket error:", error);
-      },
-    });
-
-    client.activate();
-
-    return () => {
-      client.deactivate();
-    };
-  }, [isAuthenticated, user?.userId]);
-
-  if (isHydrating || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-12 h-12 border-4 border-black border-t-transparent animate-spin"></div>
-      </div>
-    );
+function formatDate(value?: string) {
+  if (!value) {
+    return "Unknown";
   }
 
-  if (!isAuthenticated) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
+function SessionCard({
+  session,
+  onRevoke,
+  isRevoking,
+}: {
+  session: SessionSummaryResponse;
+  onRevoke: (sessionId: string) => void;
+  isRevoking: boolean;
+}) {
+  return (
+    <div className={`border-2 border-black bg-white p-4 ${session.isCurrent ? "shadow-[6px_6px_0_#0046FF]" : "shadow-[4px_4px_0_#0A0A0A]"}`}>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-black text-lg uppercase tracking-tight">
+              {session.deviceInfo || "Unknown device"}
+            </h3>
+            {session.isCurrent && (
+              <span className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-acid text-black border border-black">
+                Current Session
+              </span>
+            )}
+            {!session.isActive && (
+              <span className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-hot text-white border border-black">
+                Inactive
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">
+            {session.locationLabel || session.ipAddress || "Unknown location"}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-500">
+            <span>Created: {formatDate(session.createdAt)}</span>
+            <span>Last login: {formatDate(session.lastLoginAt)}</span>
+            <span>Expires: {formatDate(session.expiresAt)}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start lg:items-end gap-2">
+          <button
+            type="button"
+            onClick={() => onRevoke(session.sessionId)}
+            disabled={isRevoking || session.isCurrent}
+            className="btn btn-black text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+          >
+            {session.isCurrent ? "Current Session" : isRevoking ? "Revoking..." : "Revoke"}
+          </button>
+          <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+            ID: {session.sessionId}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SessionsPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isHydrating } = useAuth();
+  const [sessions, setSessions] = useState<SessionSummaryResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [isRevokingOthers, setIsRevokingOthers] = useState(false);
+
+  const currentSessionCount = useMemo(
+    () => sessions.filter((session) => session.isActive).length,
+    [sessions],
+  );
+
+  useEffect(() => {
+    if (!isHydrating && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isHydrating, router]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSessions() {
+      setError("");
+      setIsLoading(true);
+
+      try {
+        const response = await listSessions();
+        if (isMounted) {
+          setSessions(response);
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load sessions.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadSessions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const refreshSessions = async () => {
+    setIsRefreshing(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await listSessions();
+      setSessions(response);
+      setSuccess("Session list refreshed.");
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "Failed to refresh sessions.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRevoke = async (sessionId: string) => {
+    if (!sessionId) {
+      return;
+    }
+
+    setRevokingSessionId(sessionId);
+    setError("");
+    setSuccess("");
+
+    try {
+      await revokeSession(sessionId);
+      setSessions((currentSessions) => currentSessions.filter((session) => session.sessionId !== sessionId));
+      setSuccess("Session revoked successfully.");
+    } catch (revokeError) {
+      setError(revokeError instanceof Error ? revokeError.message : "Failed to revoke session.");
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  const handleRevokeOthers = async () => {
+    setIsRevokingOthers(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      await revokeOtherSessions();
+      setSessions((currentSessions) => currentSessions.filter((session) => session.isCurrent));
+      setSuccess("All other sessions have been revoked.");
+    } catch (revokeError) {
+      setError(revokeError instanceof Error ? revokeError.message : "Failed to revoke other sessions.");
+    } finally {
+      setIsRevokingOthers(false);
+    }
+  };
+
+  if (isHydrating || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-4">
-        <h1 className="text-3xl font-black uppercase mb-4">Access Denied</h1>
-        <p className="text-gray-500 font-bold mb-6">Please sign in to view your notifications.</p>
-        <Link href="/login" className="btn btn-black">Sign In</Link>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+        <div className="border-3 border-black bg-white px-6 py-5 shadow-[8px_8px_0_#0A0A0A]">
+          <p className="text-sm font-bold uppercase tracking-wide text-gray-700">Loading session dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white min-h-screen pb-20">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="btn btn-sm btn-ghost">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="text-4xl font-black uppercase tracking-tight flex items-center gap-3">
-            <Bell className="w-8 h-8" />
-            Your Notifications
-          </h1>
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-5xl mx-auto px-4 py-10 md:py-14">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+          <div>
+            <Link href="/" className="inline-flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-acid flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A]">
+                <span className="text-black font-black text-base">B</span>
+              </div>
+              <span className="text-xl font-black tracking-tight">BIDMART</span>
+            </Link>
+            <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-black">
+              Session Management
+            </h1>
+            <p className="text-gray-600 mt-2 max-w-2xl">
+              Review active sessions, revoke a specific session, or sign out everywhere else.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-start md:items-end gap-2">
+            <div className="border-2 border-black bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide">
+              {user?.displayName || user?.email || "Account"}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={refreshSessions}
+                disabled={isRefreshing}
+                className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                type="button"
+                onClick={handleRevokeOthers}
+                disabled={isRevokingOthers}
+                className="btn btn-black text-xs font-bold uppercase tracking-wide"
+              >
+                {isRevokingOthers ? "Revoking..." : "Sign Out Everywhere Else"}
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Notifications List */}
-        <div className="border-3 border-black bg-white shadow-[8px_8px_0_#0A0A0A] divide-y-2 divide-black">
-          {notifications.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-500 font-black uppercase tracking-wide">No notifications yet.</p>
-            </div>
-          ) : (
-            notifications.map((notification) => (
-              <div 
-                key={notification.id} 
-                className={`p-6 transition-colors flex items-start gap-4 ${
-                  !notification.isRead ? "bg-acid/10" : "bg-white"
-                }`}
-              >
-                <div className={`w-3.5 h-3.5 mt-1 shrink-0 rounded-full ${
-                  notification.type === "OUTBID" ? "bg-hot" : "bg-electric"
-                }`} />
-                <div className="flex-1">
-                  <p className="font-bold text-black text-base leading-tight mb-2">
-                    {notification.message}
-                  </p>
-                  <span className="text-xs text-gray-400 font-bold">
-                    {new Date(notification.createdAt).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
+        <div className="grid gap-3 mb-8 md:grid-cols-3">
+          <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0_#0A0A0A]">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Active Sessions</p>
+            <p className="text-3xl font-black text-black">{currentSessionCount}</p>
+          </div>
+          <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0_#0A0A0A]">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Current Session</p>
+            <p className="text-3xl font-black text-electric">{sessions.some((session) => session.isCurrent) ? "Yes" : "No"}</p>
+          </div>
+          <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0_#0A0A0A]">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Loaded Sessions</p>
+            <p className="text-3xl font-black text-hot">{sessions.length}</p>
+          </div>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-hot/10 border-2 border-hot text-hot text-sm font-bold">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-4 bg-acid/20 border-2 border-black text-black text-sm font-bold">
+            {success}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="border-3 border-black bg-white p-8 shadow-[8px_8px_0_#0A0A0A]">
+            <p className="text-sm font-bold uppercase tracking-wide text-gray-600">Loading sessions...</p>
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="border-3 border-black bg-white p-8 shadow-[8px_8px_0_#0A0A0A]">
+            <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">No Sessions Found</h2>
+            <p className="text-gray-600 text-sm md:text-base">There are no active sessions available for this account.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sessions.map((session) => (
+              <SessionCard
+                key={session.sessionId}
+                session={session}
+                onRevoke={handleRevoke}
+                isRevoking={revokingSessionId === session.sessionId}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
