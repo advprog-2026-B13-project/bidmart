@@ -24,6 +24,8 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingSpecification;
 import lombok.extern.slf4j.Slf4j;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @Service("catalogListingService")
 public class ListingServiceImpl implements ListingService {
