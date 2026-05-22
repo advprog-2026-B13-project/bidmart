@@ -83,7 +83,7 @@ class NotificationServiceImplTest {
         mockSaved.setRead(false);
         mockSaved.setCreatedAt(LocalDateTime.now());
 
-        when(notificationRepository.save(any(Notification.class))).thenReturn(mockSaved);
+        when(notificationRepository.saveAndFlush(any(Notification.class))).thenReturn(mockSaved);
 
         SseEmitter emitter = notificationService.subscribe(userId);
         assertNotNull(emitter);
@@ -91,7 +91,7 @@ class NotificationServiceImplTest {
         notificationService.createNotification(userId, type, message, referenceId);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository, times(1)).save(notificationCaptor.capture());
+        verify(notificationRepository, times(1)).saveAndFlush(notificationCaptor.capture());
 
         Notification savedInput = notificationCaptor.getValue();
         assertEquals(userId, savedInput.getUserId());
