@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -195,6 +196,151 @@ class WalletServiceImplTest {
         );
 
         assertEquals("Deposit amount must be greater than zero", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void getWalletByUserIdShouldCreateWalletWhenWalletDoesNotExist() {
+        UUID newUserId = UUID.randomUUID();
+
+        when(walletRepository.findByUserId(newUserId))
+                .thenThrow(new RuntimeException("Wallet not found"));
+
+        WalletModel result = walletService.getWalletByUserId(newUserId);
+
+        assertEquals(newUserId, result.getUserId());
+        assertEquals(BigDecimal.ZERO, result.getAvailableBalance());
+        assertEquals(BigDecimal.ZERO, result.getHeldBalance());
+
+        verify(walletRepository).save(any(WalletModel.class));
+    }
+
+    @Test
+    void getTransactionsShouldReturnWalletTransactions() {
+        when(walletRepository.findByUserId(userId)).thenReturn(wallet);
+
+        WalletTransactionModel transaction = new WalletTransactionModel(
+                UUID.randomUUID(),
+                wallet.getId(),
+                TransactionType.TOP_UP,
+                BigDecimal.valueOf(5000),
+                null,
+                null
+        );
+
+        when(transactionRepository.findByWalletId(wallet.getId()))
+                .thenReturn(List.of(transaction));
+
+        List<WalletTransactionModel> result = walletService.getTransactions(userId);
+
+        assertEquals(1, result.size());
+        assertEquals(TransactionType.TOP_UP, result.get(0).getType());
+        assertEquals(BigDecimal.valueOf(5000), result.get(0).getAmount());
+    }
+
+    @Test
+    void holdBalanceShouldRejectZeroAmount() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.holdBalance(userId, BigDecimal.ZERO)
+        );
+
+        assertEquals("Hold amount must be greater than zero", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void releaseBalanceShouldRejectZeroAmount() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.releaseBalance(userId, BigDecimal.ZERO)
+        );
+
+        assertEquals("Release amount must be greater than zero", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void convertHoldToPaymentShouldRejectZeroAmount() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.convertHoldToPayment(userId, BigDecimal.ZERO)
+        );
+
+        assertEquals("Payment amount must be greater than zero", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void holdBalanceShouldThrowExceptionWhenAvailableBalanceIsInsufficient() {
+        when(walletRepository.findByUserId(userId)).thenReturn(wallet);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.holdBalance(userId, BigDecimal.valueOf(20000))
+        );
+
+        assertEquals("Insufficient available balance", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void releaseBalanceShouldThrowExceptionWhenHeldBalanceIsInsufficient() {
+        wallet.setAvailableBalance(BigDecimal.valueOf(5000));
+        wallet.setHeldBalance(BigDecimal.valueOf(1000));
+
+        when(walletRepository.findByUserId(userId)).thenReturn(wallet);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.releaseBalance(userId, BigDecimal.valueOf(3000))
+        );
+
+        assertEquals("Insufficient held balance", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void convertHoldToPaymentShouldThrowExceptionWhenHeldBalanceIsInsufficient() {
+        wallet.setAvailableBalance(BigDecimal.valueOf(5000));
+        wallet.setHeldBalance(BigDecimal.valueOf(1000));
+
+        when(walletRepository.findByUserId(userId)).thenReturn(wallet);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> walletService.convertHoldToPayment(userId, BigDecimal.valueOf(3000))
+        );
+
+        assertEquals("Insufficient held balance", exception.getMessage());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void transferHeldBalanceShouldThrowExceptionWhenBuyerHeldBalanceIsInsufficient() {
+        UUID sellerId = UUID.randomUUID();
+
+        WalletModel buyerWallet = new WalletModel();
+        buyerWallet.setId(UUID.randomUUID());
+        buyerWallet.setUserId(userId);
+        buyerWallet.setAvailableBalance(BigDecimal.valueOf(2000));
+        buyerWallet.setHeldBalance(BigDecimal.valueOf(1000));
+
+        WalletModel sellerWallet = new WalletModel();
+        sellerWallet.setId(UUID.randomUUID());
+        sellerWallet.setUserId(sellerId);
+        sellerWallet.setAvailableBalance(BigDecimal.ZERO);
+        sellerWallet.setHeldBalance(BigDecimal.ZERO);
+
+        when(walletRepository.findByUserId(userId)).thenReturn(buyerWallet);
+        when(walletRepository.findByUserId(sellerId)).thenReturn(sellerWallet);
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> walletService.transferHeldBalance(userId, sellerId, BigDecimal.valueOf(3000))
+        );
+
+        assertEquals("Insufficient held balance", exception.getMessage());
         verify(transactionRepository, never()).save(any());
     }
 }

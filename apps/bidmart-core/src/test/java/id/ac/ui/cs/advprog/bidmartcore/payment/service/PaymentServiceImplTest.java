@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmartcore.payment.application.service;
+package id.ac.ui.cs.advprog.bidmartcore.payment.service;
 
 import com.midtrans.service.MidtransCoreApi;
 import id.ac.ui.cs.advprog.bidmartcore.payment.controller.dto.PaymentNotificationRequest;
@@ -300,5 +300,196 @@ class PaymentServiceImplTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void createTopUpTransactionShouldCreateQrisTransaction() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        JSONObject response = new JSONObject();
+        response.put("payment_type", "qris");
+        response.put("transaction_status", "pending");
+        response.put("acquirer", "gopay");
+
+        JSONArray actions = new JSONArray();
+        actions.put(new JSONObject()
+                .put("name", "generate-qr-code")
+                .put("method", "GET")
+                .put("url", "https://example.com/qr"));
+
+        response.put("actions", actions);
+
+        when(midtransCoreApi.chargeTransaction(anyMap()))
+                .thenReturn(response);
+
+        TopUpResponse result = paymentService.createTopUpTransaction(
+                userId,
+                BigDecimal.valueOf(10000),
+                "qris",
+                "gopay"
+        );
+
+        assertNotNull(result.getOrderId());
+        assertEquals("qris", result.getPaymentType());
+        assertEquals("gopay", result.getBank());
+        assertEquals("pending", result.getTransactionStatus());
+        assertEquals(1, result.getActions().size());
+        assertEquals("generate-qr-code", result.getActions().get(0).getName());
+
+        verify(paymentRepository).save(any(PaymentModel.class));
+        verify(midtransCoreApi).chargeTransaction(anyMap());
+    }
+
+    @Test
+    void createTopUpTransactionShouldUseDefaultPaymentTypeAndBankWhenNull() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        JSONObject response = new JSONObject();
+        response.put("payment_type", "bank_transfer");
+        response.put("transaction_status", "pending");
+
+        JSONArray vaNumbers = new JSONArray();
+        vaNumbers.put(new JSONObject()
+                .put("bank", "bca")
+                .put("va_number", "1234567890"));
+
+        response.put("va_numbers", vaNumbers);
+
+        when(midtransCoreApi.chargeTransaction(anyMap()))
+                .thenReturn(response);
+
+        TopUpResponse result = paymentService.createTopUpTransaction(
+                userId,
+                BigDecimal.valueOf(10000),
+                null,
+                null
+        );
+
+        assertEquals("bank_transfer", result.getPaymentType());
+        assertEquals("bca", result.getBank());
+        assertEquals("1234567890", result.getVaNumber());
+    }
+
+    @Test
+    void handleNotificationShouldThrowExceptionWhenPayloadIsNull() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> paymentService.handleNotification(null)
+        );
+
+        assertEquals("order_id is required", exception.getMessage());
+    }
+
+    @Test
+    void handleNotificationShouldThrowExceptionWhenOrderIdIsNull() {
+        PaymentNotificationRequest request = new PaymentNotificationRequest();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> paymentService.handleNotification(request)
+        );
+
+        assertEquals("order_id is required", exception.getMessage());
+    }
+
+    @Test
+    void handleNotificationShouldMapPendingStatus() {
+        String orderId = "TOPUP-123";
+
+        PaymentModel payment = PaymentModel.builder()
+                .orderId(orderId)
+                .userId(UUID.randomUUID())
+                .amount(BigDecimal.valueOf(10000))
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        when(paymentRepository.findByOrderId(orderId))
+                .thenReturn(Optional.of(payment));
+
+        PaymentNotificationRequest request = createNotification(
+                orderId,
+                "pending",
+                "201",
+                "10000.00"
+        );
+
+        PaymentNotificationResponse response = paymentService.handleNotification(request);
+
+        assertEquals(orderId, response.getOrderId());
+        assertEquals("PENDING", response.getStatus());
+        assertEquals("payment updated", response.getMessage());
+
+        verify(walletService, never()).deposit(any(), any());
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    void handleNotificationShouldReverseWalletWhenSuccessfulPaymentBecomesFailed() {
+        UUID userId = UUID.randomUUID();
+        String orderId = "TOPUP-123";
+        BigDecimal amount = BigDecimal.valueOf(10000);
+
+        PaymentModel payment = PaymentModel.builder()
+                .orderId(orderId)
+                .userId(userId)
+                .amount(amount)
+                .status(PaymentStatus.SUCCESS)
+                .build();
+
+        when(paymentRepository.findByOrderId(orderId))
+                .thenReturn(Optional.of(payment));
+
+        PaymentNotificationRequest request = createNotification(
+                orderId,
+                "cancel",
+                "202",
+                "10000.00"
+        );
+
+        PaymentNotificationResponse response = paymentService.handleNotification(request);
+
+        assertEquals(orderId, response.getOrderId());
+        assertEquals("FAILED", response.getStatus());
+        assertEquals("wallet reversed", response.getMessage());
+
+        verify(walletService).withdraw(userId, amount);
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    void handleNotificationShouldReturnReversalPendingWhenWithdrawFails() {
+        UUID userId = UUID.randomUUID();
+        String orderId = "TOPUP-123";
+        BigDecimal amount = BigDecimal.valueOf(10000);
+
+        PaymentModel payment = PaymentModel.builder()
+                .orderId(orderId)
+                .userId(userId)
+                .amount(amount)
+                .status(PaymentStatus.SUCCESS)
+                .build();
+
+        when(paymentRepository.findByOrderId(orderId))
+                .thenReturn(Optional.of(payment));
+
+        doThrow(new IllegalArgumentException("Insufficient balance"))
+                .when(walletService)
+                .withdraw(userId, amount);
+
+        PaymentNotificationRequest request = createNotification(
+                orderId,
+                "cancel",
+                "202",
+                "10000.00"
+        );
+
+        PaymentNotificationResponse response = paymentService.handleNotification(request);
+
+        assertEquals(orderId, response.getOrderId());
+        assertEquals("FAILED", response.getStatus());
+        assertEquals("wallet reversal pending", response.getMessage());
+
+        verify(walletService).withdraw(userId, amount);
+        verify(paymentRepository).save(payment);
     }
 }
