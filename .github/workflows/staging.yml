@@ -6,6 +6,7 @@ on:
       - staging
     paths:
       - 'apps/bidmart-core/**'
+      - 'apps/bidmart-functional-tests/**'
   pull_request:
     branches:
       - staging

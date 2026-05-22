@@ -71,10 +71,9 @@ public class BiddingStepDefs {
                 .post("/api/bidding/bids");
     }
 
-    @When("I place a bid on the test listing")
-    public void placeBidOnTestListing() {
-        BigDecimal currentPrice = fetchCurrentPrice();
-        long bidAmount = currentPrice.longValue() + TestConfig.bidIncrement();
+    @When("I place a manual bid on the test listing")
+    public void placeManualBidOnTestListing() {
+        long bidAmount = fetchCurrentPrice().longValue() + 1;
 
         lastResponse = authenticatedRequest()
                 .contentType("application/json")
@@ -83,6 +82,34 @@ public class BiddingStepDefs {
                         "amount", bidAmount,
                         "bidType", "MANUAL"))
                 .post("/api/bidding/bids");
+    }
+
+    @When("I place a proxy bid above current price on the test listing")
+    public void placeProxyBidAboveCurrentPrice() {
+        // Fetch fresh price — captures any price movement from the manual bid above
+        long bidAmount = fetchCurrentPrice().longValue() + 1;
+
+        lastResponse = authenticatedRequest()
+                .contentType("application/json")
+                .body(Map.of(
+                        "listingId", TestConfig.testListingId(),
+                        "amount", bidAmount,
+                        "bidType", "PROXY"))
+                .post("/api/bidding/bids");
+    }
+
+    @When("I get the bids for the test listing with authentication")
+    public void getBidsForListingAuthenticated() {
+        lastResponse = authenticatedRequest()
+                .get("/api/bidding/listings/{id}/bids", TestConfig.testListingId());
+    }
+
+    @And("my proxy bid has a max amount")
+    public void myProxyBidHasMaxAmount() {
+        java.util.List<java.util.Map<String, Object>> bids = lastResponse.jsonPath().getList("data");
+        assertThat(bids).as("bid list must not be null").isNotNull();
+        boolean found = bids.stream().anyMatch(bid -> bid.get("maxAmount") != null);
+        assertThat(found).as("at least one of my bids should have a maxAmount (proxy bid)").isTrue();
     }
 
     @When("I place a bid of {long} on the test listing")

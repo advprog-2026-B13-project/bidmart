@@ -14,13 +14,19 @@ Feature: Bidding API
     When I place a bid of 50000 without authentication
     Then the response code is 401
 
-  Scenario: Authenticated bidder places a valid bid
-    Given I am logged in as the test bidder
-    When I place a bid on the test listing
-    Then the response code is 200
-    And the bid is accepted or outbid
-
   Scenario: Place a bid that is too low returns 400
     Given I am logged in as the test bidder
     When I place a bid of 1 on the test listing
     Then the response code is 400
+
+  Scenario: Authenticated bidder places manual bid then raises with proxy bid
+    Given I am logged in as the test bidder
+    When I place a manual bid on the test listing
+    Then the response code is 200
+    And the bid is accepted or outbid
+    When I place a proxy bid above current price on the test listing
+    Then the response code is 200
+    And the bid is accepted or outbid
+    When I get the bids for the test listing with authentication
+    Then the response code is 200
+    And my proxy bid has a max amount
