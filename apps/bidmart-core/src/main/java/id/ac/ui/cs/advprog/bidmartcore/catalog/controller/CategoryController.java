@@ -47,7 +47,7 @@ public class CategoryController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Category> getCategoryById(@PathVariable Integer id) {
-        Category category = categoryService.getCategoryById(id);
+        CategoryResponse category = categoryService.getCategoryById(id);
         return ResponseEntity.ok(category);
     }
 
@@ -61,10 +61,10 @@ public class CategoryController {
         Category category = new Category();
         category.setName(request.getName());
         if (request.getParentId() != null) {
-            Category parentCategory = categoryService.getCategoryById(request.getParentId());
+            CategoryResponse parentCategory = categoryService.getCategoryById(request.getParentId());
             category.setParentCategory(parentCategory);
         }
-        Category savedCategory = categoryService.createCategory(category);
+        CategoryResponse savedCategory = categoryService.createCategory(request);
         return new ResponseEntity<>(savedCategory, HttpStatus.CREATED);
     }
 
