@@ -50,6 +50,7 @@
         }
 
         @Override
+        @Transactional
         public WalletModel topUp(UUID userId, BigDecimal amount) {
                         return deposit(userId, amount);
         }
