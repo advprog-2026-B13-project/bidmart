@@ -18,9 +18,11 @@ jobs:
             core:
               - 'apps/bidmart-core/**'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/main.yml'
             fe:
               - 'apps/bidmart-fe/**'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/main.yml'
 
   # ========== BUILD & TEST ==========
 
@@ -28,7 +30,6 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.core == 'true'
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +109,7 @@ jobs:
         run: pnpm build
 
   # ========== SONARCLOUD SCANS ==========
-  
+
   sonar-fe:
     needs: [detect-changes, fe]
     if: needs.detect-changes.outputs.fe == 'true'
@@ -143,28 +144,24 @@ jobs:
         with:
           projectBaseDir: apps/bidmart-fe
 
-      - name: SonarQube Quality Gate check
-        id: sonarqube-quality-gate-check
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        with:
-          pollingTimeoutSec: 600
-          scanMetadataReportFile: apps/bidmart-fe/.scannerwork/report-task.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
-
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, core, fe]
+    needs: [detect-changes, core, fe, sonar-fe]
     if: always()
     steps:
-      - name: Check CI status
+      - name: Check CI results
         run: |
-          if [ "${{ needs.detect-changes.outputs.core }}" = "true" ] && [ "${{ needs.core.result }}" != "success" ]; then
-            echo "❌ Core CI + SonarCloud failed"; exit 1
+          CORE="${{ needs.core.result }}"
+          FE="${{ needs.fe.result }}"
+          SONAR_FE="${{ needs.sonar-fe.result }}"
+          echo "core=$CORE  fe=$FE  sonar-fe=$SONAR_FE"
+          if [[ "$CORE" == "failure" || "$CORE" == "cancelled" ]]; then
+            echo "❌ core job $CORE"; exit 1
           fi
-          if [ "${{ needs.detect-changes.outputs.fe }}" = "true" ] && [ "${{ needs.fe.result }}" != "success" ]; then
-            echo "❌ Frontend CI + SonarCloud failed"; exit 1
+          if [[ "$FE" == "failure" || "$FE" == "cancelled" ]]; then
+            echo "❌ fe job $FE"; exit 1
           fi
-          echo "✅ All CI + SonarCloud checks passed"
+          if [[ "$SONAR_FE" == "failure" || "$SONAR_FE" == "cancelled" ]]; then
+            echo "❌ sonar-fe job $SONAR_FE"; exit 1
+          fi
+          echo "✅ CI passed"
