@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmartcore.order.service;
+package id.ac.ui.cs.advprog.bidmartcore.order.event;
 
 import id.ac.ui.cs.advprog.bidmartcore.bidding.domain.event.AuctionClosedEvent;
 import id.ac.ui.cs.advprog.bidmartcore.order.model.Order;
