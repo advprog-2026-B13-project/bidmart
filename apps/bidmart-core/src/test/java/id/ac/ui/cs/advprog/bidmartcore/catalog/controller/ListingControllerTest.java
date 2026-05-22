@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmartcore.catalog.controller;
 
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.AuthContext;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.ListingCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.ListingStatus;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.ListingService;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -51,6 +53,11 @@ class ListingControllerTest {
         @ExceptionHandler(IllegalStateException.class)
         public ResponseEntity<String> handleIllegalState(IllegalStateException ex) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+
+        @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+        public ResponseEntity<String> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
         }
 
         @ExceptionHandler(RuntimeException.class)
@@ -103,7 +110,9 @@ class ListingControllerTest {
 
         mockMvc.perform(get("/api/catalog/listings/search")
                         .param("keyword", "ROG")
-                        .param("minPrice", "10000000"))
+                        .param("minPrice", "10000000")
+                        .param("page", "0")
+                        .param("size", "10"))
                 .andExpect(status().isOk());
     }
 
@@ -140,7 +149,6 @@ class ListingControllerTest {
                         .param("minPrice", "10000000")
                         .param("maxPrice", "30000000")
                         .param("categoryId", "2")
-                        .param("status", "ACTIVE")
                         .param("page", "0")
                         .param("size", "5"))
                 .andExpect(status().isOk());
@@ -263,7 +271,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Positive Case [createListing]: Berhasil menerbitkan produk baru dalam database")
     void testCreateListingSuccess() throws Exception {
-        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1}";
+        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1,\"minBidIncrement\":500,\"endTime\":\"2099-12-31T00:00:00\"}";
         when(authContext.getUserId()).thenReturn(userId);
         when(listingService.createListing(any(), eq(userId))).thenReturn(sampleListing);
 
@@ -287,7 +295,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [createListing]: Menolak eksekusi pembuatan jika otentikasi gagal")
     void testCreateListingUnauthenticated() throws Exception {
-        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1}";
+        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1,\"minBidIncrement\":500,\"endTime\":\"2099-12-31T00:00:00\"}";
         when(authContext.getUserId()).thenReturn(null);
         when(listingService.createListing(any(), eq(null)))
                 .thenThrow(new IllegalArgumentException("User tidak terautentikasi"));
@@ -301,9 +309,9 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [createListing]: Menolak pembuatan jika service melempar SecurityException")
     void testCreateListingSecurityException() throws Exception {
-        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1}";
+        String payload = "{\"title\":\"ROG\",\"description\":\"Mulus\",\"startingPrice\":10000,\"categoryId\":1,\"minBidIncrement\":500,\"endTime\":\"2099-12-31T00:00:00\"}";
         when(authContext.getUserId()).thenReturn(userId);
-        when(listingService.createListing(any(), eq(userId)))
+        when(listingService.createListing(any(ListingCreateRequest.class), eq(userId)))
                 .thenThrow(new SecurityException("Tidak memiliki izin"));
 
         mockMvc.perform(post("/api/catalog/listings/create")
@@ -317,7 +325,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Positive Case [updateListing]: Berhasil memperbarui kelengkapan deskripsi listing")
     void testUpdateListingSuccess() throws Exception {
-        String payload = "{\"description\":\"Update Deskripsi Baru\"}";
+        String payload = "{\"title\":\"ROG Updated\",\"description\":\"Update Deskripsi Baru\"}";
         when(authContext.getUserId()).thenReturn(userId);
         when(listingService.updateListing(eq(listingId), eq(userId), any())).thenReturn(sampleListing);
 
@@ -330,7 +338,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Negative Case [updateListing]: Menolak pembaharuan jika pelempar request bukan pemilik asli")
     void testUpdateListingNotOwner() throws Exception {
-        String payload = "{\"description\":\"Hacker Test\"}";
+        String payload = "{\"title\":\"Hacked\",\"description\":\"Hacker Test\"}";
         when(authContext.getUserId()).thenReturn(userId);
         when(listingService.updateListing(eq(listingId), eq(userId), any()))
                 .thenThrow(new SecurityException("Akses ditolak"));
@@ -344,7 +352,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [updateListing]: Menolak modifikasi jika state siklus lelang sudah berjalan final")
     void testUpdateListingFinalStateConflict() throws Exception {
-        String payload = "{\"description\":\"Update State Akhir\"}";
+        String payload = "{\"title\":\"Final State\",\"description\":\"Update State Akhir\"}";
         when(authContext.getUserId()).thenReturn(userId);
         when(listingService.updateListing(eq(listingId), eq(userId), any()))
                 .thenThrow(new IllegalStateException("Sudah ada bid"));
@@ -358,7 +366,7 @@ class ListingControllerTest {
     @Test
     @DisplayName("Edge Case [updateListing]: Menolak pembaruan jika ID listing tidak ditemukan")
     void testUpdateListingNotFound() throws Exception {
-        String payload = "{\"description\":\"Update Tidak Ada\"}";
+        String payload = "{\"title\":\"Not Found\",\"description\":\"Update Tidak Ada\"}";
         when(authContext.getUserId()).thenReturn(userId);
         when(listingService.updateListing(eq(listingId), eq(userId), any()))
                 .thenThrow(new IllegalArgumentException("Listing tidak ditemukan"));

@@ -22,11 +22,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import jakarta.validation.Valid;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryCreateRequest;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
-import id.ac.ui.cs.advprog.bidmartcore.catalog.service.CategoryService;
-import lombok.RequiredArgsConstructor;
 
 @RestController("catalogCategoryController")
 @RequestMapping("/api/catalog/categories")
@@ -46,24 +42,15 @@ public class CategoryController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Category> getCategoryById(@PathVariable Integer id) {
+    public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Integer id) {
         CategoryResponse category = categoryService.getCategoryById(id);
         return ResponseEntity.ok(category);
     }
 
     @PostMapping
-    public ResponseEntity<Category> createCategory(
-            @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role,
-            @Valid @RequestBody CategoryCreateRequest request) { // 🔥 Menggunakan @Valid dan DTO request
-        if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat menambah kategori.");
-        }
-        Category category = new Category();
-        category.setName(request.getName());
-        if (request.getParentId() != null) {
-            CategoryResponse parentCategory = categoryService.getCategoryById(request.getParentId());
-            category.setParentCategory(parentCategory);
-        }
+    @RequirePermission(PermissionValue.CATALOG_CREATE_CATEGORY)
+    public ResponseEntity<CategoryResponse> createCategory(
+            @Valid @RequestBody CategoryCreateRequest request) {
         CategoryResponse savedCategory = categoryService.createCategory(request);
         return new ResponseEntity<>(savedCategory, HttpStatus.CREATED);
     }
