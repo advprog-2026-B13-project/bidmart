@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { getCategories, getSubCategories } from "@/lib/api/endpoints";
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<{ slug: string; name: string; id: number }[]>([]);
+  const [categories, setCategories] = useState<{ slug: string; name: string; id: number; imageUrl: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export default function CategoriesPage() {
               >
                 <div className="relative aspect-4/3 overflow-hidden">
                   <img
-                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
+                    src={cat.imageUrl || "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"}
                     alt={cat.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

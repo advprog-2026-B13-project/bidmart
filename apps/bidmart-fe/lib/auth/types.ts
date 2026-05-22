@@ -113,6 +113,23 @@ export type ResendVerificationOtpInput = {
   verificationToken: string;
 };
 
+export type PasswordResetRequestInput = {
+  email: string;
+};
+
+export type PasswordResetVerifyInput = {
+  token: string;
+};
+
+export type PasswordResetVerifyResponse = {
+  valid: boolean;
+};
+
+export type PasswordResetConfirmInput = {
+  token: string;
+  newPassword: string;
+};
+
 export type MfaVerifyInput = {
   preAuthToken: string;
   code: string;

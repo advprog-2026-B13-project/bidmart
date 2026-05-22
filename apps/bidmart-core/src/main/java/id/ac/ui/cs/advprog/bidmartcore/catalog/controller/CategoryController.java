@@ -10,12 +10,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import id.ac.ui.cs.advprog.bidmartcore.catalog.model.Category;
+import id.ac.ui.cs.advprog.bidmartcore.auth.domain.model.enums.PermissionValue;
+import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.RequirePermission;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryCreateRequest;
+import id.ac.ui.cs.advprog.bidmartcore.catalog.dto.CategoryResponse;
 import id.ac.ui.cs.advprog.bidmartcore.catalog.service.CategoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import jakarta.validation.Valid;
@@ -32,12 +35,12 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping("/main")
-    public ResponseEntity<List<Category>> getMainCategories() {
+    public ResponseEntity<List<CategoryResponse>> getMainCategories() {
         return ResponseEntity.ok(categoryService.getMainCategories());
     }
 
     @GetMapping("/sub/{parentId}")
-    public ResponseEntity<List<Category>> getSubCategories(@PathVariable Integer parentId) {
+    public ResponseEntity<List<CategoryResponse>> getSubCategories(@PathVariable Integer parentId) {
         return ResponseEntity.ok(categoryService.getSubCategories(parentId));
     }
 
@@ -65,28 +68,17 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Category> updateCategory(
+    @RequirePermission(PermissionValue.CATALOG_UPDATE_CATEGORY)
+    public ResponseEntity<CategoryResponse> updateCategory(
             @PathVariable Integer id,
-            @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role,
-            @RequestBody Category categoryDetails) {
-
-        if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat mengubah kategori.");
-        }
-
-        Category updatedCategory = categoryService.updateCategory(id, categoryDetails);
+            @Valid @RequestBody CategoryCreateRequest request) {
+        CategoryResponse updatedCategory = categoryService.updateCategory(id, request);
         return ResponseEntity.ok(updatedCategory);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCategory(
-            @PathVariable Integer id,
-            @RequestHeader(value = "X-User-Role", defaultValue = "USER") String role) {
-
-        if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw new SecurityException("Akses Ditolak: Hanya Admin yang dapat menghapus kategori.");
-        }
-
+    @RequirePermission(PermissionValue.CATALOG_DELETE_CATEGORY)
+    public ResponseEntity<Void> deleteCategory(@PathVariable Integer id) {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }

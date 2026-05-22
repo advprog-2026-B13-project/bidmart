@@ -10,12 +10,13 @@ public class CategoryResponse {
 
     private final Integer id;
     private final String name;
+    private final String imageUrl;
     private final Integer parentId;
 
     public static CategoryResponse from(Category category) {
         Integer parentId = category.getParentCategory() != null
                 ? category.getParentCategory().getId()
                 : null;
-        return new CategoryResponse(category.getId(), category.getName(), parentId);
+        return new CategoryResponse(category.getId(), category.getName(), category.getImageUrl(), parentId);
     }
 }

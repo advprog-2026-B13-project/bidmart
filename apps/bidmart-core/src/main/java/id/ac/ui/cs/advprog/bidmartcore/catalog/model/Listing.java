@@ -83,15 +83,8 @@ public class Listing {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-
-    @Column(name = "moderated_by_admin_id")
-    private UUID moderatedByAdminId;
-
-    @Column(name = "takedown_reason", columnDefinition = "TEXT")
-    private String takedownReason;
-
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Transient
+    private Boolean canEdit;
 
     @PrePersist
     public void prePersistSetup() {

@@ -12,4 +12,7 @@ public interface AuthUseCase {
     Map<String, Object> confirmSessionReplacement(String replacementToken, boolean shouldReplace, SessionClientInfo clientInfo);
     void logout(String sessionId);
     Map<String, Object> refreshToken(String refreshToken);
+    void requestPasswordReset(String email);
+    boolean verifyPasswordResetToken(String token);
+    void resetPassword(String token, String newPassword);
 }
