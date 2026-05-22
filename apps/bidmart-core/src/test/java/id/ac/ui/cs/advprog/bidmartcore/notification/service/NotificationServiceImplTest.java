@@ -9,9 +9,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -20,7 +18,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,9 +25,6 @@ class NotificationServiceImplTest {
 
     @Mock
     private NotificationRepository notificationRepository;
-
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private NotificationServiceImpl notificationService;
@@ -58,8 +52,6 @@ class NotificationServiceImplTest {
         notification2.setMessage("Congratulations, you won the bid!");
         notification2.setRead(true);
         notification2.setCreatedAt(LocalDateTime.now());
-
-        ReflectionTestUtils.setField(notificationService, "messagingTemplate", messagingTemplate);
     }
 
     @Test
@@ -77,7 +69,7 @@ class NotificationServiceImplTest {
     }
 
     @Test
-    void createNotification_shouldSaveAndBroadcastNotification() {
+    void createNotification_shouldSaveNotificationAndSendSse() {
         String type = "OUTBID";
         String message = "You have been outbid!";
         UUID referenceId = UUID.randomUUID();
@@ -93,6 +85,9 @@ class NotificationServiceImplTest {
 
         when(notificationRepository.save(any(Notification.class))).thenReturn(mockSaved);
 
+        SseEmitter emitter = notificationService.subscribe(userId);
+        assertNotNull(emitter);
+
         notificationService.createNotification(userId, type, message, referenceId);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
@@ -104,10 +99,5 @@ class NotificationServiceImplTest {
         assertEquals(message, savedInput.getMessage());
         assertEquals(referenceId, savedInput.getReferenceId());
         assertFalse(savedInput.isRead());
-
-        verify(messagingTemplate, times(1)).convertAndSend(
-                eq("/topic/notifications/" + userId),
-                eq(mockSaved)
-        );
     }
 }

@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -55,7 +56,7 @@ class NotificationControllerTest {
         when(notificationService.getUserNotifications(userId)).thenReturn(Arrays.asList(notification1, notification2));
 
         mockMvc.perform(get("/api/notifications/user/{userId}", userId)
-                .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(2))
                 .andExpect(jsonPath("$[0].type").value("OUTBID"))
@@ -72,8 +73,17 @@ class NotificationControllerTest {
         when(notificationService.getUserNotifications(userId)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/notifications/user/{userId}", userId)
-                .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(0));
+    }
+
+    @Test
+    void streamNotifications_shouldReturnSseEmitter() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(notificationService.subscribe(userId)).thenReturn(new SseEmitter());
+
+        mockMvc.perform(get("/api/notifications/user/{userId}/stream", userId))
+                .andExpect(status().isOk());
     }
 }
