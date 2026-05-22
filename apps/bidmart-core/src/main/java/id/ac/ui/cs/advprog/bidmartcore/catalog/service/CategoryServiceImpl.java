@@ -14,6 +14,10 @@ import java.util.List;
 @Service
 public class CategoryServiceImpl implements CategoryService {
 
+    private static final String NOT_FOUND_SUFFIX = " tidak ditemukan";
+    private static final String CATEGORY_ID_PREFIX = "Kategori dengan ID ";
+    private static final String PARENT_CATEGORY_ID_PREFIX = "Parent kategori dengan ID ";
+
     private final CategoryRepository categoryRepository;
 
     public CategoryServiceImpl(CategoryRepository categoryRepository) {
@@ -30,7 +34,7 @@ public class CategoryServiceImpl implements CategoryService {
         if (request.getParentId() != null) {
             Category parent = categoryRepository.findById(request.getParentId())
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "Parent kategori dengan ID " + request.getParentId() + " tidak ditemukan"));
+                            PARENT_CATEGORY_ID_PREFIX + request.getParentId() + NOT_FOUND_SUFFIX));
             category.setParentCategory(parent);
         }
 
@@ -56,7 +60,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public CategoryResponse getCategoryById(Integer id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Kategori dengan ID " + id + " tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(CATEGORY_ID_PREFIX + id + NOT_FOUND_SUFFIX));
         return CategoryResponse.from(category);
     }
 
@@ -64,14 +68,14 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryResponse updateCategory(Integer id, CategoryCreateRequest request) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Kategori dengan ID " + id + " tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(CATEGORY_ID_PREFIX + id + NOT_FOUND_SUFFIX));
         category.setName(request.getName());
         category.setImageUrl(request.getImageUrl());
 
         if (request.getParentId() != null) {
             Category parent = categoryRepository.findById(request.getParentId())
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "Parent kategori dengan ID " + request.getParentId() + " tidak ditemukan"));
+                            PARENT_CATEGORY_ID_PREFIX + request.getParentId() + NOT_FOUND_SUFFIX));
             category.setParentCategory(parent);
         } else {
             category.setParentCategory(null);
@@ -87,7 +91,7 @@ public class CategoryServiceImpl implements CategoryService {
     public void deleteCategory(Integer id) {
         log.info("Category delete: categoryId={}", id);
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Kategori dengan ID " + id + " tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException(CATEGORY_ID_PREFIX + id + NOT_FOUND_SUFFIX));
         if (category.getSubCategories() != null && !category.getSubCategories().isEmpty()) {
             log.warn("Category delete rejected - has subcategories: categoryId={}", id);
             throw new IllegalStateException("Kategori tidak bisa dihapus karena masih memiliki sub-kategori.");

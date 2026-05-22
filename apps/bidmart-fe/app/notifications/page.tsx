@@ -68,7 +68,7 @@ export default function NotificationsPage() {
             message: newNotif.message,
             isRead: newNotif.read !== undefined ? newNotif.read : newNotif.isRead,
             referenceId: newNotif.referenceId,
-            createdAt: newNotif.createdAt,
+            createdAt: newNotif.createdAt || new Date().toISOString(),
           };
           setNotifications((prev) => [mappedNotif, ...prev]);
         } catch (err) {
@@ -209,7 +209,7 @@ export default function NotificationsPage() {
                   }
 
                   return (
-                      <div
+                      <button
                           key={notification.id}
                           onClick={handleMarkAsRead}
                           className={`p-6 transition-colors flex items-start gap-4 cursor-pointer hover:bg-gray-50/50 ${
@@ -217,7 +217,7 @@ export default function NotificationsPage() {
                           }`}
                       >
                         {content}
-                      </div>
+                      </button>
                   );
                 })
             )}
