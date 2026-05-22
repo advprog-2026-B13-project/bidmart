@@ -6,6 +6,10 @@ on:
       - staging
     paths:
       - 'apps/bidmart-core/**'
+      - 'apps/bidmart-functional-tests/**'
+  pull_request:
+    branches:
+      - staging
   workflow_dispatch:
 
 concurrency:
@@ -14,7 +18,8 @@ concurrency:
 
 jobs:
   deploy-core-staging:
-    name: Build Core and Deploy to Railway (Staging)
+    name: Build Core and Deploy to GHCR (Pulled by Watchtower)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,3 +53,53 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  functional-test:
+    name: Serenity Functional Tests (Staging)
+    needs: [deploy-core-staging]
+    if: always() && (needs.deploy-core-staging.result == 'success' || needs.deploy-core-staging.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Wait for Watchtower to pick up new image
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: sleep 60
+
+      - name: Wait for staging health check
+        run: |
+          for i in {1..12}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.staging.bidmart.store/api/health/status || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Staging is healthy"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Staging did not become healthy in time"
+          exit 1
+
+      - name: Run Serenity functional tests
+        working-directory: apps/bidmart-functional-tests
+        env:
+          SERENITY_BASE_URL: https://api.staging.bidmart.store
+          SERENITY_BIDDER_EMAIL: ${{ secrets.SERENITY_BIDDER_EMAIL }}
+          SERENITY_BIDDER_PASSWORD: ${{ secrets.SERENITY_BIDDER_PASSWORD }}
+          SERENITY_TEST_LISTING_ID: ${{ secrets.SERENITY_TEST_LISTING_ID }}
+          SERENITY_BID_INCREMENT: "1"
+        run: chmod +x gradlew && ./gradlew test
+
+      - name: Upload Serenity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenity-report
+          path: apps/bidmart-functional-tests/target/site/serenity/
+          retention-days: 30

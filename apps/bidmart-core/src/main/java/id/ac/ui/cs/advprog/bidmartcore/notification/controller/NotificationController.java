@@ -25,4 +25,10 @@ public class NotificationController {
         List<Notification> notifications = notificationService.getUserNotifications(userId);
         return ResponseEntity.ok(notifications);
     }
+
+    @PostMapping("/{id}/read")
+    public ResponseEntity<Void> markAsRead(@PathVariable UUID id) {
+        notificationService.markAsRead(id);
+        return ResponseEntity.ok().build();
+    }
 }

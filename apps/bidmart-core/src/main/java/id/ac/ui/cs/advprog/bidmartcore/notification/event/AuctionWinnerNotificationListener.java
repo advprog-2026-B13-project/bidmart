@@ -36,7 +36,8 @@ public class AuctionWinnerNotificationListener {
                 notificationService.createNotification(
                         event.getWinnerBidderId(),
                         "AUCTION_WON",
-                        message
+                        message,
+                        listing.getId()
                 );
             });
         }

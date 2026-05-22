@@ -65,7 +65,8 @@ class AuctionWinnerNotificationListenerTest {
         verify(notificationService, times(1)).createNotification(
                 eq(winnerId),
                 eq("AUCTION_WON"),
-                messageCaptor.capture()
+                messageCaptor.capture(),
+                eq(listingId)
         );
 
         String message = messageCaptor.getValue();
@@ -82,7 +83,6 @@ class AuctionWinnerNotificationListenerTest {
 
         Listing listing = new Listing();
         listing.setId(listingId);
-        // Title has 60 characters
         listing.setTitle("Super Ultra Rare Vintage Shiny Charizard First Edition Card 1999");
         listing.setSellerId(sellerId);
 
@@ -94,7 +94,8 @@ class AuctionWinnerNotificationListenerTest {
         verify(notificationService, times(1)).createNotification(
                 eq(winnerId),
                 eq("AUCTION_WON"),
-                messageCaptor.capture()
+                messageCaptor.capture(),
+                eq(listingId)
         );
 
         String message = messageCaptor.getValue();
@@ -113,7 +114,7 @@ class AuctionWinnerNotificationListenerTest {
 
         listener.onAuctionClosed(event);
 
-        verify(notificationService, never()).createNotification(any(), any(), any());
+        verify(notificationService, never()).createNotification(any(), any(), any(), any());
     }
 
     @Test
