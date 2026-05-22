@@ -12,6 +12,10 @@ import type {
   LoginResult,
   MfaVerifyInput,
   OtherUserProfileResponse,
+  PasswordResetConfirmInput,
+  PasswordResetRequestInput,
+  PasswordResetVerifyInput,
+  PasswordResetVerifyResponse,
   ProfileUpdateInput,
   ProfileResponse,
   SessionReplacementConfirmationInput,
@@ -150,6 +154,51 @@ export async function resendRegistrationVerificationOtp(
 
   if (payload.success === false) {
     throw new Error(payload.message || "Failed to resend verification OTP");
+  }
+}
+
+export async function requestPasswordReset(input: PasswordResetRequestInput): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/password-reset/request",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to request password reset");
+  }
+}
+
+export async function verifyPasswordResetToken(
+  input: PasswordResetVerifyInput,
+): Promise<PasswordResetVerifyResponse> {
+  const payload = await apiFetch<ApiResponse<PasswordResetVerifyResponse>>(
+    "/api/auth/password-reset/verify",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  return unwrapOrThrow(payload);
+}
+
+export async function confirmPasswordReset(input: PasswordResetConfirmInput): Promise<void> {
+  const payload = await apiFetch<ApiResponse<null>>(
+    "/api/auth/password-reset/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { auth: false },
+  );
+
+  if (payload.success === false) {
+    throw new Error(payload.message || "Failed to reset password");
   }
 }
 

@@ -30,8 +30,8 @@ public class DevEmailTestController {
 
     private final EmailOtpSenderPort emailOtpSenderPort;
 
-    @Value("${auth.registration.verification-frontend-base-url:http://localhost:3000}")
-    private String verificationFrontendBaseUrl;
+    @Value("${auth.frontend-base-url:http://localhost:3000}")
+    private String frontendBaseUrl;
 
     @PostMapping("/test-otp")
     @Operation(
@@ -69,13 +69,13 @@ public class DevEmailTestController {
     }
 
     private String buildVerificationUrl(String email, String otp) {
-        if (!StringUtils.hasText(verificationFrontendBaseUrl)) {
+        if (!StringUtils.hasText(frontendBaseUrl)) {
             return null;
         }
 
-        String baseUrl = verificationFrontendBaseUrl.endsWith("/")
-                ? verificationFrontendBaseUrl.substring(0, verificationFrontendBaseUrl.length() - 1)
-                : verificationFrontendBaseUrl;
+        String baseUrl = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
 
         return baseUrl
                 + "/verify-email?email="
@@ -84,4 +84,3 @@ public class DevEmailTestController {
                 + URLEncoder.encode(otp, StandardCharsets.UTF_8);
     }
 }
-

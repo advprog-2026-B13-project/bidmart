@@ -18,6 +18,7 @@ import id.ac.ui.cs.advprog.bidmartcore.catalog.repository.ListingRepository;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,12 +29,27 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder {
+    @Value("${seeder.admin.email}")
+    private String adminEmail;
+
+    @Value("${seeder.admin.password}")
+    private String adminPassword;
+
+    private static final String DEFAULT_PASSWORD = "password123";
+    private static final String CAT_ELECTRONICS = "Electronics";
+    private static final String CAT_WATCHES = "Watches";
+    private static final String CAT_FURNITURE = "Furniture";
+    private static final String CAT_BOOKS = "Books";
+    private static final String CAT_MUSICAL_INSTRUMENTS = "Musical Instruments";
+    private static final String CAT_GAMING = "Gaming";
+    private static final String CAT_JEWELRY = "Jewelry";
+    private static final String CAT_COLLECTIBLES = "Collectibles";
+    private static final String CAT_FASHION = "Fashion";
 
     private final UserSpringRepository userRepository;
     private final RoleSpringRepository roleRepository;
@@ -69,38 +85,40 @@ public class DataSeeder {
                 });
 
         // --- Users ---
-        User sarah = createUser("sarah.chen@email.com", "password123", "Sarah Chen",
+        User admin = createUser(adminEmail, adminPassword, "Admin User",
+                "https://i.pravatar.cc/150?u=admin", adminRole, 0.00);
+        User sarah = createUser("sarah.chen@email.com", DEFAULT_PASSWORD, "Sarah Chen",
                 "https://i.pravatar.cc/150?u=sarah", userRole, 2450.00);
-        User marcus = createUser("marcus.wong@email.com", "password123", "Marcus Wong",
+        User marcus = createUser("marcus.wong@email.com", DEFAULT_PASSWORD, "Marcus Wong",
                 "https://i.pravatar.cc/150?u=marcus", userRole, 1890.50);
-        User elena = createUser("elena.rossi@email.com", "password123", "Elena Rossi",
+        User elena = createUser("elena.rossi@email.com", DEFAULT_PASSWORD, "Elena Rossi",
                 "https://i.pravatar.cc/150?u=elena", userRole, 3200.00);
 
-        List<User> allUsers = List.of(sarah, marcus, elena);
+        List<User> allUsers = List.of(admin, sarah, marcus, elena);
 
         // --- Categories ---
         Map<String, Category> topCategories = Map.of(
-                "Electronics", saveCategory("Electronics", null),
-                "Watches", saveCategory("Watches", null),
+                CAT_ELECTRONICS, saveCategory(CAT_ELECTRONICS, null),
+                CAT_WATCHES, saveCategory(CAT_WATCHES, null),
                 "Art", saveCategory("Art", null),
-                "Furniture", saveCategory("Furniture", null),
-                "Books", saveCategory("Books", null),
-                "Musical Instruments", saveCategory("Musical Instruments", null),
-                "Gaming", saveCategory("Gaming", null),
-                "Jewelry", saveCategory("Jewelry", null),
-                "Collectibles", saveCategory("Collectibles", null),
-                "Fashion", saveCategory("Fashion", null)
+                CAT_FURNITURE, saveCategory(CAT_FURNITURE, null),
+                CAT_BOOKS, saveCategory(CAT_BOOKS, null),
+                CAT_MUSICAL_INSTRUMENTS, saveCategory(CAT_MUSICAL_INSTRUMENTS, null),
+                CAT_GAMING, saveCategory(CAT_GAMING, null),
+                CAT_JEWELRY, saveCategory(CAT_JEWELRY, null),
+                CAT_COLLECTIBLES, saveCategory(CAT_COLLECTIBLES, null),
+                CAT_FASHION, saveCategory(CAT_FASHION, null)
         );
 
         // Sub-categories for Electronics
-        Category electronics = topCategories.get("Electronics");
+        Category electronics = topCategories.get(CAT_ELECTRONICS);
         saveCategory("Cameras", electronics);
         saveCategory("Audio", electronics);
         saveCategory("Vintage Tech", electronics);
         saveCategory("Computers", electronics);
 
         // Sub-categories for Watches
-        Category watches = topCategories.get("Watches");
+        Category watches = topCategories.get(CAT_WATCHES);
         saveCategory("Luxury", watches);
         saveCategory("Vintage", watches);
         saveCategory("Smartwatches", watches);
@@ -114,49 +132,49 @@ public class DataSeeder {
         saveCategory("Photography", art);
 
         // Sub-categories for Furniture
-        Category furniture = topCategories.get("Furniture");
+        Category furniture = topCategories.get(CAT_FURNITURE);
         saveCategory("Chairs", furniture);
         saveCategory("Tables", furniture);
         saveCategory("Storage", furniture);
         saveCategory("Lighting", furniture);
 
         // Sub-categories for Books
-        Category books = topCategories.get("Books");
+        Category books = topCategories.get(CAT_BOOKS);
         saveCategory("First Editions", books);
         saveCategory("Rare Books", books);
         saveCategory("Comics", books);
         saveCategory("Magazines", books);
 
         // Sub-categories for Musical Instruments
-        Category music = topCategories.get("Musical Instruments");
+        Category music = topCategories.get(CAT_MUSICAL_INSTRUMENTS);
         saveCategory("Guitars", music);
         saveCategory("Synthesizers", music);
         saveCategory("Drums", music);
         saveCategory("Studio Gear", music);
 
         // Sub-categories for Gaming
-        Category gaming = topCategories.get("Gaming");
+        Category gaming = topCategories.get(CAT_GAMING);
         saveCategory("Consoles", gaming);
         saveCategory("Games", gaming);
-        saveCategory("Collectibles", gaming);
+        saveCategory(CAT_COLLECTIBLES, gaming);
         saveCategory("Arcade", gaming);
 
         // Sub-categories for Jewelry
-        Category jewelry = topCategories.get("Jewelry");
+        Category jewelry = topCategories.get(CAT_JEWELRY);
         saveCategory("Rings", jewelry);
         saveCategory("Necklaces", jewelry);
-        saveCategory("Watches", jewelry);
+        saveCategory(CAT_WATCHES, jewelry);
         saveCategory("Earrings", jewelry);
 
         // Sub-categories for Collectibles
-        Category collectibles = topCategories.get("Collectibles");
+        Category collectibles = topCategories.get(CAT_COLLECTIBLES);
         saveCategory("Sports Memorabilia", collectibles);
         saveCategory("Trading Cards", collectibles);
         saveCategory("Toys", collectibles);
         saveCategory("Coins & Stamps", collectibles);
 
         // Sub-categories for Fashion
-        Category fashion = topCategories.get("Fashion");
+        Category fashion = topCategories.get(CAT_FASHION);
         saveCategory("Designer Bags", fashion);
         saveCategory("Vintage", fashion);
         saveCategory("Sneakers", fashion);
@@ -174,21 +192,21 @@ public class DataSeeder {
                 now.plusHours(2).plusMinutes(30), ListingStatus.ACTIVE, 23, elena);
 
         Listing lst002 = createListing(
-                sarah, topCategories.get("Furniture"), "Herman Miller Eames Lounge Chair — Walnut",
+                sarah, topCategories.get(CAT_FURNITURE), "Herman Miller Eames Lounge Chair — Walnut",
                 "Iconic Eames Lounge Chair and Ottoman in genuine walnut veneer with black leather upholstery. Authentic Herman Miller piece from authorized dealer. Purchased 2022.",
                 "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=800&q=80",
                 new BigDecimal("4500"), new BigDecimal("5200"), null,
                 now.plusHours(18), ListingStatus.ACTIVE, 15, elena);
 
         Listing lst003 = createListing(
-                marcus, topCategories.get("Books"), "First Edition Hemingway — The Sun Also Rises",
+                marcus, topCategories.get(CAT_BOOKS), "First Edition Hemingway — The Sun Also Rises",
                 "True first edition, first printing of Ernest Hemingway's masterpiece published by Charles Scribner's Sons, 1926. Dust jacket intact with minor wear. Authenticated.",
                 "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&q=80",
                 new BigDecimal("15000"), new BigDecimal("18750"), new BigDecimal("17500"),
                 now.plusDays(3), ListingStatus.ACTIVE, 8, marcus);
 
         Listing lst004 = createListing(
-                elena, topCategories.get("Watches"), "Rolex Submariner Date — 41mm Stainless",
+                elena, topCategories.get(CAT_WATCHES), "Rolex Submariner Date — 41mm Stainless",
                 "2021 Rolex Submariner Date ref. 126610LN. Complete set with box, papers, and warranty card. Worn only 6 months. No scratches on crystal or clasp.",
                 "https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=800&q=80",
                 new BigDecimal("12000"), new BigDecimal("14200"), new BigDecimal("13500"),
@@ -202,21 +220,21 @@ public class DataSeeder {
                 now.plusDays(5), ListingStatus.ACTIVE, 12, elena);
 
         Listing lst006 = createListing(
-                marcus, topCategories.get("Musical Instruments"), "Gibson Les Paul Standard '59 Reissue",
+                marcus, topCategories.get(CAT_MUSICAL_INSTRUMENTS), "Gibson Les Paul Standard '59 Reissue",
                 "Gibson Custom Shop 60th Anniversary 1959 Les Paul Standard. Historic Teambuilt model with accurate '59 specs. tobacco burst finish. Hardshell case included.",
                 "https://images.unsplash.com/photo-1564186763535-ebb21ef5277f?w=800&q=80",
                 new BigDecimal("3500"), new BigDecimal("4100"), null,
                 now.plusHours(8), ListingStatus.ACTIVE, 19, marcus);
 
         Listing lst007 = createListing(
-                sarah, topCategories.get("Gaming"), "Nintendo Sealed DS Lite — Arctic White",
+                sarah, topCategories.get(CAT_GAMING), "Nintendo Sealed DS Lite — Arctic White",
                 "Brand new, factory sealed Nintendo DS Lite in Arctic White. Japanese region free. Original sticker on back has been preserved. Collector grade.",
                 "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=800&q=80",
                 new BigDecimal("800"), new BigDecimal("1150"), new BigDecimal("900"),
                 now.plusHours(4), ListingStatus.ACTIVE, 27, sarah);
 
         Listing lst008 = createListing(
-                elena, topCategories.get("Watches"), "Omega Speedmaster Moonwatch — Hesalite",
+                elena, topCategories.get(CAT_WATCHES), "Omega Speedmaster Moonwatch — Hesalite",
                 "Omega Speedmaster Professional Moonwatch with hesalite crystal. Caliber 3861 manual movement. Full kit: box, papers, NATO strap, bracelet. Worn twice.",
                 "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
                 new BigDecimal("5500"), new BigDecimal("6200"), null,

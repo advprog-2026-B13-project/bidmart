@@ -10,8 +10,11 @@ import id.ac.ui.cs.advprog.bidmartcore.payment.model.PaymentStatus;
 import id.ac.ui.cs.advprog.bidmartcore.payment.repository.PaymentSpringRepository;
 import id.ac.ui.cs.advprog.bidmartcore.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
@@ -34,11 +38,17 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletService walletService;
     private final MidtransCoreApi midtransCoreApi;
 
+    private static final String BANK_TRANSFER = "bank_transfer";
+    private static final String GOPAY = "gopay";
+
     @Value("${midtrans.server-key}")
     private String serverKey;
 
+    private static final Logger AUDIT = LoggerFactory.getLogger("id.ac.ui.cs.advprog.bidmartcore.AUDIT");
+
     @Override
     public TopUpResponse createTopUpTransaction(UUID userId, BigDecimal amount, String paymentType, String bank) {
+        log.info("Top-up requested: userId={} amount={} paymentType={} bank={}", userId, amount, paymentType, bank);
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Top up amount must be greater than zero");
         }
@@ -61,7 +71,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         String resolvedPaymentType = (paymentType == null || paymentType.isBlank())
-                ? "bank_transfer"
+                ? BANK_TRANSFER
                 : paymentType.toLowerCase(Locale.ROOT);
         String bankCode = (bank == null || bank.isBlank()) ? "bca" : bank.toLowerCase(Locale.ROOT);
 
@@ -78,28 +88,29 @@ public class PaymentServiceImpl implements PaymentService {
             case "bank_transfer" -> {
                 Map<String, Object> bankTransfer = new HashMap<>();
                 bankTransfer.put("bank", bankCode);
-                requestBody.put("bank_transfer", bankTransfer);
+                requestBody.put(BANK_TRANSFER, bankTransfer);
                 responseBank = bankCode;
             }
             case "qris" -> {
                 Map<String, Object> qris = new HashMap<>();
-                String acquirer = (bank == null || bank.isBlank()) ? "gopay" : bankCode;
+                String acquirer = (bank == null || bank.isBlank()) ? GOPAY : bankCode;
                 qris.put("acquirer", acquirer);
                 requestBody.put("qris", qris);
                 responseBank = acquirer;
             }
-            case "gopay" -> requestBody.put("gopay", new HashMap<>());
+            case "gopay" -> requestBody.put(GOPAY, new HashMap<>());
             case "shopeepay" -> requestBody.put("shopeepay", new HashMap<>());
             default -> throw new IllegalArgumentException("Unsupported payment type: " + paymentType);
         }
 
+        log.info("Charging Midtrans transaction: orderId={} grossAmount={}", orderId, grossAmount);
         try {
             JSONObject response = midtransCoreApi.chargeTransaction(requestBody);
             String responsePaymentType = response.optString("payment_type", resolvedPaymentType);
             String transactionStatus = response.optString("transaction_status", "pending");
 
             String vaNumber = null;
-            if ("bank_transfer".equals(resolvedPaymentType)) {
+            if (BANK_TRANSFER.equals(resolvedPaymentType)) {
                 if (response.has("va_numbers")) {
                     JSONArray vaNumbers = response.getJSONArray("va_numbers");
                     if (!vaNumbers.isEmpty()) {
@@ -117,11 +128,13 @@ public class PaymentServiceImpl implements PaymentService {
 
             List<PaymentAction> actions = parseActions(response);
 
+            log.info("Midtrans charge success: orderId={} status={} paymentType={}", orderId, transactionStatus, responsePaymentType);
             return new TopUpResponse(orderId, responsePaymentType, responseBank, vaNumber, transactionStatus, actions);
         } catch (Exception ex) {
             payment.setStatus(PaymentStatus.FAILED);
             payment.setUpdatedAt(LocalDateTime.now());
             paymentRepository.save(payment);
+            log.error("Midtrans charge failed: orderId={} userId={} amount={}", orderId, userId, amount, ex);
             throw new IllegalStateException("Failed to create Midtrans transaction", ex);
         }
     }
@@ -129,10 +142,16 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentNotificationResponse handleNotification(PaymentNotificationRequest payload) {
         if (payload == null || payload.getOrderId() == null) {
+            log.warn("Payment notification rejected: missing order_id");
             throw new IllegalArgumentException("order_id is required");
         }
 
+        log.info("Payment notification received: orderId={} status={} grossAmount={}",
+                payload.getOrderId(), payload.getTransactionStatus(), payload.getGrossAmount());
+
         if (!isValidSignature(payload)) {
+            log.error("Payment notification INVALID SIGNATURE: orderId={}", payload.getOrderId());
+            AUDIT.error("PAYMENT_SIGNATURE_INVALID orderId={}", payload.getOrderId());
             return new PaymentNotificationResponse(payload.getOrderId(), PaymentStatus.FAILED.name(), "invalid signature");
         }
 
@@ -148,19 +167,29 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         if (nextStatus == PaymentStatus.SUCCESS && previousStatus != PaymentStatus.SUCCESS) {
+            log.info("Payment SUCCESS - depositing to wallet: orderId={} userId={} amount={}",
+                    payment.getOrderId(), payment.getUserId(), payment.getAmount());
+            AUDIT.info("PAYMENT_SUCCESS orderId={} userId={} amount={}", payment.getOrderId(), payment.getUserId(), payment.getAmount());
             walletService.deposit(payment.getUserId(), payment.getAmount());
             return new PaymentNotificationResponse(payment.getOrderId(), nextStatus.name(), "wallet updated");
         }
 
         if (nextStatus == PaymentStatus.FAILED && previousStatus == PaymentStatus.SUCCESS) {
+            log.warn("Payment FAILED after SUCCESS - attempting reversal: orderId={} userId={} amount={}",
+                    payment.getOrderId(), payment.getUserId(), payment.getAmount());
+            AUDIT.warn("PAYMENT_REVERSAL orderId={} userId={} amount={}", payment.getOrderId(), payment.getUserId(), payment.getAmount());
             try {
                 walletService.withdraw(payment.getUserId(), payment.getAmount());
                 return new PaymentNotificationResponse(payment.getOrderId(), nextStatus.name(), "wallet reversed");
             } catch (IllegalArgumentException ex) {
+                log.error("Payment reversal FAILED - insufficient balance: orderId={} userId={} amount={}",
+                        payment.getOrderId(), payment.getUserId(), payment.getAmount(), ex);
+                AUDIT.error("PAYMENT_REVERSAL_FAILED orderId={} userId={} amount={}", payment.getOrderId(), payment.getUserId(), payment.getAmount());
                 return new PaymentNotificationResponse(payment.getOrderId(), nextStatus.name(), "wallet reversal pending");
             }
         }
 
+        log.info("Payment status updated: orderId={} {} -> {}", payment.getOrderId(), previousStatus, nextStatus);
         return new PaymentNotificationResponse(payment.getOrderId(), nextStatus.name(), "payment updated");
     }
 

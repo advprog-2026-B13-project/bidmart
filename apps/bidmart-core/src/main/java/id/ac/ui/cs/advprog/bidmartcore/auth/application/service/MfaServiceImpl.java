@@ -33,6 +33,8 @@ public class MfaServiceImpl implements MfaUseCase {
     private final PasswordEncoder passwordEncoder;
     private final EmailOtpSenderPort emailOtpSenderPort;
 
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final GoogleAuthenticator googleAuthenticator = new GoogleAuthenticator();
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -43,7 +45,7 @@ public class MfaServiceImpl implements MfaUseCase {
     @Transactional
     public Map<String, Object> setupTotp(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         // Remove existing inactive TOTP credentials
         totpRepository.findByUserId(userId).ifPresent(existing -> {
@@ -106,7 +108,7 @@ public class MfaServiceImpl implements MfaUseCase {
     @Transactional
     public void enableEmailMfa(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         user.setDefault2FAMethod(MFAType.EMAIL);
         userRepository.save(user);
@@ -116,7 +118,7 @@ public class MfaServiceImpl implements MfaUseCase {
     @Transactional
     public void disableMfa(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         user.setDefault2FAMethod(MFAType.DISABLED);
         userRepository.save(user);
@@ -132,7 +134,7 @@ public class MfaServiceImpl implements MfaUseCase {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired pre-auth token"));
 
         User user = userRepository.findById(data.userId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
 
         // Invalidate any existing OTPs
         emailOtpRepository.invalidateAllByUserId(user.getId());

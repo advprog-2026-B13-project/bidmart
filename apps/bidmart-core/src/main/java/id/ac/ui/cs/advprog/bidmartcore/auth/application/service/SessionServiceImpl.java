@@ -12,6 +12,7 @@ import id.ac.ui.cs.advprog.bidmartcore.auth.domain.port.output.UserRepositoryPor
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtToken;
 import id.ac.ui.cs.advprog.bidmartcore.auth.infrastructure.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SessionServiceImpl implements SessionUseCase {
@@ -46,6 +48,7 @@ public class SessionServiceImpl implements SessionUseCase {
     @Override
     @Transactional
     public Map<String, Object> createSession(UUID userId, SessionClientInfo clientInfo) {
+        log.info("Session create requested: userId={} ip={}", userId, clientInfo != null ? clientInfo.ipAddress() : "unknown");
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -85,6 +88,7 @@ public class SessionServiceImpl implements SessionUseCase {
     @Override
     @Transactional
     public void revokeSession(UUID userId, String sessionId) {
+        log.info("Session revoke: userId={} sessionId={}", userId, sessionId);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
@@ -100,6 +104,7 @@ public class SessionServiceImpl implements SessionUseCase {
     @Override
     @Transactional
     public void revokeAllOtherSessions(UUID userId, String currentSessionId) {
+        log.info("Revoke all other sessions: userId={} currentSessionId={}", userId, currentSessionId);
         List<Session> sessions = sessionRepository.findAllByUserId(userId);
         for (Session s : sessions) {
             if (!s.getId().equals(currentSessionId) && s.isActive()) {

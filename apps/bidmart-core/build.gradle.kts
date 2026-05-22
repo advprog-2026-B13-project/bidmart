@@ -33,16 +33,7 @@ repositories {
     mavenCentral()
 }
 
-dependencyManagement {
-    imports {
-        mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.6")
-    }
-}
-
 dependencies {
-    implementation("org.springframework.modulith:spring-modulith-starter-core")
-    testImplementation("org.springframework.modulith:spring-modulith-starter-test")
-    testImplementation("org.springframework.modulith:spring-modulith-docs")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")

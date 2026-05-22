@@ -32,6 +32,15 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     private final RedisScript<Long> rollbackScript;
 
     private static final String KEY_PREFIX = "auction:";
+    private static final String FIELD_STATUS = "status";
+    private static final String FIELD_PRICE = "price";
+    private static final String FIELD_END_TIME = "endTime";
+    private static final String FIELD_WINNER = "winner";
+    private static final String FIELD_SELLER_ID = "sellerId";
+    private static final String FIELD_STARTING_PRICE = "startingPrice";
+    private static final String FIELD_RESERVE_PRICE = "reservePrice";
+    private static final String FIELD_MIN_BID_INCREMENT = "minBidIncrement";
+    private static final String FIELD_START_TIME = "startTime";
     private static final String EXPIRY_SET_KEY = "auction:expiry";
 
     private String key(UUID listingId) {
@@ -129,7 +138,7 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     public void cacheAuction(UUID listingId, ListingInfo info) {
         String redisKey = key(listingId);
 
-        Boolean inserted = redis.opsForHash().putIfAbsent(redisKey, "status", info.status().name());
+        Boolean inserted = redis.opsForHash().putIfAbsent(redisKey, FIELD_STATUS, info.status().name());
         if (Boolean.FALSE.equals(inserted)) {
             return; // already cached, skip
         }
@@ -143,16 +152,16 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
 
         long bidCount = bidRepository.countByListing(listingId);
         redis.opsForHash().putAll(redisKey, Map.of(
-                "price", String.valueOf(price),
-                "endTime", String.valueOf(endTime),
-                "status", info.status().name(),
-                "winner", winner,
+                FIELD_PRICE, String.valueOf(price),
+                FIELD_END_TIME, String.valueOf(endTime),
+                FIELD_STATUS, info.status().name(),
+                FIELD_WINNER, winner,
                 "maxAmount", String.valueOf(maxAmount),
-                "sellerId", info.sellerId().toString(),
-                "startingPrice", String.valueOf(info.startingPrice().longValue()),
-                "reservePrice", info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
-                "minBidIncrement", String.valueOf(info.minBidIncrement().longValue()),
-                "startTime", String.valueOf(toEpochMillis(info.startTime()))
+                FIELD_SELLER_ID, info.sellerId().toString(),
+                FIELD_STARTING_PRICE, String.valueOf(info.startingPrice().longValue()),
+                FIELD_RESERVE_PRICE, info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
+                FIELD_MIN_BID_INCREMENT, String.valueOf(info.minBidIncrement().longValue()),
+                FIELD_START_TIME, String.valueOf(toEpochMillis(info.startTime()))
         ));
         redis.opsForHash().put(redisKey, "bidCount", String.valueOf(bidCount));
 
@@ -169,16 +178,16 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
         String winner = info.winnerId() != null ? info.winnerId().toString() : "";
         long maxAmount = winner.isBlank() ? price : resolveHighestMaxAmount(listingId, price);
         redis.opsForHash().putAll(key(listingId), Map.of(
-                "price", String.valueOf(price),
-                "endTime", String.valueOf(endTime),
-                "status", info.status().name(),
-                "winner", winner,
+                FIELD_PRICE, String.valueOf(price),
+                FIELD_END_TIME, String.valueOf(endTime),
+                FIELD_STATUS, info.status().name(),
+                FIELD_WINNER, winner,
                 "maxAmount", String.valueOf(maxAmount),
-                "sellerId", info.sellerId().toString(),
-                "startingPrice", String.valueOf(info.startingPrice().longValue()),
-                "reservePrice", info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
-                "minBidIncrement", String.valueOf(info.minBidIncrement().longValue()),
-                "startTime", String.valueOf(toEpochMillis(info.startTime()))
+                FIELD_SELLER_ID, info.sellerId().toString(),
+                FIELD_STARTING_PRICE, String.valueOf(info.startingPrice().longValue()),
+                FIELD_RESERVE_PRICE, info.reservePrice() != null ? String.valueOf(info.reservePrice().longValue()) : "0",
+                FIELD_MIN_BID_INCREMENT, String.valueOf(info.minBidIncrement().longValue()),
+                FIELD_START_TIME, String.valueOf(toEpochMillis(info.startTime()))
         ));
 
         // Update expiry sorted set (anti-snipe extends end time)
@@ -205,14 +214,14 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
 
     @Override
     public long getAuctionEndTime(UUID listingId) {
-        Object endTime = redis.opsForHash().get(key(listingId), "endTime");
+        Object endTime = redis.opsForHash().get(key(listingId), FIELD_END_TIME);
         return endTime != null ? Long.parseLong(endTime.toString()) : 0L;
     }
 
     @Override
     public LiveAuctionState getAuctionLiveState(UUID listingId) {
         List<Object> values = redis.opsForHash().multiGet(key(listingId),
-                java.util.List.of("price", "winner"));
+                java.util.List.of(FIELD_PRICE, FIELD_WINNER));
         Object price = values.get(0);
         if (price == null) return null;
         String winner = values.get(1) != null ? values.get(1).toString() : "";
@@ -222,8 +231,8 @@ public class RedisConcurrencyAdapter implements ConcurrencyPort {
     @Override
     public ListingPort.ListingInfo getListingInfoFromCache(UUID listingId) {
         List<Object> values = redis.opsForHash().multiGet(key(listingId), java.util.List.of(
-                "sellerId", "status", "startingPrice", "price",
-                "reservePrice", "minBidIncrement", "startTime", "endTime", "winner"));
+                FIELD_SELLER_ID, FIELD_STATUS, FIELD_STARTING_PRICE, FIELD_PRICE,
+                FIELD_RESERVE_PRICE, FIELD_MIN_BID_INCREMENT, FIELD_START_TIME, FIELD_END_TIME, FIELD_WINNER));
         if (values.get(0) == null) return null;
         try {
             UUID sellerId = UUID.fromString(values.get(0).toString());
