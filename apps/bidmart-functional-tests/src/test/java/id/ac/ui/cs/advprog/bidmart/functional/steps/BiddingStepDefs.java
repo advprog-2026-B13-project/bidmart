@@ -43,6 +43,26 @@ public class BiddingStepDefs {
 
         // Cookie is HttpOnly (name: bm_access_token) so REST Assured won't receive it; read from response body
         accessToken = response.jsonPath().getString("data.accessToken");
+
+        // Session limit (CONFIRMATION_TOKEN strategy) reached: functional tests accumulate active
+        // sessions across CI runs, so confirm replacing the oldest to obtain a usable token.
+        if (accessToken == null || accessToken.isBlank()) {
+            String replacementToken = response.jsonPath().getString("data.sessionReplacementToken");
+            if (replacementToken != null && !replacementToken.isBlank()) {
+                Response confirm = given()
+                        .contentType("application/json")
+                        .body(Map.of(
+                                "sessionReplacementToken", replacementToken,
+                                "replaceOldestSession", true))
+                        .post("/api/auth/confirm-session-replacement");
+
+                assertThat(confirm.statusCode())
+                        .as("Session replacement confirmation failed")
+                        .isEqualTo(200);
+                accessToken = confirm.jsonPath().getString("data.accessToken");
+            }
+        }
+
         assertThat(accessToken)
                 .as("accessToken must be present (cookie or body)")
                 .isNotBlank();
