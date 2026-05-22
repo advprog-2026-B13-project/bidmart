@@ -118,10 +118,11 @@ export default function NewListingPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
           <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+            <label htmlFor="title" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
               Title <span className="text-hot">*</span>
             </label>
             <input
+              id="title"
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
@@ -133,7 +134,7 @@ export default function NewListingPage() {
 
           {/* Category */}
           <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+            <label htmlFor="categoryId" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
               Category <span className="text-hot">*</span>
             </label>
             {isLoadingCategories ? (
@@ -141,6 +142,7 @@ export default function NewListingPage() {
             ) : (
               <>
                 <select
+                  id="categoryId"
                   value={categoryId}
                   onChange={e => setCategoryId(e.target.value ? Number(e.target.value) : "")}
                   className={inputClass("categoryId")}
@@ -157,10 +159,11 @@ export default function NewListingPage() {
 
           {/* Description */}
           <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+            <label htmlFor="description" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
               Description <span className="text-hot">*</span>
             </label>
             <textarea
+              id="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={5}
@@ -175,10 +178,11 @@ export default function NewListingPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4">Pricing</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="startingPrice" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Starting Price (IDR) <span className="text-hot">*</span>
                 </label>
                 <input
+                  id="startingPrice"
                   type="number"
                   min="0"
                   value={startingPrice}
@@ -189,10 +193,11 @@ export default function NewListingPage() {
                 {errors.startingPrice && <p className="mt-1 text-xs font-bold text-hot">{errors.startingPrice}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="reservePrice" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Reserve Price (IDR) <span className="text-hot">*</span>
                 </label>
                 <input
+                  id="reservePrice"
                   type="number"
                   min="0"
                   value={reservePrice}
@@ -203,10 +208,11 @@ export default function NewListingPage() {
                 {errors.reservePrice && <p className="mt-1 text-xs font-bold text-hot">{errors.reservePrice}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="minBidIncrement" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Min Bid Increment (IDR) <span className="text-hot">*</span>
                 </label>
                 <input
+                  id="minBidIncrement"
                   type="number"
                   min="1"
                   value={minBidIncrement}
@@ -229,10 +235,11 @@ export default function NewListingPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4">Auction Timing</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="startTime" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   Start Time <span className="text-hot">*</span>
                 </label>
                 <input
+                  id="startTime"
                   type="datetime-local"
                   value={startTime}
                   onChange={e => setStartTime(e.target.value)}
@@ -241,10 +248,11 @@ export default function NewListingPage() {
                 {errors.startTime && <p className="mt-1 text-xs font-bold text-hot">{errors.startTime}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                <label htmlFor="endTime" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
                   End Time <span className="text-hot">*</span>
                 </label>
                 <input
+                  id="endTime"
                   type="datetime-local"
                   value={endTime}
                   onChange={e => setEndTime(e.target.value)}
@@ -257,10 +265,11 @@ export default function NewListingPage() {
 
           {/* Image URL */}
           <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0_#0A0A0A]">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+            <label htmlFor="imageUrl" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
               Image URL <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <input
+              id="imageUrl"
               type="url"
               value={imageUrl}
               onChange={e => setImageUrl(e.target.value)}

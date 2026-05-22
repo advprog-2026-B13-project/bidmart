@@ -152,7 +152,7 @@ function ImageGallery({ images, title }: { images: string[]; title: string }) {
         <div className="aspect-4/3 bg-gray-100">
           <img
             src={validImages[active]}
-            alt={`${title} - Image ${active + 1}`}
+            alt={`${title} - ${active + 1}`}
             className="w-full h-full object-cover"
           />
         </div>

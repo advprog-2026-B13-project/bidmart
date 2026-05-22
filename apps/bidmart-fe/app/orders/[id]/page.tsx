@@ -372,9 +372,10 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
                         Please enter the tracking number (resi) to ship the item to the buyer.
                       </p>
                       <div className="max-w-md space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Tracking Number / Resi</label>
+                        <label htmlFor="trackingInput" className="text-[10px] font-black uppercase tracking-widest text-gray-500">Tracking Number / Resi</label>
                         <input
                           type="text"
+                          id="trackingInput"
                           value={trackingInput}
                           onChange={(e) => setTrackingInput(e.target.value)}
                           placeholder="e.g. JNE123456789"

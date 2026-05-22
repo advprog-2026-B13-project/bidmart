@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { SubmitEventHandler, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -93,7 +93,7 @@ export default function AdminRolesPage() {
     });
   };
 
-  const handleCreateRole = async (event: React.FormEvent) => {
+  const handleCreateRole: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
     setError("");
     setSuccess("");
@@ -141,7 +141,7 @@ export default function AdminRolesPage() {
   };
 
   const handleDeleteRole = async (roleId: number, roleLabel: string) => {
-    if (!window.confirm(`Delete role ${roleLabel}?`)) {
+    if (!globalThis.confirm(`Delete role ${roleLabel}?`)) {
       return;
     }
 
@@ -188,8 +188,9 @@ export default function AdminRolesPage() {
           <h2 className="text-xl font-black uppercase tracking-tight mb-4">Create Role</h2>
           <form onSubmit={handleCreateRole} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Role Name</label>
+              <label htmlFor="name" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Role Name</label>
               <input
+                id="name"
                 value={roleName}
                 onChange={(event) => setRoleName(event.target.value)}
                 className="input"
@@ -198,11 +199,12 @@ export default function AdminRolesPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Permissions</label>
+              <label htmlFor="permissions" className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Permissions</label>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 border-2 border-black p-3 bg-white">
                 {permissions.map((permission) => (
                   <label key={permission} className="flex items-center gap-2 text-sm font-medium">
                     <input
+                      id="permissions"
                       type="checkbox"
                       checked={selectedPermissions.includes(permission)}
                       onChange={() => togglePermissionSelection(permission)}
@@ -225,54 +227,82 @@ export default function AdminRolesPage() {
 
           {isLoading ? (
             <div className="card p-5 font-bold text-sm uppercase text-gray-600">Loading roles...</div>
-          ) : roles.length === 0 ? (
-            <div className="card p-5 font-bold text-sm uppercase text-gray-600">No roles found.</div>
           ) : (
-            roles.map((role) => (
-              <div key={role.roleId} className="card p-5 space-y-4">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Role ID {role.roleId}</p>
-                    <h3 className="text-2xl font-black uppercase tracking-tight">{role.roleName}</h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteRole(role.roleId, role.roleName)}
-                    disabled={deletingRoleId === role.roleId}
-                    className="btn text-xs font-bold uppercase"
-                  >
-                    {deletingRoleId === role.roleId ? "Deleting..." : "Delete Role"}
-                  </button>
-                </div>
-
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 border-2 border-black p-3 bg-white">
-                  {permissions.map((permission) => (
-                    <label key={`${role.roleId}-${permission}`} className="flex items-center gap-2 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        checked={(draftPermissions[role.roleId] || []).includes(permission)}
-                        onChange={() => toggleRoleDraftPermission(role.roleId, permission)}
-                        disabled={!permissionSet.has(permission)}
-                        className="w-4 h-4"
-                      />
-                      <span>{permission}</span>
-                    </label>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleSavePermissions(role.roleId)}
-                  disabled={savingRoleId === role.roleId}
-                  className="btn btn-black text-xs font-bold uppercase"
-                >
-                  {savingRoleId === role.roleId ? "Saving..." : "Save Permissions"}
-                </button>
-              </div>
-            ))
+            <RolesList
+              roles={roles}
+              permissions={permissions}
+              draftPermissions={draftPermissions}
+              permissionSet={permissionSet}
+              toggleRoleDraftPermission={toggleRoleDraftPermission}
+              handleDeleteRole={handleDeleteRole}
+              deletingRoleId={deletingRoleId}
+              handleSavePermissions={handleSavePermissions}
+              savingRoleId={savingRoleId}
+            />
           )}
         </section>
       </div>
     </div>
+  );
+}
+
+function RolesList({ roles, permissions, draftPermissions, permissionSet, toggleRoleDraftPermission, handleDeleteRole, deletingRoleId, handleSavePermissions, savingRoleId }: {
+  roles: AdminRoleResponse[];
+  permissions: string[];
+  draftPermissions: Record<number, string[]>;
+  permissionSet: Set<string>;
+  toggleRoleDraftPermission: (roleId: number, permission: string) => void;
+  handleDeleteRole: (roleId: number, roleLabel: string) => void;
+  deletingRoleId: number | null;
+  handleSavePermissions: (roleId: number) => void;
+  savingRoleId: number | null;
+}) {
+  return (
+    roles.length === 0 ? (
+      <div className="card p-5 font-bold text-sm uppercase text-gray-600">No roles found.</div>
+    ) : (
+      roles.map((role) => (
+        <div key={role.roleId} className="card p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Role ID {role.roleId}</p>
+              <h3 className="text-2xl font-black uppercase tracking-tight">{role.roleName}</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDeleteRole(role.roleId, role.roleName)}
+              disabled={deletingRoleId === role.roleId}
+              className="btn text-xs font-bold uppercase"
+            >
+              {deletingRoleId === role.roleId ? "Deleting..." : "Delete Role"}
+            </button>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 border-2 border-black p-3 bg-white">
+            {permissions.map((permission) => (
+              <label key={`${role.roleId}-${permission}`} className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={(draftPermissions[role.roleId] || []).includes(permission)}
+                  onChange={() => toggleRoleDraftPermission(role.roleId, permission)}
+                  disabled={!permissionSet.has(permission)}
+                  className="w-4 h-4"
+                />
+                <span>{permission}</span>
+              </label>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleSavePermissions(role.roleId)}
+            disabled={savingRoleId === role.roleId}
+            className="btn btn-black text-xs font-bold uppercase"
+          >
+            {savingRoleId === role.roleId ? "Saving..." : "Save Permissions"}
+          </button>
+        </div>
+      ))
+    )
   );
 }

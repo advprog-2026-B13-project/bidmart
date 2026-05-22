@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, SubmitEventHandler } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -114,7 +114,7 @@ export default function AdminCategoriesPage() {
     setForm(emptyForm);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError("");
@@ -130,10 +130,10 @@ export default function AdminCategoriesPage() {
     }
 
     try {
-      if (editingId !== null) {
-        await updateCategory(editingId, payload);
-      } else {
+      if (editingId === null) {
         await createCategory(payload);
+      } else {
+        await updateCategory(editingId, payload);
       }
       closeForm();
       await loadCategories();
@@ -147,7 +147,7 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Delete category "${name}"? This cannot be undone.`,
     );
     if (!confirmed) return;
@@ -196,7 +196,7 @@ export default function AdminCategoriesPage() {
         <div className="flex items-center gap-3 mb-2">
           <Link
             href="/admin"
-            className="w-10 h-10 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all bg-white"
+            className="w-10 h-10 flex items-center justify-center border-2 border-black shadow-[3px_3px_0_#0A0A0A] hover:shadow-[5px_5px_0_#0A0A0A] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all bg-white"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -235,7 +235,147 @@ export default function AdminCategoriesPage() {
               Loading categories...
             </p>
           </div>
-        ) : mainCategories.length === 0 ? (
+        ) : (
+          <CategoryList
+            mainCategories={mainCategories}
+            subCategories={subCategories}
+            expandedIds={expandedIds}
+            toggleExpand={toggleExpand}
+            openCreateForm={openCreateForm}
+            openEditForm={openEditForm}
+            handleDelete={handleDelete}
+            deletingId={deletingId}
+          />
+        )}
+
+        {showForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="max-w-md w-full border-3 border-black bg-white p-6 shadow-[8px_8px_0_#0A0A0A]">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    {editingId === null ? "New" : "Edit"} Category
+                    {form.parentId !== null && " · Subcategory"}
+                  </p>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">
+                    {editingId === null ? "Create Category" : "Edit Category"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:border-black"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="grid gap-4">
+                <div>
+                  <label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    className="input mt-1"
+                    placeholder="e.g. Electronics"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="imageUrl" className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    Image URL
+                  </label>
+                  <input
+                    type="text"
+                    id="imageUrl"
+                    value={form.imageUrl}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, imageUrl: e.target.value }))
+                    }
+                    className="input mt-1"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                {editingId === null && form.parentId === null && (
+                  <div>
+                    <label htmlFor="parentId" className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Parent Category (optional — leave empty for main)
+                    </label>
+                    <select
+                      id="parentId"
+                      value={form.parentId ?? ""}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          parentId: e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        }))
+                      }
+                      className="input mt-1"
+                    >
+                      <option value="">None (Main Category)</option>
+                      {mainCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 mt-2">
+                  <SubmitButton isSubmitting={submitting} editingId={editingId} />
+                  <button
+                    type="button"
+                    onClick={closeForm}
+                    className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubmitButton({ isSubmitting, editingId }: { isSubmitting: boolean; editingId: number | null }) {
+  const editingText = editingId === null ? "Create" : "Update";
+
+  return (
+    <button type="submit" disabled={isSubmitting} className="btn btn-acid text-xs font-bold uppercase tracking-wide">
+      {isSubmitting
+        ? "Saving..."
+        : editingText}
+    </button>
+  );
+}
+
+function CategoryList({ mainCategories, subCategories, expandedIds, toggleExpand, openCreateForm, openEditForm, handleDelete, deletingId }: {
+  mainCategories: CategoryResponse[];
+  subCategories: Record<number, CategoryResponse[]>;
+  expandedIds: Set<number>;
+  toggleExpand: (id: number) => void;
+  openCreateForm: (parentId: number) => void;
+  openEditForm: (cat: CategoryResponse) => void;
+  handleDelete: (id: number, name: string) => void;
+  deletingId: number | null;
+}) {
+  return (
+    mainCategories.length === 0 ? (
           <div className="border-2 border-dashed border-gray-300 bg-gray-50 p-8">
             <p className="text-sm font-bold uppercase tracking-wide text-gray-600">
               No categories found. Create your first category above.
@@ -365,115 +505,6 @@ export default function AdminCategoriesPage() {
               );
             })}
           </div>
-        )}
-
-        {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="max-w-md w-full border-3 border-black bg-white p-6 shadow-[8px_8px_0_#0A0A0A]">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    {editingId !== null ? "Edit" : "New"} Category
-                    {form.parentId !== null && " · Subcategory"}
-                  </p>
-                  <h3 className="text-2xl font-black uppercase tracking-tight">
-                    {editingId !== null ? "Edit Category" : "Create Category"}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:border-black"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="grid gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    className="input mt-1"
-                    placeholder="e.g. Electronics"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    Image URL
-                  </label>
-                  <input
-                    type="text"
-                    value={form.imageUrl}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, imageUrl: e.target.value }))
-                    }
-                    className="input mt-1"
-                    placeholder="https://..."
-                  />
-                </div>
-
-                {editingId === null && form.parentId === null && (
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                      Parent Category (optional — leave empty for main)
-                    </label>
-                    <select
-                      value={form.parentId ?? ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          parentId: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        }))
-                      }
-                      className="input mt-1"
-                    >
-                      <option value="">None (Main Category)</option>
-                      {mainCategories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-3 mt-2">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="btn btn-acid text-xs font-bold uppercase tracking-wide"
-                  >
-                    {submitting
-                      ? "Saving..."
-                      : editingId !== null
-                        ? "Update"
-                        : "Create"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeForm}
-                    className="btn btn-ghost text-xs font-bold uppercase tracking-wide"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        )
   );
 }
